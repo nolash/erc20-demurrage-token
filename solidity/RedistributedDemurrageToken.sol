@@ -23,6 +23,8 @@ contract RedistributedDemurrageToken {
 	event Approval(address indexed _owner, address indexed _spender, uint256 _value);
 	event Mint(address indexed _minter, address indexed _beneficiary, uint256 _amount);
 	event Debug(uint256 _foo);
+	event Taxed(uint256 indexed _period);
+	event Redistribution(address indexed _account, uint256 indexed _period, uint256 _amount);
 
 	constructor(string memory _name, string memory _symbol, uint32 _taxLevel, uint256 _period) {
 		owner = msg.sender;
@@ -56,17 +58,25 @@ contract RedistributedDemurrageToken {
 	}
 
 	function increaseBalance(address _account, uint256 _delta) private returns (bool) {
-		uint256 oldBalance = getBaseBalance(_account);
-		account[_account] &= bytes20(0x00);
-		account[_account] |= bytes32((oldBalance + _delta) & 0x00ffffffffffffffffffffffffffffffffffffffff);
+		uint256 oldBalance;
+		uint256 newBalance;
+		
+		oldBalance = getBaseBalance(_account);
+		newBalance = oldBalance + _delta;
+		account[_account] &= bytes32(0xffffffffffffffffffffffff0000000000000000000000000000000000000000);
+		account[_account] |= bytes32(newBalance & 0x00ffffffffffffffffffffffffffffffffffffffff);
 		return true;
 	}
 
 	function decreaseBalance(address _account, uint256 _delta) private returns (bool) {
-		uint256 oldBalance = getBaseBalance(_account);
+		uint256 oldBalance;
+	       	uint256 newBalance;
+
+		oldBalance = getBaseBalance(_account);	
 		require(oldBalance >= _delta);
-		account[_account] &= bytes20(0x00);
-		account[_account] |= bytes32((oldBalance - _delta) & 0x00ffffffffffffffffffffffffffffffffffffffff);
+		newBalance = oldBalance - _delta;
+		account[_account] &= bytes32(0xffffffffffffffffffffffff0000000000000000000000000000000000000000);
+		account[_account] |= bytes32(newBalance & 0x00ffffffffffffffffffffffffffffffffffffffff);
 		return true;
 	}
 
@@ -93,6 +103,14 @@ contract RedistributedDemurrageToken {
 
 	function toRedistributionPeriod(bytes32 redistribution) public pure returns (uint256) {
 		return uint256(redistribution & 0x00000000000000000000000000000000000000000000000000ffffffffffffff);
+	}
+
+	function toRedistributionSupply(bytes32 redistribution) public pure returns (uint256) {
+		return uint256(redistribution & 0x0000000000ffffffffffffffffffffffffffffffffffffffff00000000000000) >> 56;
+	}
+
+	function toRedistributionParticipants(bytes32 redistribution) public pure returns (uint256) {
+		return uint256(redistribution & 0xffffffffff000000000000000000000000000000000000000000000000000000) >> 216;
 	}
 
 	function redistributionCount() public view returns (uint256) {
@@ -126,14 +144,26 @@ contract RedistributedDemurrageToken {
 		return (block.number - periodStart) / periodDuration + 1;
 	}
 
-	//function checkPeriod() private view returns (bytes32) {
 	function checkPeriod() private view returns (bytes32) {
-		bytes32 lastRedistribution = redistributions[redistributions.length-1];
-		uint256 currentPeriod = this.actualPeriod();
+		bytes32 lastRedistribution;
+		uint256 currentPeriod;
+
+		lastRedistribution =  redistributions[redistributions.length-1];
+		currentPeriod = this.actualPeriod();
 		if (currentPeriod <= toRedistributionPeriod(lastRedistribution)) {
 			return bytes32(0x00);
 		}
 		return lastRedistribution;
+	}
+
+	function accountPeriod(address _account) public returns (uint256) {
+		return (uint256(account[_account]) & 0xffffffffffffffffffffffff0000000000000000000000000000000000000000) >> 160;
+	}
+
+	function registerAccountPeriod(address _account, uint256 _period) private returns (bool) {
+		account[_account] &= 0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff;
+		account[_account] |= bytes32(_period << 160);
+		incrementRedistributionParticipants();
 	}
 
 	function applyTax() public returns (uint256) {
@@ -149,28 +179,53 @@ contract RedistributedDemurrageToken {
 		currentPeriod = toRedistributionPeriod(pendingRedistribution);
 		nextRedistribution = toRedistribution(0, totalSupply, currentPeriod + 1);
 		redistributions.push(nextRedistribution);
+		emit Taxed(currentPeriod);
 		return demurrageModifier;
 	}
 
-	function accountPeriod(address _account) public returns (uint256) {
-		return (uint256(account[_account]) & 0xffffffffffffffffffffffff0000000000000000000000000000000000000000) >> 160;
+	function toReward(address _amount, uint256 _period) public view returns (uint256) {
+		return 1000000 * (((1000000-taxLevel)/1000000) ** _period);
 	}
 
-	function registerAccountPeriod(address _account, uint256 _period) private returns (bool) {
-		account[_account] &= 0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff;
-		account[_account] |= bytes32(_period << 160);
-		incrementRedistributionParticipants();
+	function applyRedistributionOnAccount(address _account) public returns (bool) {
+		bytes32 periodRedistribution;
+		uint256 supply;
+		uint256 participants;
+		uint256 value;
+		uint256 period;
+	       
+		period = accountPeriod(_account);
+		if (period >= actualPeriod()) {
+			return false;
+		}
+		participants = toRedistributionParticipants(periodRedistribution);
+		if (participants == 0) {
+			// TODO: In this case we need to give back to everyone, so we need a total accounts counter
+			revert('0 participants');
+			return true;
+		}
+		supply = toRedistributionSupply(periodRedistribution);
+		value = supply / participants;
+
+		account[_account] &= bytes32(0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff);
+		increaseBalance(_account, value);
+
+		emit Redistribution(_account, period, value);
+		return true;
 	}
 
 	function transfer(address _to, uint256 _value) public returns (bool) {
-		// TODO: Prefer to truncate the result, instead it seems to round to nearest :/
 		uint256 baseValue;
 		bool result;
 
 		applyTax();
+
+		// TODO: Prefer to truncate the result, instead it seems to round to nearest :/
 		baseValue = (_value * 1000000) / demurrageModifier;
 		result = transferBase(msg.sender, _to, baseValue);
-		emit Transfer(msg.sender, _to, _value);
+
+		applyRedistributionOnAccount(msg.sender);
+
 		return result;
 	}
 
