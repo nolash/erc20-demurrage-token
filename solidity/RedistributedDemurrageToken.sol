@@ -122,17 +122,39 @@ contract RedistributedDemurrageToken {
 		return demurrageModifier;
 	}
 
-	function transfer(address _to, uint256 _value) public returns (bool ) {
-		//&uint256 baseValue = (_value * 1000000) / demurrageModifier;
-		uint256 baseValue = (_value * 1000000) / demurrageModifier;
-		bool result = transferBase(_to, baseValue);
+	function accountPeriod(address _account) public returns (uint256) {
+		return (uint256(account[_account]) & 0xffffffffffffffffffffffff0000000000000000000000000000000000000000) >> 160;
+	}
+
+	function saveAccountPeriod(address _account, uint256 _period) private returns (bool) {
+		account[_account] &= 0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff;
+		account[_account] |= bytes32(_period << 160);	
+	}
+
+	function transfer(address _to, uint256 _value) public returns (bool) {
+		// TODO: Prefer to truncate the result, instead it seems to round to nearest :/
+		uint256 baseValue;
+		bool result;
+
+		baseValue = (_value * 1000000) / demurrageModifier;
+		result = transferBase(msg.sender, _to, baseValue);
 		emit Transfer(msg.sender, _to, _value);
 		return result;
 	}
 
-	function transferBase(address _to, uint256 _value) private returns (bool) {
-		decreaseBalance(msg.sender, _value);
-		increaseBalance(_to, _value);
+	function transferBase(address _from, address _to, uint256 _value) private returns (bool) {
+		uint256 period;
+
+		if (!decreaseBalance(msg.sender, _value)) {
+			revert('ERR_TX_DECREASEBALANCE');
+		}
+		if (!increaseBalance(_to, _value)) {
+			revert('ERR_TX_INCREASEBALANCE');
+		}
+		period = actualPeriod();
+		if (accountPeriod(_from) != period) {
+			saveAccountPeriod(_from, period);
+		}
 		return true;
 	}
 }

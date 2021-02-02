@@ -56,14 +56,12 @@ class Test(unittest.TestCase):
         pass
 
 
-    @unittest.skip('foo')
     def test_period(self):
         self.assertEqual(self.contract.functions.actualPeriod().call(), 0)
         self.eth_tester.mine_blocks(PERIOD)
         self.assertEqual(self.contract.functions.actualPeriod().call(), 1)
 
 
-    @unittest.skip('foo')
     def test_mint(self):
         tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], 1024).transact();
         r = self.w3.eth.getTransactionReceipt(tx_hash);
@@ -96,7 +94,6 @@ class Test(unittest.TestCase):
         self.assertEqual(balance_bob, 500);
 
 
-    @unittest.skip('foo')
     def test_apply_tax(self):
         self.eth_tester.mine_blocks(PERIOD)
         tx_hash = self.contract.functions.applyTax().transact()
@@ -111,7 +108,6 @@ class Test(unittest.TestCase):
         self.assertEqual(self.contract.functions.demurrageModifier().call(), 960400)
 
 
-    @unittest.skip('foo')
     def test_tax_balance(self):
         tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], 1000).transact()
         r = self.w3.eth.getTransactionReceipt(tx_hash)
@@ -152,7 +148,20 @@ class Test(unittest.TestCase):
         balance_bob_trunc = int(balance_bob/1000)*1000
         self.assertEqual(balance_bob_trunc, 500000)
 
-    
+
+    def test_period(self):
+        tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], 1024).transact();
+        r = self.w3.eth.getTransactionReceipt(tx_hash);
+        self.assertEqual(r.status, 1);
+
+        self.eth_tester.mine_blocks(PERIOD*10)
+
+        tx_hash = self.contract.functions.transfer(self.w3.eth.accounts[2], 500).transact({'from': self.w3.eth.accounts[1]});
+        r = self.w3.eth.getTransactionReceipt(tx_hash);
+        self.assertEqual(r.status, 1);
+
+        period = self.contract.functions.accountPeriod(self.w3.eth.accounts[1]).call();
+        self.assertEqual(period, 11);
 
 
 if __name__ == '__main__':
