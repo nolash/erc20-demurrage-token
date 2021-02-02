@@ -56,42 +56,42 @@ class Test(unittest.TestCase):
         pass
 
 
-    def test_period(self):
+    def test_hello(self):
         self.assertEqual(self.contract.functions.actualPeriod().call(), 0)
         self.eth_tester.mine_blocks(PERIOD)
         self.assertEqual(self.contract.functions.actualPeriod().call(), 1)
 
 
     def test_mint(self):
-        tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], 1024).transact();
-        r = self.w3.eth.getTransactionReceipt(tx_hash);
-        self.assertEqual(r.status, 1);
+        tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], 1024).transact()
+        r = self.w3.eth.getTransactionReceipt(tx_hash)
+        self.assertEqual(r.status, 1)
 
-        balance = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call();
-        self.assertEqual(balance, 1024);
+        balance = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call()
+        self.assertEqual(balance, 1024)
 
-        tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], 976).transact();
-        r = self.w3.eth.getTransactionReceipt(tx_hash);
-        self.assertEqual(r.status, 1);
+        tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], 976).transact()
+        r = self.w3.eth.getTransactionReceipt(tx_hash)
+        self.assertEqual(r.status, 1)
 
-        balance = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call();
-        self.assertEqual(balance, 2000);
+        balance = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call()
+        self.assertEqual(balance, 2000)
 
 
     def test_transfer(self):
-        tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], 1024).transact();
-        r = self.w3.eth.getTransactionReceipt(tx_hash);
-        self.assertEqual(r.status, 1);
+        tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], 1024).transact()
+        r = self.w3.eth.getTransactionReceipt(tx_hash)
+        self.assertEqual(r.status, 1)
 
-        tx_hash = self.contract.functions.transfer(self.w3.eth.accounts[2], 500).transact({'from': self.w3.eth.accounts[1]});
-        r = self.w3.eth.getTransactionReceipt(tx_hash);
-        self.assertEqual(r.status, 1);
+        tx_hash = self.contract.functions.transfer(self.w3.eth.accounts[2], 500).transact({'from': self.w3.eth.accounts[1]})
+        r = self.w3.eth.getTransactionReceipt(tx_hash)
+        self.assertEqual(r.status, 1)
 
-        balance_alice = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call();
-        self.assertEqual(balance_alice, 524);
+        balance_alice = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call()
+        self.assertEqual(balance_alice, 524)
 
-        balance_bob = self.contract.functions.balanceOf(self.w3.eth.accounts[2]).call();
-        self.assertEqual(balance_bob, 500);
+        balance_bob = self.contract.functions.balanceOf(self.w3.eth.accounts[2]).call()
+        self.assertEqual(balance_bob, 500)
 
 
     def test_apply_tax(self):
@@ -133,7 +133,7 @@ class Test(unittest.TestCase):
         self.assertEqual(r.status, 1)
 
         balance_alice = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call()
-        self.assertEqual(balance_alice, 980000);
+        self.assertEqual(balance_alice, 980000)
 
         tx_hash = self.contract.functions.transfer(self.w3.eth.accounts[2], 500000).transact({'from': self.w3.eth.accounts[1]})
         r = self.w3.eth.getTransactionReceipt(tx_hash)
@@ -147,20 +147,6 @@ class Test(unittest.TestCase):
         balance_bob = self.contract.functions.balanceOf(self.w3.eth.accounts[2]).call()
         balance_bob_trunc = int(balance_bob/1000)*1000
         self.assertEqual(balance_bob_trunc, 500000)
-
-
-    def test_period(self):
-        tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], 1024).transact();
-        r = self.w3.eth.getTransactionReceipt(tx_hash);
-        self.assertEqual(r.status, 1);
-
-        tx_hash = self.contract.functions.transfer(self.w3.eth.accounts[2], 500).transact({'from': self.w3.eth.accounts[1]});
-        r = self.w3.eth.getTransactionReceipt(tx_hash);
-        self.assertEqual(r.status, 1);
-
-        period = self.contract.functions.accountPeriod(self.w3.eth.accounts[1]).call();
-        self.assertEqual(period, 11);
-
 
 if __name__ == '__main__':
     unittest.main()

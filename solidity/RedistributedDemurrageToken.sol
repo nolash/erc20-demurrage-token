@@ -22,6 +22,7 @@ contract RedistributedDemurrageToken {
 	event Transfer(address indexed _from, address indexed _to, uint256 _value);
 	event Approval(address indexed _owner, address indexed _spender, uint256 _value);
 	event Mint(address indexed _minter, address indexed _beneficiary, uint256 _amount);
+	event Debug(uint256 _foo);
 
 	constructor(string memory _name, string memory _symbol, uint32 _taxLevel, uint256 _period) {
 		owner = msg.sender;
@@ -63,6 +64,7 @@ contract RedistributedDemurrageToken {
 
 	function decreaseBalance(address _account, uint256 _delta) private returns (bool) {
 		uint256 oldBalance = getBaseBalance(_account);
+		require(oldBalance >= _delta);
 		account[_account] &= bytes20(0x00);
 		account[_account] |= bytes32((oldBalance - _delta) & 0x00ffffffffffffffffffffffffffffffffffffffff);
 		return true;
@@ -70,7 +72,9 @@ contract RedistributedDemurrageToken {
 
 	function mintTo(address _beneficiary, uint256 _amount) external returns (bool) {
 		require(minter[msg.sender]);
-		
+
+		// TODO: get base amount for minting
+		applyTax();
 		totalSupply += _amount;
 		increaseBalance(_beneficiary, _amount);
 		emit Mint(msg.sender, _beneficiary, _amount);
@@ -88,7 +92,7 @@ contract RedistributedDemurrageToken {
 	}
 
 	function toRedistributionPeriod(bytes32 redistribution) public pure returns (uint256) {
-		return uint256(redistribution & bytes7(0xffffffffffffff));
+		return uint256(redistribution & 0x00000000000000000000000000000000000000000000000000ffffffffffffff);
 	}
 
 	function redistributionCount() public view returns (uint256) {
@@ -104,6 +108,7 @@ contract RedistributedDemurrageToken {
 		currentRedistribution &= 0x0000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 		currentRedistribution |= participants << 216;
 
+		emit Debug(participants);
 		redistributions[redistributions.length-1] = bytes32(currentRedistribution);
 	}
 
@@ -112,19 +117,20 @@ contract RedistributedDemurrageToken {
 
 		currentRedistribution = uint256(redistributions[redistributions.length-1]);
 		currentRedistribution &= 0xffffffffff0000000000000000000000000000000000000000ffffffffffffff;
-		currentRedistribution |= totalSupply << 56; //& 0x0000000000ffffffffffffffffffffffffffffffffffffffff00000000000000;;
+		currentRedistribution |= totalSupply << 56;
 
 		redistributions[redistributions.length-1] = bytes32(currentRedistribution);
 	}
 
 	function actualPeriod() public view returns (uint256) {
-		return (block.number - periodStart) / periodDuration;
+		return (block.number - periodStart) / periodDuration + 1;
 	}
 
+	//function checkPeriod() private view returns (bytes32) {
 	function checkPeriod() private view returns (bytes32) {
 		bytes32 lastRedistribution = redistributions[redistributions.length-1];
 		uint256 currentPeriod = this.actualPeriod();
-		if (currentPeriod < toRedistributionPeriod(lastRedistribution)) {
+		if (currentPeriod <= toRedistributionPeriod(lastRedistribution)) {
 			return bytes32(0x00);
 		}
 		return lastRedistribution;
@@ -137,11 +143,11 @@ contract RedistributedDemurrageToken {
 
 		pendingRedistribution = checkPeriod();
 		if (pendingRedistribution == bytes32(0x00)) {
-			return demurrageModifier;	
+			return demurrageModifier;
 		}
 		demurrageModifier -= (demurrageModifier * taxLevel) / 1000000;
 		currentPeriod = toRedistributionPeriod(pendingRedistribution);
-		nextRedistribution = toRedistribution(0, currentPeriod + 1, 0);
+		nextRedistribution = toRedistribution(0, totalSupply, currentPeriod + 1);
 		redistributions.push(nextRedistribution);
 		return demurrageModifier;
 	}
@@ -161,6 +167,7 @@ contract RedistributedDemurrageToken {
 		uint256 baseValue;
 		bool result;
 
+		applyTax();
 		baseValue = (_value * 1000000) / demurrageModifier;
 		result = transferBase(msg.sender, _to, baseValue);
 		emit Transfer(msg.sender, _to, _value);
