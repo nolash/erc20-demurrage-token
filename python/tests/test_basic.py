@@ -22,6 +22,7 @@ TAX_LEVEL = 10000 * 2 # 2%
 #PERIOD = int(60/BLOCKTIME) * 60 * 24 * 30 # month
 PERIOD = 2
 
+
 class Test(unittest.TestCase):
 
     contract = None
@@ -55,26 +56,103 @@ class Test(unittest.TestCase):
         pass
 
 
+    @unittest.skip('foo')
     def test_period(self):
         self.assertEqual(self.contract.functions.actualPeriod().call(), 0)
         self.eth_tester.mine_blocks(PERIOD)
         self.assertEqual(self.contract.functions.actualPeriod().call(), 1)
 
+
+    @unittest.skip('foo')
+    def test_mint(self):
+        tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], 1024).transact();
+        r = self.w3.eth.getTransactionReceipt(tx_hash);
+        self.assertEqual(r.status, 1);
+
+        balance = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call();
+        self.assertEqual(balance, 1024);
+
+        tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], 976).transact();
+        r = self.w3.eth.getTransactionReceipt(tx_hash);
+        self.assertEqual(r.status, 1);
+
+        balance = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call();
+        self.assertEqual(balance, 2000);
+
+
+    def test_transfer(self):
+        tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], 1024).transact();
+        r = self.w3.eth.getTransactionReceipt(tx_hash);
+        self.assertEqual(r.status, 1);
+
+        tx_hash = self.contract.functions.transfer(self.w3.eth.accounts[2], 500).transact({'from': self.w3.eth.accounts[1]});
+        r = self.w3.eth.getTransactionReceipt(tx_hash);
+        self.assertEqual(r.status, 1);
+
+        balance_alice = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call();
+        self.assertEqual(balance_alice, 524);
+
+        balance_bob = self.contract.functions.balanceOf(self.w3.eth.accounts[2]).call();
+        self.assertEqual(balance_bob, 500);
+
+
+    @unittest.skip('foo')
     def test_apply_tax(self):
-        tx = self.contract.functions.noop().buildTransaction()
-        logg.debug('gas {}'.format(self.w3.eth.estimateGas(tx)))
+        self.eth_tester.mine_blocks(PERIOD)
+        tx_hash = self.contract.functions.applyTax().transact()
+        r = self.w3.eth.getTransactionReceipt(tx_hash)
+        self.assertEqual(self.contract.functions.redistributionCount().call(), 2)
+        self.assertEqual(self.contract.functions.demurrageModifier().call(), 980000)
 
         self.eth_tester.mine_blocks(PERIOD)
-        tx_hash = self.contract.functions.applyTax().transact();
-        r = self.w3.eth.getTransactionReceipt(tx_hash);
-        self.assertEqual(self.contract.functions.redistributionCount().call(), 2);
-        self.assertEqual(self.contract.functions.demurrageModifier().call(), TAX_LEVEL);
+        tx_hash = self.contract.functions.applyTax().transact()
+        r = self.w3.eth.getTransactionReceipt(tx_hash)
+        self.assertEqual(self.contract.functions.redistributionCount().call(), 3)
+        self.assertEqual(self.contract.functions.demurrageModifier().call(), 960400)
+
+
+    @unittest.skip('foo')
+    def test_tax_balance(self):
+        tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], 1000).transact()
+        r = self.w3.eth.getTransactionReceipt(tx_hash)
+        self.assertEqual(r.status, 1)
 
         self.eth_tester.mine_blocks(PERIOD)
-        tx_hash = self.contract.functions.applyTax().transact();
-        r = self.w3.eth.getTransactionReceipt(tx_hash);
-        self.assertEqual(self.contract.functions.redistributionCount().call(), 3);
-        self.assertEqual(self.contract.functions.demurrageModifier().call(), TAX_LEVEL * 2);
+        tx_hash = self.contract.functions.applyTax().transact()
+        r = self.w3.eth.getTransactionReceipt(tx_hash)
+        self.assertEqual(r.status, 1)
+
+        balance = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call()
+        self.assertEqual(balance, 980)
+
+    
+    def test_taxed_transfer(self):
+        tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], 1000000).transact()
+        r = self.w3.eth.getTransactionReceipt(tx_hash)
+        self.assertEqual(r.status, 1)
+
+        self.eth_tester.mine_blocks(PERIOD)
+        tx_hash = self.contract.functions.applyTax().transact()
+        r = self.w3.eth.getTransactionReceipt(tx_hash)
+        self.assertEqual(r.status, 1)
+
+        balance_alice = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call()
+        self.assertEqual(balance_alice, 980000);
+
+        tx_hash = self.contract.functions.transfer(self.w3.eth.accounts[2], 500000).transact({'from': self.w3.eth.accounts[1]})
+        r = self.w3.eth.getTransactionReceipt(tx_hash)
+        self.assertEqual(r.status, 1)
+
+        balance_alice = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call()
+        balance_alice_trunc = int(balance_alice/1000)*1000
+        self.assertEqual(balance_alice_trunc, 480000)
+
+        balance_bob = self.contract.functions.balanceOf(self.w3.eth.accounts[2]).call()
+        balance_bob_trunc = int(balance_bob/1000)*1000
+        self.assertEqual(balance_bob_trunc, 500000)
+
+    
+
 
 if __name__ == '__main__':
     unittest.main()
