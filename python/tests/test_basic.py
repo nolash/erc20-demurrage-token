@@ -141,6 +141,7 @@ class Test(unittest.TestCase):
 
         tx_hash = self.contract.functions.transfer(self.w3.eth.accounts[2], 500000).transact({'from': self.w3.eth.accounts[1]})
         r = self.w3.eth.getTransactionReceipt(tx_hash)
+        logg.debug('r {}'.format(r))
         self.assertEqual(r.status, 1)
 
         balance_alice = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call()
