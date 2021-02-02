@@ -15,7 +15,7 @@ contract RedistributedDemurrageToken {
 	uint256 public taxLevel; // PPM
 	uint256 public demurrageModifier; // PPM
 
-	bytes32[] redistributions; // uint40(participants) uint160(value) uint56(period) 
+	bytes32[] public redistributions; // uint40(participants) uint160(value) uint56(period) 
 	mapping (address => bytes32) account;
 	mapping (address => bool) minter;
 
@@ -33,7 +33,7 @@ contract RedistributedDemurrageToken {
 		symbol = _symbol;
 		decimals = 6;
 		demurrageModifier = 1000000;
-		bytes32 initialRedistribution = toRedistribution(0, 1, 0);
+		bytes32 initialRedistribution = toRedistribution(0, 0, 1);
 		redistributions.push(initialRedistribution);
 	}
 
@@ -71,16 +71,19 @@ contract RedistributedDemurrageToken {
 	function mintTo(address _beneficiary, uint256 _amount) external returns (bool) {
 		require(minter[msg.sender]);
 		
+		totalSupply += _amount;
 		increaseBalance(_beneficiary, _amount);
 		emit Mint(msg.sender, _beneficiary, _amount);
+		saveRedistributionSupply();
 		return true;
 	}
 
 	function toRedistribution(uint256 _participants, uint256 _value, uint256 _period) private pure returns(bytes32) {
 		bytes32 redistribution;
-		redistribution |= bytes32((_participants & 0xffffffffff) << 215);
-		redistribution |= bytes32((_value & 0xffffffffffffffffffffffff) << 55);
-		redistribution |= bytes32((_period & 0xffffffffffffff) << 55);
+
+		redistribution |= bytes32((_participants & 0xffffffffff) << 216);
+		redistribution |= bytes32((_value & 0xffffffffffffffffffffffff) << 56);
+		redistribution |= bytes32(_period & 0xffffffffffffff);
 		return redistribution;
 	}
 
@@ -90,6 +93,28 @@ contract RedistributedDemurrageToken {
 
 	function redistributionCount() public view returns (uint256) {
 		return redistributions.length;
+	}
+
+	function incrementRedistributionParticipants() private returns (bool) {
+		uint256 currentRedistribution;
+		uint256 participants;
+
+		currentRedistribution = uint256(redistributions[redistributions.length-1]);
+		participants = ((currentRedistribution & 0xffffffffff000000000000000000000000000000000000000000000000000000) >> 216) + 1;
+		currentRedistribution &= 0x0000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffff;
+		currentRedistribution |= participants << 216;
+
+		redistributions[redistributions.length-1] = bytes32(currentRedistribution);
+	}
+
+	function saveRedistributionSupply() private returns (bool) {
+		uint256 currentRedistribution;
+
+		currentRedistribution = uint256(redistributions[redistributions.length-1]);
+		currentRedistribution &= 0xffffffffff0000000000000000000000000000000000000000ffffffffffffff;
+		currentRedistribution |= totalSupply << 56; //& 0x0000000000ffffffffffffffffffffffffffffffffffffffff00000000000000;;
+
+		redistributions[redistributions.length-1] = bytes32(currentRedistribution);
 	}
 
 	function actualPeriod() public view returns (uint256) {
@@ -115,7 +140,6 @@ contract RedistributedDemurrageToken {
 			return demurrageModifier;	
 		}
 		demurrageModifier -= (demurrageModifier * taxLevel) / 1000000;
-		// this should increment for one single period at at time
 		currentPeriod = toRedistributionPeriod(pendingRedistribution);
 		nextRedistribution = toRedistribution(0, currentPeriod + 1, 0);
 		redistributions.push(nextRedistribution);
@@ -126,9 +150,10 @@ contract RedistributedDemurrageToken {
 		return (uint256(account[_account]) & 0xffffffffffffffffffffffff0000000000000000000000000000000000000000) >> 160;
 	}
 
-	function saveAccountPeriod(address _account, uint256 _period) private returns (bool) {
+	function registerAccountPeriod(address _account, uint256 _period) private returns (bool) {
 		account[_account] &= 0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff;
-		account[_account] |= bytes32(_period << 160);	
+		account[_account] |= bytes32(_period << 160);
+		incrementRedistributionParticipants();
 	}
 
 	function transfer(address _to, uint256 _value) public returns (bool) {
@@ -153,7 +178,7 @@ contract RedistributedDemurrageToken {
 		}
 		period = actualPeriod();
 		if (accountPeriod(_from) != period) {
-			saveAccountPeriod(_from, period);
+			registerAccountPeriod(_from, period);
 		}
 		return true;
 	}

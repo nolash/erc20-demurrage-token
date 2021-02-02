@@ -154,8 +154,6 @@ class Test(unittest.TestCase):
         r = self.w3.eth.getTransactionReceipt(tx_hash);
         self.assertEqual(r.status, 1);
 
-        self.eth_tester.mine_blocks(PERIOD*10)
-
         tx_hash = self.contract.functions.transfer(self.w3.eth.accounts[2], 500).transact({'from': self.w3.eth.accounts[1]});
         r = self.w3.eth.getTransactionReceipt(tx_hash);
         self.assertEqual(r.status, 1);
@@ -166,5 +164,3 @@ class Test(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
-    
