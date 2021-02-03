@@ -15,8 +15,8 @@ contract RedistributedDemurrageToken {
 	uint256 public taxLevel; // PPM
 	uint256 public demurrageModifier; // PPM
 
-	bytes32[] public redistributions; // uint40(participants) uint160(value) uint56(period) 
-	mapping (address => bytes32) account;
+	bytes32[] public redistributions; // uint40(participants) | uint160(value) | uint56(period) 
+	mapping (address => bytes32) account; // uint12(period) | uint160(value)
 	mapping (address => bool) minter;
 
 	event Transfer(address indexed _from, address indexed _to, uint256 _value);
@@ -40,12 +40,14 @@ contract RedistributedDemurrageToken {
 		redistributions.push(initialRedistribution);
 	}
 
+	/// Given address will be allowed to call the mintTo() function
 	function addMinter(address _minter) public returns (bool) {
 		require(msg.sender == owner);
 		minter[_minter] = true;
 		return true;
 	}
 	
+	/// ERC20
 	function balanceOf(address _account) public view returns (uint256) {
 		uint256 baseBalance = getBaseBalance(_account);
 		uint256 inverseModifier = 1000000 - demurrageModifier;
@@ -53,10 +55,12 @@ contract RedistributedDemurrageToken {
 		return baseBalance - balanceModifier;
 	}
 
+	/// Balance unmodified by demurrage
 	function getBaseBalance(address _account) private view returns (uint256) {
 		return uint256(account[_account]) & 0x00ffffffffffffffffffffffffffffffffffffffff;
 	}
 
+	/// Increases base balance for a single account
 	function increaseBalance(address _account, uint256 _delta) private returns (bool) {
 		uint256 oldBalance;
 		uint256 newBalance;
@@ -68,6 +72,7 @@ contract RedistributedDemurrageToken {
 		return true;
 	}
 
+	/// Decreases base balance for a single account
 	function decreaseBalance(address _account, uint256 _delta) private returns (bool) {
 		uint256 oldBalance;
 	       	uint256 newBalance;
@@ -80,6 +85,8 @@ contract RedistributedDemurrageToken {
 		return true;
 	}
 
+	// Creates new tokens out of thin air, and allocates them to the given address
+	// Triggers tax
 	function mintTo(address _beneficiary, uint256 _amount) external returns (bool) {
 		require(minter[msg.sender]);
 
@@ -92,6 +99,7 @@ contract RedistributedDemurrageToken {
 		return true;
 	}
 
+	// Deserializes the redistribution word
 	function toRedistribution(uint256 _participants, uint256 _value, uint256 _period) private pure returns(bytes32) {
 		bytes32 redistribution;
 
@@ -101,22 +109,27 @@ contract RedistributedDemurrageToken {
 		return redistribution;
 	}
 
+	// Serializes the demurrage period part of the redistribution word
 	function toRedistributionPeriod(bytes32 redistribution) public pure returns (uint256) {
 		return uint256(redistribution & 0x00000000000000000000000000000000000000000000000000ffffffffffffff);
 	}
 
+	// Serializes the supply part of the redistribution word
 	function toRedistributionSupply(bytes32 redistribution) public pure returns (uint256) {
 		return uint256(redistribution & 0x0000000000ffffffffffffffffffffffffffffffffffffffff00000000000000) >> 56;
 	}
 
+	// Serializes the number of participants part of the redistribution word
 	function toRedistributionParticipants(bytes32 redistribution) public pure returns (uint256) {
 		return uint256(redistribution & 0xffffffffff000000000000000000000000000000000000000000000000000000) >> 216;
 	}
 
+	// Client accessor to the redistributions array length
 	function redistributionCount() public view returns (uint256) {
 		return redistributions.length;
 	}
 
+	// Add number of participants for the current redistribution period by one
 	function incrementRedistributionParticipants() private returns (bool) {
 		uint256 currentRedistribution;
 		uint256 participants;
@@ -130,6 +143,7 @@ contract RedistributedDemurrageToken {
 		redistributions[redistributions.length-1] = bytes32(currentRedistribution);
 	}
 
+	// Save the current total supply amount to the current redistribution period
 	function saveRedistributionSupply() private returns (bool) {
 		uint256 currentRedistribution;
 
@@ -140,10 +154,12 @@ contract RedistributedDemurrageToken {
 		redistributions[redistributions.length-1] = bytes32(currentRedistribution);
 	}
 
+	// Get the demurrage period of the current block number
 	function actualPeriod() public view returns (uint256) {
 		return (block.number - periodStart) / periodDuration + 1;
 	}
 
+	// Add an entered demurrage period to the redistribution array
 	function checkPeriod() private view returns (bytes32) {
 		bytes32 lastRedistribution;
 		uint256 currentPeriod;
@@ -156,16 +172,20 @@ contract RedistributedDemurrageToken {
 		return lastRedistribution;
 	}
 
+	// Deserialize the pemurrage period for the given account is participating in
 	function accountPeriod(address _account) public returns (uint256) {
 		return (uint256(account[_account]) & 0xffffffffffffffffffffffff0000000000000000000000000000000000000000) >> 160;
 	}
 
+	// Save the given demurrage period as the currently participation period for the given address
 	function registerAccountPeriod(address _account, uint256 _period) private returns (bool) {
 		account[_account] &= 0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff;
 		account[_account] |= bytes32(_period << 160);
 		incrementRedistributionParticipants();
 	}
 
+	// Recalculate the demurrage modifier for the new period
+	// After this, all REPORTED balances will have been reduced by the corresponding ratio (but the totalsupply stays the same)
 	function applyTax() public returns (uint256) {
 		bytes32 pendingRedistribution;
 		bytes32 nextRedistribution;
@@ -183,6 +203,7 @@ contract RedistributedDemurrageToken {
 		return demurrageModifier;
 	}
 
+	// Calculate a value reduced by demurrage by the given period
 	function toTaxPeriodAmount(uint256 _value, uint256 _period) public view returns (uint256) {
 		uint256 valueFactor;
 	      
@@ -196,6 +217,8 @@ contract RedistributedDemurrageToken {
 		return (valueFactor * _value) / 1000000;
 	}
 
+	// If the given account is participating in a period and that period has been crossed
+	// THEN increase the base value of the account with its share of the value reduction of the period
 	function applyRedistributionOnAccount(address _account) public returns (bool) {
 		bytes32 periodRedistribution;
 		uint256 supply;
@@ -226,6 +249,7 @@ contract RedistributedDemurrageToken {
 		return true;
 	}
 
+	// ERC20, triggers tax and/or redistribution
 	function transfer(address _to, uint256 _value) public returns (bool) {
 		uint256 baseValue;
 		bool result;
@@ -240,6 +264,7 @@ contract RedistributedDemurrageToken {
 		return result;
 	}
 
+	// ERC20 transfer backend for transfer, transferFrom
 	function transferBase(address _from, address _to, uint256 _value) private returns (bool) {
 		uint256 period;
 
