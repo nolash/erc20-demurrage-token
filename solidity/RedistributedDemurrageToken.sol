@@ -21,10 +21,10 @@ contract RedistributedDemurrageToken {
 
 	event Transfer(address indexed _from, address indexed _to, uint256 _value);
 	event Approval(address indexed _owner, address indexed _spender, uint256 _value);
-	event Mint(address indexed _minter, address indexed _beneficiary, uint256 _amount);
-	event Debug(uint256 _foo);
+	event Mint(address indexed _minter, address indexed _beneficiary, uint256 _value);
+	//event Debug(uint256 _foo);
 	event Taxed(uint256 indexed _period);
-	event Redistribution(address indexed _account, uint256 indexed _period, uint256 _amount);
+	event Redistribution(address indexed _account, uint256 indexed _period, uint256 _value);
 
 	constructor(string memory _name, string memory _symbol, uint32 _taxLevel, uint256 _period) {
 		owner = msg.sender;
@@ -126,7 +126,7 @@ contract RedistributedDemurrageToken {
 		currentRedistribution &= 0x0000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 		currentRedistribution |= participants << 216;
 
-		emit Debug(participants);
+		//emit Debug(participants);
 		redistributions[redistributions.length-1] = bytes32(currentRedistribution);
 	}
 
@@ -183,29 +183,41 @@ contract RedistributedDemurrageToken {
 		return demurrageModifier;
 	}
 
-	function toReward(address _amount, uint256 _period) public view returns (uint256) {
-		return 1000000 * (((1000000-taxLevel)/1000000) ** _period);
+	function toTaxPeriodAmount(uint256 _value, uint256 _period) public view returns (uint256) {
+		uint256 valueFactor;
+	      
+	       	// TODO: doesn't work for solidity as floats are missing and using ints linearly increases the order of magnitude  	
+		// valueFactor = 1000000 * (((1000000-taxLevel)/1000000) ** _period);
+		valueFactor = 1000000;
+		for (uint256 i = 0; i < _period; i++) {
+			valueFactor = (valueFactor * taxLevel) / 1000000;
+		}
+
+		return (valueFactor * _value) / 1000000;
 	}
 
 	function applyRedistributionOnAccount(address _account) public returns (bool) {
 		bytes32 periodRedistribution;
 		uint256 supply;
 		uint256 participants;
+		uint256 baseValue;
 		uint256 value;
 		uint256 period;
 	       
 		period = accountPeriod(_account);
-		if (period >= actualPeriod()) {
+		if (period == 0 || period >= actualPeriod()) {
 			return false;
 		}
+		periodRedistribution = redistributions[period-1];
 		participants = toRedistributionParticipants(periodRedistribution);
 		if (participants == 0) {
 			// TODO: In this case we need to give back to everyone, so we need a total accounts counter
 			revert('0 participants');
-			return true;
 		}
 		supply = toRedistributionSupply(periodRedistribution);
-		value = supply / participants;
+		// TODO: Make sure value for balance increases round down, and that we can do a single allocation to a sink account with the difference. We can use the highest bit in "participants" for that.
+		baseValue = supply / participants;
+		value = toTaxPeriodAmount(baseValue, period);
 
 		account[_account] &= bytes32(0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff);
 		increaseBalance(_account, value);
@@ -219,12 +231,11 @@ contract RedistributedDemurrageToken {
 		bool result;
 
 		applyTax();
+		applyRedistributionOnAccount(msg.sender);
 
 		// TODO: Prefer to truncate the result, instead it seems to round to nearest :/
 		baseValue = (_value * 1000000) / demurrageModifier;
 		result = transferBase(msg.sender, _to, baseValue);
-
-		applyRedistributionOnAccount(msg.sender);
 
 		return result;
 	}
@@ -232,14 +243,14 @@ contract RedistributedDemurrageToken {
 	function transferBase(address _from, address _to, uint256 _value) private returns (bool) {
 		uint256 period;
 
-		if (!decreaseBalance(msg.sender, _value)) {
+		if (!decreaseBalance(_from, _value)) {
 			revert('ERR_TX_DECREASEBALANCE');
 		}
 		if (!increaseBalance(_to, _value)) {
 			revert('ERR_TX_INCREASEBALANCE');
 		}
 		period = actualPeriod();
-		if (accountPeriod(_from) != period) {
+		if (_value > 0 && accountPeriod(_from) != period) {
 			registerAccountPeriod(_from, period);
 		}
 		return true;

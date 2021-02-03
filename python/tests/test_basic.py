@@ -20,7 +20,7 @@ testdir = os.path.dirname(__file__)
 #BLOCKTIME = 5 # seconds
 TAX_LEVEL = 10000 * 2 # 2%
 #PERIOD = int(60/BLOCKTIME) * 60 * 24 * 30 # month
-PERIOD = 2
+PERIOD = 10
 
 
 class Test(unittest.TestCase):
@@ -57,9 +57,9 @@ class Test(unittest.TestCase):
 
 
     def test_hello(self):
-        self.assertEqual(self.contract.functions.actualPeriod().call(), 0)
-        self.eth_tester.mine_blocks(PERIOD)
         self.assertEqual(self.contract.functions.actualPeriod().call(), 1)
+        self.eth_tester.mine_blocks(PERIOD)
+        self.assertEqual(self.contract.functions.actualPeriod().call(), 2)
 
 
     def test_mint(self):
@@ -147,6 +147,7 @@ class Test(unittest.TestCase):
         balance_bob = self.contract.functions.balanceOf(self.w3.eth.accounts[2]).call()
         balance_bob_trunc = int(balance_bob/1000)*1000
         self.assertEqual(balance_bob_trunc, 500000)
+
 
 if __name__ == '__main__':
     unittest.main()

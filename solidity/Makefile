@@ -7,6 +7,8 @@ all:
 
 test: all
 	python ../python/tests/test_basic.py
+	python ../python/tests/test_period.py
+	python ../python/tests/test_redistribution.py
 
 install: all
 	cp -v RedistributedDemurrageToken.{json,bin} ../python/eth_address_declarator/data/
