@@ -18,8 +18,7 @@
   * Inflated Balance: The inflated balance of each user is stored for bookkeeping.
   * Number of Decimals: Resolution on token (TODO) (Default 6)
   * Minimum Activity Volume: (TODO) the minimum transaction amount to be considered active (Default 0)
-  * Minimum Activity Txns: (TODO) the minimum number of transaction to be considered active (Default 1)
-  * Sink Token Address: If no one trades the tax goes to this address
+  * Sink Token Address: Rounding errors and if no one trades the tax goes to this address
 
 
 ## Ownership
@@ -37,7 +36,7 @@
 
 
 ## Demurrage
-* Holding Tax (`demurrage`) is applied when a **mint** or **transfer** is triggered for first time/block in a new `period`;
+* Holding Tax (`demurrage`) is applied when a **mint** or **transfer** is triggered for first time/block in a new `period`; (it can also be triggered explicitly)
   - Supply _stays the same_.
   - Updates `demurrageModifier` which represents the accumulated tax value and is an exponential decay step (of size `demurrage`) for each `period`
     - `demurrageModifier = (1-demurrage)^period` 
