@@ -7,14 +7,15 @@
   * A monthly Sarafu holding tax (demurrage) of 2% is deducted from users 
   * Each month (after a number of blocks) the total amount tax is distributed evenly out to _active_ users.
     *  any single transaction by a user is considered _active_ (heartbeat) (possibly add minimum size of heartbeat in constructor (TODO))
-  * This is meant to result in a disincentivization to hold (hodl) the Sarafu token and increase its usage as a medium of excahnge rather than a store of value.
+  * This is meant to result in a disincentivization to hold (hodl) the Sarafu token and increase its usage as a medium of exchange rather than a store of value.
+  * This token can be added to liquidity pools with other ERC20 tokens and or Community Inclusion Currencies (CICs) - and thereby act as a central network token and connect various tokens and CICs together.
 
 
 ## Variables
 
 * Inputs to Constructor (Set only once during contract deployment can't be changed )  
-  * `Demmurage` aka Decay amount: A percentage of token supply that will be charged once per - aka `period` and evenly redistributed to _active_ users 
-  * Demmurage Period (blocks)- aka `period`: The number of blocks (equivalent to a time frame) over which a new Holding Fee is applied and redistributed. 
+  * `Demurrage` aka Decay amount: A percentage of token supply that will be charged once per - aka `period` and evenly redistributed to _active_ users 
+  * Demurrage Period (blocks)- aka `period`: The number of blocks (equivalent to a time frame) over which a new Holding Fee is applied and redistributed. 
   * Inflated Balance: The inflated balance of each user is stored for bookkeeping.
   * Number of Decimals: Resolution on token (TODO) (Default 6)
   * Minimum Activity Volume: (TODO) the minimum transaction amount to be considered active
@@ -73,7 +74,7 @@
   - bits 000-055: period
   - bits 056-215: supply
   - bits 216-253: participant count
-  - bits     254: Set if invidiual redistribution amounts are fractions (TODO)
+  - bits     254: Set if individual redistribution amounts are fractions (TODO)
   - bits     255: Set if "dust" has been transferred to sink (TODO)
 
 
