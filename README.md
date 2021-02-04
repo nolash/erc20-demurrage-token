@@ -17,7 +17,7 @@
   * Demmurage Period (blocks)- aka `period`: The number of blocks (equivalent to a time frame) over which a new Holding Fee is applied and redistributed. 
   * Inflated Balance: The inflated balance of each user is stored for bookkeeping.
   * Number of Decimals: Resolution on token (TODO) (Default 6)
-  * Minimum Activity Volume: (TODO) the minimum transaction amount to be considered active (Default 0)
+  * Minimum Activity Volume: (TODO) the minimum transaction amount to be considered active
   * Sink Token Address: Rounding errors and if no one trades the tax goes to this address
 
 
