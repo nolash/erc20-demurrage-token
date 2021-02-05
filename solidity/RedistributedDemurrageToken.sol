@@ -6,9 +6,9 @@ pragma solidity > 0.6.11;
 contract RedistributedDemurrageToken {
 
 	address public owner;
-	uint256 public decimals;
 	string public name;
 	string public symbol;
+	uint256 public decimals;
 	uint256 public totalSupply;
 
 	uint256 public periodStart;
@@ -198,7 +198,7 @@ contract RedistributedDemurrageToken {
 		uint256 truncatedResult;
 
 		if (_numParts == 0) { // no division by zero please
-			return _sumWhole;
+			revert('ERR_NUMPARTS_ZERO');
 		}
 		require(_numParts < _sumWhole); // At least you are never LESS than the sum of your parts. Think about that.
 
@@ -207,18 +207,40 @@ contract RedistributedDemurrageToken {
 		return _sumWhole - truncatedResult;
 	}
 
+	function applyDefaultRedistribution(bytes32 _redistribution) private returns (uint256) {
+		uint256 redistributionSupply;
+		uint256 redistributionPeriod;
+		uint256 unit;
+		uint256 truncatedResult;
+
+		redistributionSupply = toRedistributionSupply(_redistribution);
+
+		unit = (redistributionSupply * taxLevel) / 1000000;
+		//truncatedResult = (unit * taxLevel) / 1000000;
+		truncatedResult = (unit * 1000000) / taxLevel;
+
+		if (truncatedResult < redistributionSupply) {
+			redistributionPeriod = toRedistributionPeriod(_redistribution); // since we reuse period here, can possibly be optimized by passing period instead
+			redistributions[redistributionPeriod-1] |= 0x8000000000000000000000000000000000000000000000000000000000000000;
+		}
+
+		increaseBaseBalance(sinkAddress, unit); //truncatedResult);
+		return unit;
+	}
+
 	// sets the remainder bit for the given period and books the remainder to the sink address balance
 	// returns false if no change was made
 	function applyRemainderOnPeriod(uint256 _remainder, uint256 _period) private returns (bool) {
-		bytes32 redistribution;
-
-		redistribution = redistributions[_period-1];
+		uint256 periodSupply;
 
 		if (_remainder == 0) {
 			return false;
 		}
-		redistribution |= 0x8000000000000000000000000000000000000000000000000000000000000000;
-		increaseBaseBalance(sinkAddress, _remainder);
+
+		redistributions[_period-1] |= 0x8000000000000000000000000000000000000000000000000000000000000000;
+
+		periodSupply = toRedistributionSupply(redistributions[_period-1]);
+		increaseBaseBalance(sinkAddress, periodSupply - _remainder);
 		return true;
 	}
 
@@ -241,8 +263,12 @@ contract RedistributedDemurrageToken {
 		redistributions.push(nextRedistribution);
 
 		currentParticipants = toRedistributionParticipants(currentRedistribution);
-		currentRemainder = remainder(currentParticipants, totalSupply); // we can use totalSupply directly because it will always be the same as the recorded supply on the current redistribution
-		applyRemainderOnPeriod(currentRemainder, currentPeriod);
+		if (currentParticipants == 0) {
+			currentRemainder = applyDefaultRedistribution(currentRedistribution);
+		} else {
+			currentRemainder = remainder(currentParticipants, totalSupply); // we can use totalSupply directly because it will always be the same as the recorded supply on the current redistribution
+			applyRemainderOnPeriod(currentRemainder, currentPeriod);
+		}
 		emit Taxed(currentPeriod, currentRemainder);
 		return demurrageModifier;
 	}

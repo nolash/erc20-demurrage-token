@@ -129,6 +129,8 @@ class Test(unittest.TestCase):
 
 
     def test_apply_tax(self):
+        self.contract.functions.mintTo(self.w3.eth.accounts[1], 1024).transact()
+
         self.eth_tester.mine_blocks(PERIOD)
         tx_hash = self.contract.functions.applyTax().transact()
         r = self.w3.eth.getTransactionReceipt(tx_hash)
