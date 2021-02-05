@@ -40,6 +40,7 @@ contract RedistributedDemurrageToken {
 		symbol = _symbol;
 		decimals = _decimals;
 		demurrageModifier = 1000000;
+		sinkAddress = _defaultSinkAddress;
 		bytes32 initialRedistribution = toRedistribution(0, 0, 1);
 		redistributions.push(initialRedistribution);
 	}
@@ -65,24 +66,25 @@ contract RedistributedDemurrageToken {
 	}
 
 	/// Increases base balance for a single account
-	function increaseBalance(address _account, uint256 _delta) private returns (bool) {
+	function increaseBaseBalance(address _account, uint256 _delta) private returns (bool) {
 		uint256 oldBalance;
 		uint256 newBalance;
 		
 		oldBalance = getBaseBalance(_account);
 		newBalance = oldBalance + _delta;
+		require(uint160(newBalance) > uint160(oldBalance), 'ERR_WOULDWRAP'); // revert if increase would result in a wrapped value
 		account[_account] &= bytes32(0xffffffffffffffffffffffff0000000000000000000000000000000000000000);
 		account[_account] |= bytes32(newBalance & 0x00ffffffffffffffffffffffffffffffffffffffff);
 		return true;
 	}
 
 	/// Decreases base balance for a single account
-	function decreaseBalance(address _account, uint256 _delta) private returns (bool) {
+	function decreaseBaseBalance(address _account, uint256 _delta) private returns (bool) {
 		uint256 oldBalance;
 	       	uint256 newBalance;
 
 		oldBalance = getBaseBalance(_account);	
-		require(oldBalance >= _delta);
+		require(oldBalance >= _delta, 'ERR_OVERSPEND'); // overspend guard
 		newBalance = oldBalance - _delta;
 		account[_account] &= bytes32(0xffffffffffffffffffffffff0000000000000000000000000000000000000000);
 		account[_account] |= bytes32(newBalance & 0x00ffffffffffffffffffffffffffffffffffffffff);
@@ -97,7 +99,7 @@ contract RedistributedDemurrageToken {
 		// TODO: get base amount for minting
 		applyTax();
 		totalSupply += _amount;
-		increaseBalance(_beneficiary, _amount);
+		increaseBaseBalance(_beneficiary, _amount);
 		emit Mint(msg.sender, _beneficiary, _amount);
 		saveRedistributionSupply();
 		return true;
@@ -177,7 +179,7 @@ contract RedistributedDemurrageToken {
 	}
 
 	// Deserialize the pemurrage period for the given account is participating in
-	function accountPeriod(address _account) public returns (uint256) {
+	function accountPeriod(address _account) public view returns (uint256) {
 		return (uint256(account[_account]) & 0xffffffffffffffffffffffff0000000000000000000000000000000000000000) >> 160;
 	}
 
@@ -190,14 +192,15 @@ contract RedistributedDemurrageToken {
 
 	// Determine whether the unit number is rounded down, rounded up or evenly divides.
 	// Returns 0 if evenly distributed, or the remainder as a positive number
+	// A _numParts value 0 will be interpreted as the value 1
 	function remainder(uint256 _numParts, uint256 _sumWhole) public pure returns (uint256) {
 		uint256 unit;
 		uint256 truncatedResult;
 
-		if (_numParts == 0) { // no div by zero, please
-			return 0;
+		if (_numParts == 0) { // no division by zero please
+			return _sumWhole;
 		}
-		require(_numParts < _sumWhole); // you are never less than the sum of your parts. Think about that.
+		require(_numParts < _sumWhole); // At least you are never LESS than the sum of your parts. Think about that.
 
 		unit = _sumWhole / _numParts;
 		truncatedResult = unit * _numParts;
@@ -215,7 +218,7 @@ contract RedistributedDemurrageToken {
 			return false;
 		}
 		redistribution |= 0x8000000000000000000000000000000000000000000000000000000000000000;
-		increaseBalance(sinkAddress, _remainder);
+		increaseBaseBalance(sinkAddress, _remainder);
 		return true;
 	}
 
@@ -275,16 +278,16 @@ contract RedistributedDemurrageToken {
 		periodRedistribution = redistributions[period-1];
 		participants = toRedistributionParticipants(periodRedistribution);
 		if (participants == 0) {
-			// TODO: In this case we need to give back to everyone, so we need a total accounts counter
-			revert('0 participants');
+			return false;
 		}
+
 		supply = toRedistributionSupply(periodRedistribution);
 		// TODO: Make sure value for balance increases round down, and that we can do a single allocation to a sink account with the difference. We can use the highest bit in "participants" for that.
 		baseValue = supply / participants;
-		value = toTaxPeriodAmount(baseValue, period);
+		value = toTaxPeriodAmount(baseValue, period-1);
 
 		account[_account] &= bytes32(0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff);
-		increaseBalance(_account, value);
+		increaseBaseBalance(_account, value);
 
 		emit Redistribution(_account, period, value);
 		return true;
@@ -314,10 +317,10 @@ contract RedistributedDemurrageToken {
 	function transferBase(address _from, address _to, uint256 _value) private returns (bool) {
 		uint256 period;
 
-		if (!decreaseBalance(_from, _value)) {
+		if (!decreaseBaseBalance(_from, _value)) {
 			revert('ERR_TX_DECREASEBALANCE');
 		}
-		if (!increaseBalance(_to, _value)) {
+		if (!increaseBaseBalance(_to, _value)) {
 			revert('ERR_TX_INCREASEBALANCE');
 		}
 		period = actualPeriod();
