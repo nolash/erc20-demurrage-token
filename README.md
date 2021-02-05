@@ -9,6 +9,8 @@
     *  any single transaction by a user is considered _active_ (heartbeat) (possibly add minimum size of heartbeat in constructor (TODO))
   * This is meant to result in a disincentivization to hold (hodl) the Sarafu token and increase its usage as a medium of exchange rather than a store of value.
   * This token can be added to liquidity pools with other ERC20 tokens and or Community Inclusion Currencies (CICs) - and thereby act as a central network token and connect various tokens and CICs together.
+  * Example calculation can be found here: https://gitlab.com/grassrootseconomics/cic-docs/-/blob/master/demurrage-redist-sarafu.ods
+    -  If there are 10 users all with balances of 1000 Sarafu. and only 2 of them trade (assume they trade back and forth with no net balance change). Then their resulting balances of those two trading would be 1080 while the remaining non-active users would be 980. If this behaviour continued in the next tax period with the same two users only trading (with no net balance changes) they would have 1158.39999968 Sarafu and those users not trading would be further reduced to balances of 960.40 Sarafu. If this continued on forever those two trading users would have the entire token supply and the non-trading users would eventually reach a zero balance.
 
 
 ## Variables
@@ -41,7 +43,6 @@
   - Supply _stays the same_.
   - Updates `demurrageModifier` which represents the accumulated tax value and is an exponential decay step (of size `demurrage`) for each `period`
     - `demurrageModifier = (1-demurrage)^period` 
-      - e.g. a `demurrage` of 2% at a `period` of 0 would be give a `demurrageModifier= (1-0.02)^0 = 1-1 = 0`.
       - e.g. a `demurrage` of 2% at a `period` of 1 would be give a `demurrageModifier = (1-0.02)^1 = 0.98`.
       - e.g. a `demurrage` of 2% at a `period` of 2 would be give a `demurrageModifier = (1-0.02)^2 = 0.9604`.
 * All client-facing values (_balance output_ , _transfer inputs_) are adjusted with `demurrageModifier`.
