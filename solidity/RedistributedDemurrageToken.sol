@@ -16,7 +16,7 @@ contract RedistributedDemurrageToken {
 	uint256 public taxLevel; // PPM
 	uint256 public demurrageModifier; // PPM
 
-	bytes32[] public redistributions; // uint1(usedDustSink) | uint1(isFractional) | uint38(participants) | uint160(value) | uint56(period)
+	bytes32[] public redistributions; // uint1(isFractional) | uint1(unused) | uint38(participants) | uint160(value) | uint56(period)
 	mapping (address => bytes32) account; // uint20(unused) | uint56(period) | uint160(value)
 	mapping (address => bool) minter;
 	mapping (address => mapping (address => uint256 ) ) allowance; // holder -> spender -> amount (amount is subject to demurrage)
@@ -107,7 +107,7 @@ contract RedistributedDemurrageToken {
 	function toRedistribution(uint256 _participants, uint256 _value, uint256 _period) private pure returns(bytes32) {
 		bytes32 redistribution;
 
-		redistribution |= bytes32((_participants & 0xffffffffff) << 216);
+		redistribution |= bytes32((_participants & 0x7fffffffff) << 216);
 		redistribution |= bytes32((_value & 0xffffffffffffffffffffffff) << 56);
 		redistribution |= bytes32(_period & 0xffffffffffffff);
 		return redistribution;
@@ -125,7 +125,7 @@ contract RedistributedDemurrageToken {
 
 	// Serializes the number of participants part of the redistribution word
 	function toRedistributionParticipants(bytes32 redistribution) public pure returns (uint256) {
-		return uint256(redistribution & 0x3fffffffff000000000000000000000000000000000000000000000000000000) >> 216;
+		return uint256(redistribution & 0x7fffffffff000000000000000000000000000000000000000000000000000000) >> 216;
 	}
 
 	// Client accessor to the redistributions array length
@@ -139,8 +139,8 @@ contract RedistributedDemurrageToken {
 		uint256 participants;
 
 		currentRedistribution = uint256(redistributions[redistributions.length-1]);
-		participants = ((currentRedistribution & 0xffffffffff000000000000000000000000000000000000000000000000000000) >> 216) + 1;
-		currentRedistribution &= 0x0000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffff;
+		participants = ((currentRedistribution & 0x7fffffffff000000000000000000000000000000000000000000000000000000) >> 216) + 1;
+		currentRedistribution &= 0x8000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 		currentRedistribution |= participants << 216;
 
 		//emit Debug(participants);
@@ -152,7 +152,7 @@ contract RedistributedDemurrageToken {
 		uint256 currentRedistribution;
 
 		currentRedistribution = uint256(redistributions[redistributions.length-1]);
-		currentRedistribution &= 0x3fffffffff0000000000000000000000000000000000000000ffffffffffffff;
+		currentRedistribution &= 0xffffffffff0000000000000000000000000000000000000000ffffffffffffff;
 		currentRedistribution |= totalSupply << 56;
 
 		redistributions[redistributions.length-1] = bytes32(currentRedistribution);
@@ -203,8 +203,19 @@ contract RedistributedDemurrageToken {
 		truncatedResult = unit * _numParts;
 		return _sumWhole - truncatedResult;
 	}
-	
-	function applyRemainder(uint256 remainder) public returns (bool) {
+
+	// sets the remainder bit for the given period and books the remainder to the sink address balance
+	// returns false if no change was made
+	function applyRemainderOnPeriod(uint256 _remainder, uint256 _period) private returns (bool) {
+		bytes32 redistribution;
+
+		redistribution = redistributions[_period-1];
+
+		if (_remainder == 0) {
+			return false;
+		}
+		redistribution |= 0x8000000000000000000000000000000000000000000000000000000000000000;
+		increaseBalance(sinkAddress, _remainder);
 		return true;
 	}
 
@@ -228,7 +239,7 @@ contract RedistributedDemurrageToken {
 
 		currentParticipants = toRedistributionParticipants(currentRedistribution);
 		currentRemainder = remainder(currentParticipants, totalSupply); // we can use totalSupply directly because it will always be the same as the recorded supply on the current redistribution
-		applyRemainder(currentRemainder);
+		applyRemainderOnPeriod(currentRemainder, currentPeriod);
 		emit Taxed(currentPeriod, currentRemainder);
 		return demurrageModifier;
 	}
