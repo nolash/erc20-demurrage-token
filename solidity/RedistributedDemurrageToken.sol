@@ -207,6 +207,8 @@ contract RedistributedDemurrageToken {
 		return _sumWhole - truncatedResult;
 	}
 
+	// Called in the edge case where participant number is 0. It will override the participant count to 1.
+	// Returns the remainder sent to the sink address
 	function applyDefaultRedistribution(bytes32 _redistribution) private returns (uint256) {
 		uint256 redistributionSupply;
 		uint256 redistributionPeriod;
@@ -221,7 +223,8 @@ contract RedistributedDemurrageToken {
 
 		if (truncatedResult < redistributionSupply) {
 			redistributionPeriod = toRedistributionPeriod(_redistribution); // since we reuse period here, can possibly be optimized by passing period instead
-			redistributions[redistributionPeriod-1] |= 0x8000000000000000000000000000000000000000000000000000000000000000;
+			redistributions[redistributionPeriod-1] &= 0x0000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffff; // just to be safe, zero out all participant count data, in this case there will be only one
+			redistributions[redistributionPeriod-1] |= 0x8000000001000000000000000000000000000000000000000000000000000000;
 		}
 
 		increaseBaseBalance(sinkAddress, unit); //truncatedResult);
