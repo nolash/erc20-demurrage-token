@@ -317,12 +317,9 @@ contract RedistributedDemurrageToken {
 	function transferBase(address _from, address _to, uint256 _value) private returns (bool) {
 		uint256 period;
 
-		if (!decreaseBaseBalance(_from, _value)) {
-			revert('ERR_TX_DECREASEBALANCE');
-		}
-		if (!increaseBaseBalance(_to, _value)) {
-			revert('ERR_TX_INCREASEBALANCE');
-		}
+		decreaseBaseBalance(_from, _value);
+		increaseBaseBalance(_to, _value);
+
 		period = actualPeriod();
 		if (_value > 0 && accountPeriod(_from) != period) {
 			registerAccountPeriod(_from, period);
