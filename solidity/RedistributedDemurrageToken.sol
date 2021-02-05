@@ -2,6 +2,7 @@ pragma solidity > 0.6.11;
 
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// TODO: assign bitmask values to contants 
 contract RedistributedDemurrageToken {
 
 	address public owner;
@@ -15,7 +16,7 @@ contract RedistributedDemurrageToken {
 	uint256 public taxLevel; // PPM
 	uint256 public demurrageModifier; // PPM
 
-	bytes32[] public redistributions; // uint40(participants) | uint160(value) | uint56(period) 
+	bytes32[] public redistributions; // uint1(usedDustSink) | uint1(isFractional) | uint38(participants) | uint160(value) | uint56(period)
 	mapping (address => bytes32) account; // uint12(period) | uint160(value)
 	mapping (address => bool) minter;
 
@@ -121,7 +122,7 @@ contract RedistributedDemurrageToken {
 
 	// Serializes the number of participants part of the redistribution word
 	function toRedistributionParticipants(bytes32 redistribution) public pure returns (uint256) {
-		return uint256(redistribution & 0xffffffffff000000000000000000000000000000000000000000000000000000) >> 216;
+		return uint256(redistribution & 0x3fffffffff000000000000000000000000000000000000000000000000000000) >> 216;
 	}
 
 	// Client accessor to the redistributions array length
@@ -148,7 +149,7 @@ contract RedistributedDemurrageToken {
 		uint256 currentRedistribution;
 
 		currentRedistribution = uint256(redistributions[redistributions.length-1]);
-		currentRedistribution &= 0xffffffffff0000000000000000000000000000000000000000ffffffffffffff;
+		currentRedistribution &= 0x3fffffffff0000000000000000000000000000000000000000ffffffffffffff;
 		currentRedistribution |= totalSupply << 56;
 
 		redistributions[redistributions.length-1] = bytes32(currentRedistribution);
