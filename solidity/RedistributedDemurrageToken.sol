@@ -27,10 +27,10 @@ contract RedistributedDemurrageToken {
 	event Approval(address indexed _owner, address indexed _spender, uint256 _value);
 	event Mint(address indexed _minter, address indexed _beneficiary, uint256 _value);
 	//event Debug(uint256 _foo);
-	event Taxed(uint256 indexed _period);
+	event Taxed(uint256 indexed _period, uint256 remainder);
 	event Redistribution(address indexed _account, uint256 indexed _period, uint256 _value);
 
-	constructor(string memory _name, string memory _symbol, uint8 _decimals, uint32 _taxLevel, uint256 _period, address _defaultSinkAddress) {
+	constructor(string memory _name, string memory _symbol, uint8 _decimals, uint32 _taxLevel, uint256 _period, address _defaultSinkAddress) public {
 		owner = msg.sender;
 		minter[owner] = true;
 		periodStart = block.number;
@@ -44,7 +44,7 @@ contract RedistributedDemurrageToken {
 		redistributions.push(initialRedistribution);
 	}
 
-	/// Given address will be allowed to call the mintTo() function
+	// Given address will be allowed to call the mintTo() function
 	function addMinter(address _minter) public returns (bool) {
 		require(msg.sender == owner);
 		minter[_minter] = true;
@@ -188,22 +188,48 @@ contract RedistributedDemurrageToken {
 		incrementRedistributionParticipants();
 	}
 
+	// Determine whether the unit number is rounded down, rounded up or evenly divides.
+	// Returns 0 if evenly distributed, or the remainder as a positive number
+	function remainder(uint256 _numParts, uint256 _sumWhole) public pure returns (uint256) {
+		uint256 unit;
+		uint256 truncatedResult;
+
+		if (_numParts == 0) { // no div by zero, please
+			return 0;
+		}
+		require(_numParts < _sumWhole); // you are never less than the sum of your parts. Think about that.
+
+		unit = _sumWhole / _numParts;
+		truncatedResult = unit * _numParts;
+		return _sumWhole - truncatedResult;
+	}
+	
+	function applyRemainder(uint256 remainder) public returns (bool) {
+		return true;
+	}
+
 	// Recalculate the demurrage modifier for the new period
-	// After this, all REPORTED balances will have been reduced by the corresponding ratio (but the totalsupply stays the same)
+	// After this, all REPORTED balances will have been reduced by the corresponding ratio (but the effecive totalsupply stays the same)
 	function applyTax() public returns (uint256) {
-		bytes32 pendingRedistribution;
+		bytes32 currentRedistribution;
 		bytes32 nextRedistribution;
 		uint256 currentPeriod;
+		uint256 currentParticipants;
+		uint256 currentRemainder;
 
-		pendingRedistribution = checkPeriod();
-		if (pendingRedistribution == bytes32(0x00)) {
+		currentRedistribution = checkPeriod();
+		if (currentRedistribution == bytes32(0x00)) {
 			return demurrageModifier;
 		}
 		demurrageModifier -= (demurrageModifier * taxLevel) / 1000000;
-		currentPeriod = toRedistributionPeriod(pendingRedistribution);
+		currentPeriod = toRedistributionPeriod(currentRedistribution);
 		nextRedistribution = toRedistribution(0, totalSupply, currentPeriod + 1);
 		redistributions.push(nextRedistribution);
-		emit Taxed(currentPeriod);
+
+		currentParticipants = toRedistributionParticipants(currentRedistribution);
+		currentRemainder = remainder(currentParticipants, totalSupply); // we can use totalSupply directly because it will always be the same as the recorded supply on the current redistribution
+		applyRemainder(currentRemainder);
+		emit Taxed(currentPeriod, currentRemainder);
 		return demurrageModifier;
 	}
 
