@@ -40,12 +40,15 @@ class Test(unittest.TestCase):
         self.abi = json.load(f)
         f.close()
 
+
         backend = eth_tester.PyEVMBackend(eth_params)
         self.eth_tester =  eth_tester.EthereumTester(backend)
         provider = web3.Web3.EthereumTesterProvider(self.eth_tester)
         self.w3 = web3.Web3(provider)
+        self.sink_address = self.w3.eth.accounts[9]
+
         c = self.w3.eth.contract(abi=self.abi, bytecode=self.bytecode)
-        tx_hash = c.constructor('Foo Token', 'FOO', 6, TAX_LEVEL, PERIOD).transact({'from': self.w3.eth.accounts[0]})
+        tx_hash = c.constructor('Foo Token', 'FOO', 6, TAX_LEVEL, PERIOD, self.sink_address).transact({'from': self.w3.eth.accounts[0]})
 
         r = self.w3.eth.getTransactionReceipt(tx_hash)
         self.contract = self.w3.eth.contract(abi=self.abi, address=r.contractAddress)

@@ -21,6 +21,8 @@ contract RedistributedDemurrageToken {
 	mapping (address => bool) minter;
 	mapping (address => mapping (address => uint256 ) ) allowance; // holder -> spender -> amount (amount is subject to demurrage)
 
+	address sinkAddress; // receives redistribuion remainders
+
 	event Transfer(address indexed _from, address indexed _to, uint256 _value);
 	event Approval(address indexed _owner, address indexed _spender, uint256 _value);
 	event Mint(address indexed _minter, address indexed _beneficiary, uint256 _value);
@@ -28,7 +30,7 @@ contract RedistributedDemurrageToken {
 	event Taxed(uint256 indexed _period);
 	event Redistribution(address indexed _account, uint256 indexed _period, uint256 _value);
 
-	constructor(string memory _name, string memory _symbol, uint8 _decimals, uint32 _taxLevel, uint256 _period) {
+	constructor(string memory _name, string memory _symbol, uint8 _decimals, uint32 _taxLevel, uint256 _period, address _defaultSinkAddress) {
 		owner = msg.sender;
 		minter[owner] = true;
 		periodStart = block.number;
