@@ -4,13 +4,15 @@
 * Network / Basic Income Token
   * 100 Sarafu is distributed to anyone in Kenya after user validation by the owner of a faucet which mints new Sarafu.
   * Validated users are those that validate their phone number in Kenya.
-  * A monthly Sarafu holding tax (demurrage) of 2% is deducted from users 
+  * A monthly Sarafu holding tax aka ([demurrage](https://en.wikipedia.org/wiki/Demurrage_(currency))) of 2% is deducted from users 
   * Each month (after a number of blocks) the total amount tax is distributed evenly out to _active_ users.
     *  any single transaction by a user is considered _active_ (heartbeat) (possibly add minimum size of heartbeat in constructor (TODO))
   * This is meant to result in a disincentivization to hold (hodl) the Sarafu token and increase its usage as a medium of exchange rather than a store of value.
   * This token can be added to liquidity pools with other ERC20 tokens and or Community Inclusion Currencies (CICs) - and thereby act as a central network token and connect various tokens and CICs together.
-  * Example calculation can be found here: https://gitlab.com/grassrootseconomics/cic-docs/-/blob/master/demurrage-redist-sarafu.ods
-    -  If there are 10 users all with balances of 1000 Sarafu. and only 2 of them trade (assume they trade back and forth with no net balance change). Then their resulting balances of those two trading would be 1080 while the remaining non-active users would be 980. If this behaviour continued in the next tax period with the same two users only trading (with no net balance changes) they would have 1158.39999968 Sarafu and those users not trading would be further reduced to balances of 960.40 Sarafu. If this continued on forever those two trading users would have the entire token supply and the non-trading users would eventually reach a zero balance.
+  * Example 
+    -  With a demurrage of 2% - If there are 10 users all with balances of 1000 Sarafu and only 2 of them trade (assume they trade back and forth with no net balance change). 
+    - Then the resulting balances after one tax period of those two trading would be 1080 Sarafu while the remaining non-active users would be 980 Sarafu. If this behaviour continued in the next tax period, with the same two users only trading (with no net balance changes), they would have 1158.39999968 Sarafu and those users that are not trading would have their balances further reduced to 960.40 Sarafu. If this continued on ~forever those two active trading users would have the entire token supply and the non-trading users would eventually reach a zero balance.
+    - this example calculation for 3 tax periods can be found here: https://gitlab.com/grassrootseconomics/cic-docs/-/blob/master/demurrage-redist-sarafu.ods
 
 
 ## Variables
