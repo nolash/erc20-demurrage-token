@@ -17,8 +17,9 @@ contract RedistributedDemurrageToken {
 	uint256 public demurrageModifier; // PPM
 
 	bytes32[] public redistributions; // uint1(usedDustSink) | uint1(isFractional) | uint38(participants) | uint160(value) | uint56(period)
-	mapping (address => bytes32) account; // uint12(period) | uint160(value)
+	mapping (address => bytes32) account; // uint20(unused) | uint56(period) | uint160(value)
 	mapping (address => bool) minter;
+	mapping (address => mapping (address => uint256 ) ) allowance; // holder -> spender -> amount (amount is subject to demurrage)
 
 	event Transfer(address indexed _from, address indexed _to, uint256 _value);
 	event Approval(address indexed _owner, address indexed _spender, uint256 _value);
@@ -27,7 +28,7 @@ contract RedistributedDemurrageToken {
 	event Taxed(uint256 indexed _period);
 	event Redistribution(address indexed _account, uint256 indexed _period, uint256 _value);
 
-	constructor(string memory _name, string memory _symbol, uint32 _taxLevel, uint256 _period) {
+	constructor(string memory _name, string memory _symbol, uint8 _decimals, uint32 _taxLevel, uint256 _period) {
 		owner = msg.sender;
 		minter[owner] = true;
 		periodStart = block.number;
@@ -35,7 +36,7 @@ contract RedistributedDemurrageToken {
 		taxLevel = _taxLevel;
 		name = _name;
 		symbol = _symbol;
-		decimals = 6;
+		decimals = _decimals;
 		demurrageModifier = 1000000;
 		bytes32 initialRedistribution = toRedistribution(0, 0, 1);
 		redistributions.push(initialRedistribution);
@@ -250,6 +251,11 @@ contract RedistributedDemurrageToken {
 		return true;
 	}
 
+	// Inflates the given amount according to the current demurrage modifier
+	function toBaseAmount(uint256 _value) public view returns (uint256) {
+		return (_value * 1000000) / demurrageModifier;
+	}
+
 	// ERC20, triggers tax and/or redistribution
 	function transfer(address _to, uint256 _value) public returns (bool) {
 		uint256 baseValue;
@@ -259,7 +265,7 @@ contract RedistributedDemurrageToken {
 		applyRedistributionOnAccount(msg.sender);
 
 		// TODO: Prefer to truncate the result, instead it seems to round to nearest :/
-		baseValue = (_value * 1000000) / demurrageModifier;
+		baseValue = toBaseAmount(_value);
 		result = transferBase(msg.sender, _to, baseValue);
 
 		return result;
@@ -279,6 +285,34 @@ contract RedistributedDemurrageToken {
 		if (_value > 0 && accountPeriod(_from) != period) {
 			registerAccountPeriod(_from, period);
 		}
+		return true;
+	}
+
+	// ERC20, triggers tax and/or redistribution
+	function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
+		uint256 baseValue;
+		bool result;
+
+		applyTax();
+		applyRedistributionOnAccount(msg.sender);
+
+		baseValue = toBaseAmount(_value);
+		require(allowance[_from][msg.sender] >= baseValue);
+
+		result = transferBase(_from, _to, baseValue);
+		return result;
+	}
+
+	// ERC20, triggers tax and/or redistribution
+	function approve(address _spender, uint256 _value) public returns (bool) {
+		uint256 baseValue;
+
+		applyTax();
+		applyRedistributionOnAccount(msg.sender);
+
+		baseValue = toBaseAmount(_value);
+		allowance[msg.sender][_spender] += baseValue;
+		emit Approval(msg.sender, _spender, _value);
 		return true;
 	}
 }
