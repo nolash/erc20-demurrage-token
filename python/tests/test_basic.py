@@ -3,6 +3,7 @@ import os
 import unittest
 import json
 import logging
+import datetime
 
 # third-party imports
 import web3
@@ -18,9 +19,11 @@ logging.getLogger('eth.vm').setLevel(logging.WARNING)
 testdir = os.path.dirname(__file__)
 
 #BLOCKTIME = 5 # seconds
-TAX_LEVEL = 10000 * 2 # 2%
+TAX_LEVEL = int(10000 * 2) # 2%
+# calc "1-(0.98)^(1/518400)" <- 518400 = 30 days of blocks
+# 0.00000003897127107225
 #PERIOD = int(60/BLOCKTIME) * 60 * 24 * 30 # month
-PERIOD = 10
+PERIOD = 1
 
 
 class Test(unittest.TestCase):
@@ -48,12 +51,15 @@ class Test(unittest.TestCase):
         self.sink_address = self.w3.eth.accounts[9]
 
         c = self.w3.eth.contract(abi=self.abi, bytecode=self.bytecode)
-        tx_hash = c.constructor('Foo Token', 'FOO', 6, TAX_LEVEL, PERIOD, self.sink_address).transact({'from': self.w3.eth.accounts[0]})
+        tx_hash = c.constructor('Foo Token', 'FOO', 6, TAX_LEVEL * (10 ** 32), PERIOD, self.sink_address).transact({'from': self.w3.eth.accounts[0]})
 
         r = self.w3.eth.getTransactionReceipt(tx_hash)
         self.contract = self.w3.eth.contract(abi=self.abi, address=r.contractAddress)
 
         self.start_block = self.w3.eth.blockNumber
+        b = self.w3.eth.getBlock(self.start_block)
+        self.start_time = b['timestamp']
+
 
     def tearDown(self):
         pass
@@ -61,8 +67,29 @@ class Test(unittest.TestCase):
 
     def test_hello(self):
         self.assertEqual(self.contract.functions.actualPeriod().call(), 1)
-        self.eth_tester.mine_blocks(PERIOD)
+        self.eth_tester.time_travel(self.start_time + 61)
         self.assertEqual(self.contract.functions.actualPeriod().call(), 2)
+
+
+
+    def test_apply_demurrage(self):
+        modifier = 10 * (10 ** 37)
+        demurrage_modifier = self.contract.functions.demurrageModifier().call()
+        demurrage_modifier &= (1 << 128) - 1
+        self.assertEqual(modifier, demurrage_modifier)
+
+        self.eth_tester.time_travel(self.start_time + 59)
+        demurrage_modifier = self.contract.functions.demurrageModifier().call()
+        demurrage_modifier &= (1 << 128) - 1
+        self.assertEqual(modifier, demurrage_modifier)
+
+        self.eth_tester.time_travel(self.start_time + 61)
+        tx_hash = self.contract.functions.applyDemurrage().transact()
+        r = self.w3.eth.getTransactionReceipt(tx_hash)
+
+        demurrage_modifier = self.contract.functions.demurrageModifier().call()
+        demurrage_modifier &= (1 << 128) - 1
+        self.assertEqual(int(98 * (10 ** 36)), demurrage_modifier)
 
 
     def test_mint(self):
@@ -79,6 +106,26 @@ class Test(unittest.TestCase):
 
         balance = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call()
         self.assertEqual(balance, 2000)
+
+        self.eth_tester.time_travel(self.start_time + 61)
+        balance = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call()
+        self.assertEqual(balance, int(2000 * 0.98))
+
+    
+    def test_base_amount(self):
+        tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], 1000).transact()
+        r = self.w3.eth.getTransactionReceipt(tx_hash)
+        self.assertEqual(r.status, 1)
+
+        self.eth_tester.time_travel(self.start_time + 61)
+
+        self.contract.functions.applyDemurrage().transact()
+        demurrage_modifier = self.contract.functions.demurrageModifier().call()
+        demurrage_amount = self.contract.functions.toDemurrageAmount(demurrage_modifier).call()
+        logg.debug('d {} {}'.format(demurrage_modifier.to_bytes(32, 'big').hex(), demurrage_amount))
+
+        a = self.contract.functions.toBaseAmount(1000).call();
+        self.assertEqual(a, 1020)
 
 
     def test_transfer(self):
@@ -126,63 +173,6 @@ class Test(unittest.TestCase):
 
         balance_alice = self.contract.functions.balanceOf(self.w3.eth.accounts[3]).call()
         self.assertEqual(balance_alice, 500)
-
-
-    def test_apply_tax(self):
-        self.contract.functions.mintTo(self.w3.eth.accounts[1], 1024).transact()
-
-        self.eth_tester.mine_blocks(PERIOD)
-        tx_hash = self.contract.functions.applyTax().transact()
-        r = self.w3.eth.getTransactionReceipt(tx_hash)
-        self.assertEqual(self.contract.functions.redistributionCount().call(), 2)
-        self.assertEqual(self.contract.functions.demurrageModifier().call(), 980000)
-
-        self.eth_tester.mine_blocks(PERIOD)
-        tx_hash = self.contract.functions.applyTax().transact()
-        r = self.w3.eth.getTransactionReceipt(tx_hash)
-        self.assertEqual(self.contract.functions.redistributionCount().call(), 3)
-        self.assertEqual(self.contract.functions.demurrageModifier().call(), 960400)
-
-
-    def test_tax_balance(self):
-        tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], 1000).transact()
-        r = self.w3.eth.getTransactionReceipt(tx_hash)
-        self.assertEqual(r.status, 1)
-
-        self.eth_tester.mine_blocks(PERIOD)
-        tx_hash = self.contract.functions.applyTax().transact()
-        r = self.w3.eth.getTransactionReceipt(tx_hash)
-        self.assertEqual(r.status, 1)
-
-        balance = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call()
-        self.assertEqual(balance, 980)
-
-    
-    def test_taxed_transfer(self):
-        tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], 1000000).transact()
-        r = self.w3.eth.getTransactionReceipt(tx_hash)
-        self.assertEqual(r.status, 1)
-
-        self.eth_tester.mine_blocks(PERIOD)
-        tx_hash = self.contract.functions.applyTax().transact()
-        r = self.w3.eth.getTransactionReceipt(tx_hash)
-        self.assertEqual(r.status, 1)
-
-        balance_alice = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call()
-        self.assertEqual(balance_alice, 980000)
-
-        tx_hash = self.contract.functions.transfer(self.w3.eth.accounts[2], 500000).transact({'from': self.w3.eth.accounts[1]})
-        r = self.w3.eth.getTransactionReceipt(tx_hash)
-        logg.debug('r {}'.format(r))
-        self.assertEqual(r.status, 1)
-
-        balance_alice = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call()
-        balance_alice_trunc = int(balance_alice/1000)*1000
-        self.assertEqual(balance_alice_trunc, 480000)
-
-        balance_bob = self.contract.functions.balanceOf(self.w3.eth.accounts[2]).call()
-        balance_bob_trunc = int(balance_bob/1000)*1000
-        self.assertEqual(balance_bob_trunc, 500000)
 
 
 if __name__ == '__main__':

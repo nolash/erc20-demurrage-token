@@ -19,8 +19,7 @@ logging.getLogger('eth.vm').setLevel(logging.WARNING)
 testdir = os.path.dirname(__file__)
 
 #BLOCKTIME = 5 # seconds
-TAX_LEVEL = 10000 * 2 # 2%
-#PERIOD = int(60/BLOCKTIME) * 60 * 24 * 30 # month
+TAX_LEVEL = int((10000 * 2) * (10 ** 32)) # 2%
 PERIOD = 10
 
 
@@ -62,14 +61,20 @@ class Test(unittest.TestCase):
 
 
     def test_tax_period(self):
+        t = self.contract.functions.taxLevel().call()
+        logg.debug('taxlevel {}'.format(t))
+
         a = self.contract.functions.toTaxPeriodAmount(1000000, 0).call()
-        self.assertEqual(1000000, a)
+        self.assertEqual(a, 1000000)
 
         a = self.contract.functions.toTaxPeriodAmount(1000000, 1).call()
-        self.assertEqual(980000, a)
+        self.assertEqual(a, 980000)
 
         a = self.contract.functions.toTaxPeriodAmount(1000000, 2).call()
-        self.assertEqual(960400, a)
+        self.assertEqual(a, 960400)
+
+        a = self.contract.functions.toTaxPeriodAmount(980000, 1).call()
+        self.assertEqual(a, 960400)
 
 
     def test_fractional_state(self):

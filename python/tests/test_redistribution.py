@@ -20,7 +20,7 @@ testdir = os.path.dirname(__file__)
 #BLOCKTIME = 5 # seconds
 TAX_LEVEL = 10000 * 2 # 2%
 #PERIOD = int(60/BLOCKTIME) * 60 * 24 * 30 # month
-PERIOD = 20
+PERIOD = 1
 
 
 class Test(unittest.TestCase):
@@ -47,13 +47,15 @@ class Test(unittest.TestCase):
         self.sink_address = self.w3.eth.accounts[9]
 
         c = self.w3.eth.contract(abi=self.abi, bytecode=self.bytecode)
-        tx_hash = c.constructor('Foo Token', 'FOO', 6, TAX_LEVEL, PERIOD, self.sink_address).transact({'from': self.w3.eth.accounts[0]})
+        tx_hash = c.constructor('Foo Token', 'FOO', 6, TAX_LEVEL * (10 ** 32), PERIOD, self.sink_address).transact({'from': self.w3.eth.accounts[0]})
 
         r = self.w3.eth.getTransactionReceipt(tx_hash)
         self.contract = self.w3.eth.contract(abi=self.abi, address=r.contractAddress)
 
         self.start_block = self.w3.eth.blockNumber
-        logg.debug('starting at block number {}'.format(self.start_block))
+        b = self.w3.eth.getBlock(self.start_block)
+        self.start_time = b['timestamp']
+
 
     def tearDown(self):
         pass
@@ -68,26 +70,28 @@ class Test(unittest.TestCase):
 
 
     # TODO: check receipt log outputs
-    @unittest.skip('foo')
     def test_redistribution_storage(self):
-        self.contract.functions.mintTo(self.w3.eth.accounts[1], 2000).transact()
+        self.contract.functions.mintTo(self.w3.eth.accounts[1], 1000000).transact()
+        self.contract.functions.mintTo(self.w3.eth.accounts[2], 1000000).transact()
 
-        tx_hash = self.contract.functions.transfer(self.w3.eth.accounts[2], 500).transact({'from': self.w3.eth.accounts[1]})
+        external_address = web3.Web3.toChecksumAddress('0x' + os.urandom(20).hex())
+        tx_hash = self.contract.functions.transfer(external_address, 1000000).transact({'from': self.w3.eth.accounts[2]})
+        tx_hash = self.contract.functions.transfer(external_address, 999999).transact({'from': self.w3.eth.accounts[1]})
         r = self.w3.eth.getTransactionReceipt(tx_hash)
         logg.debug('tx before {}'.format(r))
         self.assertEqual(r.status, 1)
 
-        self.eth_tester.mine_blocks(PERIOD)
+        self.eth_tester.time_travel(self.start_time + 61)
 
         redistribution = self.contract.functions.redistributions(0).call();
-        self.assertEqual(redistribution.hex(), '000000000100000000000000000000000000000000000007d000000000000001')
+        self.assertEqual(redistribution.hex(), '000000000100000000000000000000000000000000001e848000000000000001')
 
         tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[0], 1000000).transact()
         r = self.w3.eth.getTransactionReceipt(tx_hash)
         self.assertEqual(r.status, 1)
 
         redistribution = self.contract.functions.redistributions(1).call()
-        self.assertEqual(redistribution.hex(), '000000000000000000000000000000000000000000000f4a1000000000000002')
+        self.assertEqual(redistribution.hex(), '000000000000000000000000000000000000000000002dc6c000000000000002')
     
 
     def test_redistribution_balance_on_zero_participants(self):
@@ -95,24 +99,27 @@ class Test(unittest.TestCase):
         tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], supply).transact()
         r = self.w3.eth.getTransactionReceipt(tx_hash)
 
-        self.eth_tester.mine_blocks(PERIOD)
+        self.eth_tester.time_travel(self.start_time + 61)
 
-        tx_hash = self.contract.functions.applyTax().transact()
+        tx_hash = self.contract.functions.applyDemurrage().transact()
         r = self.w3.eth.getTransactionReceipt(tx_hash)
         logg.debug('r {}'.format(r))
         self.assertEqual(r.status, 1)
+        tx_hash = self.contract.functions.changePeriod().transact()
+        rr = self.w3.eth.getTransactionReceipt(tx_hash)
+        self.assertEqual(rr.status, 1)
 
         redistribution = self.contract.functions.redistributions(0).call();
         supply = self.contract.functions.totalSupply().call()
 
         sink_increment = int(supply * (TAX_LEVEL / 1000000))
         for l in r['logs']:
-            if l.topics[0].hex() == '0x337db9c77a0769d770641c73e3282be23b15e2bddd830c219461dec832313389': # event Taxed(uint256,uint256)
+            if l.topics[0].hex() == '0xa0717e54e02bd9829db5e6e998aec0ae9de796b8d150a3cc46a92ab869697755': # event Decayed(uint256,uint256,uint256,uint256)
                 period = int.from_bytes(l.topics[1], 'big')
-                self.assertEqual(period, 1)
+                self.assertEqual(period, 2)
                 b = bytes.fromhex(l.data[2:])
                 remainder = int.from_bytes(b, 'big')
-                self.assertEqual(remainder, sink_increment)
+                self.assertEqual(remainder, int((1000000 - TAX_LEVEL) * (10 ** 32)))
                 logg.debug('period {} remainder {}'.format(period, remainder))
 
         sink_balance = self.contract.functions.balanceOf(self.sink_address).call()
@@ -140,14 +147,15 @@ class Test(unittest.TestCase):
         r = self.w3.eth.getTransactionReceipt(tx_hash)
         # No cheating!
         self.contract.functions.transfer(self.w3.eth.accounts[3], spend_amount).transact({'from': self.w3.eth.accounts[3]})
-        # Too low
+        # Cheapskate!
         self.contract.functions.transfer(external_address, spend_amount-1).transact({'from': self.w3.eth.accounts[4]})
 
         self.assertEqual(r.status, 1)
 
-        self.eth_tester.mine_blocks(PERIOD)
+        self.eth_tester.time_travel(self.start_time + 61)
 
-        self.contract.functions.applyTax().transact()
+        self.contract.functions.applyDemurrage().transact()
+        self.contract.functions.changePeriod().transact()
 
         bummer_balance = self.contract.functions.balanceOf(self.w3.eth.accounts[3]).call()
         self.assertEqual(bummer_balance, mint_amount - (mint_amount * (TAX_LEVEL / 1000000)))

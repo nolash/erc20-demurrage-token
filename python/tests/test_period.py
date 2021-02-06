@@ -20,7 +20,7 @@ testdir = os.path.dirname(__file__)
 #BLOCKTIME = 5 # seconds
 TAX_LEVEL = 10000 * 2 # 2%
 #PERIOD = int(60/BLOCKTIME) * 60 * 24 * 30 # month
-PERIOD = 2
+PERIOD = 1
 
 
 class Test(unittest.TestCase):
@@ -47,12 +47,15 @@ class Test(unittest.TestCase):
         self.sink_address = self.w3.eth.accounts[9]
 
         c = self.w3.eth.contract(abi=self.abi, bytecode=self.bytecode)
-        tx_hash = c.constructor('Foo Token', 'FOO', 6, TAX_LEVEL, PERIOD, self.sink_address).transact({'from': self.w3.eth.accounts[0]})
+        tx_hash = c.constructor('Foo Token', 'FOO', 6, TAX_LEVEL * (10 ** 32), PERIOD, self.sink_address).transact({'from': self.w3.eth.accounts[0]})
 
         r = self.w3.eth.getTransactionReceipt(tx_hash)
         self.contract = self.w3.eth.contract(abi=self.abi, address=r.contractAddress)
 
         self.start_block = self.w3.eth.blockNumber
+        b = self.w3.eth.getBlock(self.start_block)
+        self.start_time = b['timestamp']
+
 
     def tearDown(self):
         pass
@@ -63,15 +66,14 @@ class Test(unittest.TestCase):
         r = self.w3.eth.getTransactionReceipt(tx_hash)
         self.assertEqual(r.status, 1)
 
-        self.eth_tester.mine_blocks(PERIOD * 10)
-
-        tx_hash = self.contract.functions.transfer(self.w3.eth.accounts[2], 500).transact({'from': self.w3.eth.accounts[1]})
+        self.eth_tester.time_travel(self.start_time + 61)
+        tx_hash = self.contract.functions.changePeriod().transact()
         r = self.w3.eth.getTransactionReceipt(tx_hash)
-        logg.debug('r {}'.format(r));
         self.assertEqual(r.status, 1)
 
-        period = self.contract.functions.accountPeriod(self.w3.eth.accounts[1]).call()
-        self.assertEqual(period, 12)
+        redistribution = self.contract.functions.redistributions(1).call()
+        self.assertEqual(2, self.contract.functions.toRedistributionPeriod(redistribution).call())
+        self.assertEqual(2, self.contract.functions.actualPeriod().call())
 
 
 if __name__ == '__main__':
