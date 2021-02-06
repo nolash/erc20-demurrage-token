@@ -138,6 +138,10 @@ class Test(unittest.TestCase):
         self.contract.functions.transfer(external_address, spend_amount).transact({'from': self.w3.eth.accounts[1]})
         tx_hash = self.contract.functions.transfer(external_address, spend_amount).transact({'from': self.w3.eth.accounts[2]})
         r = self.w3.eth.getTransactionReceipt(tx_hash)
+        # No cheating!
+        self.contract.functions.transfer(self.w3.eth.accounts[3], spend_amount).transact({'from': self.w3.eth.accounts[3]})
+        # Too low
+        self.contract.functions.transfer(external_address, spend_amount-1).transact({'from': self.w3.eth.accounts[4]})
 
         self.assertEqual(r.status, 1)
 
@@ -178,83 +182,6 @@ class Test(unittest.TestCase):
         logg.debug('rrr {} {}'.format(redistribution, spender_new_decayed_balance))
 
         self.assertEqual(spender_actual_balance, spender_new_decayed_balance)
-
-
-    @unittest.skip('foo')
-    def test_redistribution_balance_to_single(self):
-        z = 0
-        for i in range(3):
-            redistribution = self.contract.functions.redistributions(0).call();
-            logg.debug('foo {}'.format(redistribution.hex()))
-            self.debug_periods();
-
-            self.contract.functions.mintTo(self.w3.eth.accounts[i], 1000000*(i+1)).transact()
-            z += 1000000*(i+1)
-
-        tx_hash = self.contract.functions.transfer(self.w3.eth.accounts[3], 1000000).transact({'from': self.w3.eth.accounts[0]})
-        r = self.w3.eth.getTransactionReceipt(tx_hash)
-        logg.debug('tx before r {}'.format(r))
-
-        balance = self.contract.functions.balanceOf(self.w3.eth.accounts[0]).call()
-        self.assertEqual(balance, 0)
-
-        self.eth_tester.mine_blocks(PERIOD)
-
-        redistribution = self.contract.functions.redistributions(0).call();
-        self.assertEqual(redistribution.hex(), '000000000100000000000000000000000000000000005b8d8000000000000001')
-
-        tx_hash = self.contract.functions.transfer(self.w3.eth.accounts[3], 0).transact({'from': self.w3.eth.accounts[0]})
-        r = self.w3.eth.getTransactionReceipt(tx_hash)
-        logg.debug('tx after r {}'.format(r))
-
-        balance = self.contract.functions.balanceOf(self.w3.eth.accounts[0]).call()
-        self.assertEqual(balance, int(z * 0.02 * 0.98))
-
-        redistribution = self.contract.functions.redistributions(1).call();
-        self.assertEqual(redistribution.hex(), '000000000000000000000000000000000000000000005b8d8000000000000002')
-
-
-    @unittest.skip('foo')
-    def test_redistribution_balance_to_two(self):
-        z = 0
-        for i in range(5):
-            redistribution = self.contract.functions.redistributions(0).call();
-            logg.debug('foo {}'.format(redistribution.hex()))
-            self.debug_periods();
-
-            self.contract.functions.mintTo(self.w3.eth.accounts[i], 1000000*(i+1)).transact()
-            z += 1000000*(i+1)
-
-        tx_hash = self.contract.functions.transfer(self.w3.eth.accounts[5], 1000000).transact({'from': self.w3.eth.accounts[0]})
-        r = self.w3.eth.getTransactionReceipt(tx_hash)
-
-        tx_hash = self.contract.functions.transfer(self.w3.eth.accounts[6], 2000000).transact({'from': self.w3.eth.accounts[1]})
-        r = self.w3.eth.getTransactionReceipt(tx_hash)
-
-        # No cheating!
-        tx_hash = self.contract.functions.transfer(self.w3.eth.accounts[2], 3000000).transact({'from': self.w3.eth.accounts[2]})
-        r = self.w3.eth.getTransactionReceipt(tx_hash)
-
-        balance = self.contract.functions.balanceOf(self.w3.eth.accounts[0]).call()
-        self.assertEqual(balance, 0)
-
-        balance = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call()
-        self.assertEqual(balance, 0)
-
-        self.eth_tester.mine_blocks(PERIOD) 
-        self.debug_periods();
-
-        redistribution = self.contract.functions.redistributions(0).call();
-        self.assertEqual(redistribution.hex(), '00000000020000000000000000000000000000000000e4e1c000000000000001')
-
-        tx_hash = self.contract.functions.transfer(self.w3.eth.accounts[3], 0).transact({'from': self.w3.eth.accounts[0]})
-        r = self.w3.eth.getTransactionReceipt(tx_hash)
-
-        balance = self.contract.functions.balanceOf(self.w3.eth.accounts[0]).call()
-        self.assertEqual(balance, int((z * 0.02 * 0.98) / 2))
-
-        redistribution = self.contract.functions.redistributions(1).call();
-        self.assertEqual(redistribution.hex(), '00000000000000000000000000000000000000000000e4e1c000000000000002')
 
 
 if __name__ == '__main__':
