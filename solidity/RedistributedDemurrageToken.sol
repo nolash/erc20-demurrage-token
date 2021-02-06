@@ -6,15 +6,17 @@ pragma solidity > 0.6.11;
 contract RedistributedDemurrageToken {
 
 	address public owner;
-	uint256 public decimals;
 	string public name;
 	string public symbol;
+	uint256 public decimals;
 	uint256 public totalSupply;
+	uint256 public minimumParticipantSpend;
+	uint256 constant ppmDivider = 100000000000000000000000000000000;
 
-	uint256 public periodStart;
-	uint256 public periodDuration;
-	uint256 public taxLevel; // PPM
-	uint256 public demurrageModifier; // PPM
+	uint256 public immutable periodStart; // timestamp
+	uint256 public immutable periodDuration; // duration in SECONDS
+	uint256 public immutable taxLevel; // PPM per MINUTE
+	uint256 public demurrageModifier; // PPM uint128(block) | uint128(ppm)
 
 	bytes32[] public redistributions; // uint1(isFractional) | uint1(unused) | uint38(participants) | uint160(value) | uint56(period)
 	mapping (address => bytes32) account; // uint20(unused) | uint56(period) | uint160(value)
@@ -27,22 +29,24 @@ contract RedistributedDemurrageToken {
 	event Approval(address indexed _owner, address indexed _spender, uint256 _value);
 	event Mint(address indexed _minter, address indexed _beneficiary, uint256 _value);
 	//event Debug(uint256 _foo);
-	event Taxed(uint256 indexed _period, uint256 remainder);
+	event Decayed(uint256 indexed _period, uint256 indexed _periodCount, uint256 indexed _oldAmount, uint256 _newAmount);
 	event Redistribution(address indexed _account, uint256 indexed _period, uint256 _value);
 
-	constructor(string memory _name, string memory _symbol, uint8 _decimals, uint32 _taxLevel, uint256 _period, address _defaultSinkAddress) public {
+	constructor(string memory _name, string memory _symbol, uint8 _decimals, uint256 _taxLevelMinute, uint256 _periodMinutes, address _defaultSinkAddress) public {
 		owner = msg.sender;
 		minter[owner] = true;
-		periodStart = block.number;
-		periodDuration = _period;
-		taxLevel = _taxLevel;
+		periodStart = block.timestamp;
+		periodDuration = _periodMinutes * 60;
 		name = _name;
 		symbol = _symbol;
 		decimals = _decimals;
-		demurrageModifier = 1000000;
+		demurrageModifier = ppmDivider * 1000000; // Emulates 38 decimal places
+		demurrageModifier |= (1 << 128);
+		taxLevel = _taxLevelMinute; // 38 decimal places
 		sinkAddress = _defaultSinkAddress;
 		bytes32 initialRedistribution = toRedistribution(0, 0, 1);
 		redistributions.push(initialRedistribution);
+		minimumParticipantSpend = 10 ** uint256(_decimals);
 	}
 
 	// Given address will be allowed to call the mintTo() function
@@ -51,13 +55,24 @@ contract RedistributedDemurrageToken {
 		minter[_minter] = true;
 		return true;
 	}
-	
+
 	/// ERC20
 	function balanceOf(address _account) public view returns (uint256) {
-		uint256 baseBalance = getBaseBalance(_account);
-		uint256 inverseModifier = 1000000 - demurrageModifier;
-		uint256 balanceModifier = (inverseModifier * baseBalance) / 1000000;
-		return baseBalance - balanceModifier;
+		uint256 baseBalance;
+		uint256 anchorDemurrageAmount;
+		uint256 anchorDemurragePeriod;
+		uint256 currentDemurrageAmount;
+		uint256 periodCount;
+
+		baseBalance = getBaseBalance(_account);
+		anchorDemurrageAmount = toDemurrageAmount(demurrageModifier);
+		anchorDemurragePeriod = toDemurragePeriod(demurrageModifier);
+
+		periodCount = actualPeriod() - toDemurragePeriod(demurrageModifier);
+
+		currentDemurrageAmount = toTaxPeriodAmount(anchorDemurrageAmount, periodCount);
+
+		return (baseBalance * currentDemurrageAmount) / (ppmDivider * 1000000);
 	}
 
 	/// Balance unmodified by demurrage
@@ -69,7 +84,11 @@ contract RedistributedDemurrageToken {
 	function increaseBaseBalance(address _account, uint256 _delta) private returns (bool) {
 		uint256 oldBalance;
 		uint256 newBalance;
-		
+	
+		if (_delta == 0) {
+			return false;
+		}
+
 		oldBalance = getBaseBalance(_account);
 		newBalance = oldBalance + _delta;
 		require(uint160(newBalance) > uint160(oldBalance), 'ERR_WOULDWRAP'); // revert if increase would result in a wrapped value
@@ -82,6 +101,10 @@ contract RedistributedDemurrageToken {
 	function decreaseBaseBalance(address _account, uint256 _delta) private returns (bool) {
 		uint256 oldBalance;
 	       	uint256 newBalance;
+
+		if (_delta == 0) {
+			return false;
+		}
 
 		oldBalance = getBaseBalance(_account);	
 		require(oldBalance >= _delta, 'ERR_OVERSPEND'); // overspend guard
@@ -96,8 +119,8 @@ contract RedistributedDemurrageToken {
 	function mintTo(address _beneficiary, uint256 _amount) external returns (bool) {
 		require(minter[msg.sender]);
 
-		// TODO: get base amount for minting
-		applyTax();
+		applyDemurrage();
+		changePeriod();
 		totalSupply += _amount;
 		increaseBaseBalance(_beneficiary, _amount);
 		emit Mint(msg.sender, _beneficiary, _amount);
@@ -162,7 +185,7 @@ contract RedistributedDemurrageToken {
 
 	// Get the demurrage period of the current block number
 	function actualPeriod() public view returns (uint256) {
-		return (block.number - periodStart) / periodDuration + 1;
+		return (block.timestamp - periodStart) / periodDuration + 1;
 	}
 
 	// Add an entered demurrage period to the redistribution array
@@ -198,7 +221,7 @@ contract RedistributedDemurrageToken {
 		uint256 truncatedResult;
 
 		if (_numParts == 0) { // no division by zero please
-			return _sumWhole;
+			revert('ERR_NUMPARTS_ZERO');
 		}
 		require(_numParts < _sumWhole); // At least you are never LESS than the sum of your parts. Think about that.
 
@@ -207,24 +230,79 @@ contract RedistributedDemurrageToken {
 		return _sumWhole - truncatedResult;
 	}
 
+	// Called in the edge case where participant number is 0. It will override the participant count to 1.
+	// Returns the remainder sent to the sink address
+	function applyDefaultRedistribution(bytes32 _redistribution) private returns (uint256) {
+		uint256 redistributionSupply;
+		uint256 redistributionPeriod;
+		uint256 unit;
+		uint256 truncatedResult;
+
+		redistributionSupply = toRedistributionSupply(_redistribution);
+
+		unit = (redistributionSupply * taxLevel) / 1000000;
+		truncatedResult = (unit * 1000000) / taxLevel;
+
+		if (truncatedResult < redistributionSupply) {
+			redistributionPeriod = toRedistributionPeriod(_redistribution); // since we reuse period here, can possibly be optimized by passing period instead
+			redistributions[redistributionPeriod-1] &= 0x0000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffff; // just to be safe, zero out all participant count data, in this case there will be only one
+			redistributions[redistributionPeriod-1] |= 0x8000000001000000000000000000000000000000000000000000000000000000;
+		}
+
+		increaseBaseBalance(sinkAddress, unit / ppmDivider); //truncatedResult);
+		return unit;
+	}
+
 	// sets the remainder bit for the given period and books the remainder to the sink address balance
 	// returns false if no change was made
 	function applyRemainderOnPeriod(uint256 _remainder, uint256 _period) private returns (bool) {
-		bytes32 redistribution;
-
-		redistribution = redistributions[_period-1];
+		uint256 periodSupply;
 
 		if (_remainder == 0) {
 			return false;
 		}
-		redistribution |= 0x8000000000000000000000000000000000000000000000000000000000000000;
-		increaseBaseBalance(sinkAddress, _remainder);
+
+		redistributions[_period-1] |= 0x8000000000000000000000000000000000000000000000000000000000000000;
+
+		periodSupply = toRedistributionSupply(redistributions[_period-1]);
+		increaseBaseBalance(sinkAddress, periodSupply - _remainder);
+		return true;
+	}
+
+
+	function toDemurrageAmount(uint256 _demurrage) public pure returns (uint256) {
+		return _demurrage & 0x00000000000000000000000000000000ffffffffffffffffffffffffffffffff;
+	}
+
+	function toDemurragePeriod(uint256 _demurrage) public pure returns (uint256) {
+		return (_demurrage & 0xffffffffffffffffffffffffffffffff00000000000000000000000000000000) >> 128;
+	}
+
+	function applyDemurrage() public returns (bool) {
+		uint256 epochPeriodCount;
+		uint256 periodCount;
+		uint256 lastDemurrageAmount;
+		uint256 newDemurrageAmount;
+
+		epochPeriodCount = actualPeriod();
+		//epochPeriodCount = (block.timestamp - periodStart) / periodDuration; // toDemurrageTime(demurrageModifier);
+		periodCount = epochPeriodCount - toDemurragePeriod(demurrageModifier);
+		if (periodCount == 0) {
+			return false;
+		}
+		lastDemurrageAmount = toDemurrageAmount(demurrageModifier);
+		newDemurrageAmount = toTaxPeriodAmount(lastDemurrageAmount, periodCount);
+		demurrageModifier = 0;
+		demurrageModifier |= (newDemurrageAmount & 0x00000000000000000000000000000000ffffffffffffffffffffffffffffffff);
+		demurrageModifier |= (epochPeriodCount << 128);
+		emit Decayed(epochPeriodCount, periodCount, lastDemurrageAmount, newDemurrageAmount);
 		return true;
 	}
 
 	// Recalculate the demurrage modifier for the new period
 	// After this, all REPORTED balances will have been reduced by the corresponding ratio (but the effecive totalsupply stays the same)
-	function applyTax() public returns (uint256) {
+	//function applyTax() public returns (uint256) {
+	function changePeriod() public returns (uint256) {
 		bytes32 currentRedistribution;
 		bytes32 nextRedistribution;
 		uint256 currentPeriod;
@@ -235,29 +313,33 @@ contract RedistributedDemurrageToken {
 		if (currentRedistribution == bytes32(0x00)) {
 			return demurrageModifier;
 		}
-		demurrageModifier -= (demurrageModifier * taxLevel) / 1000000;
+		//demurrageModifier -= (demurrageModifier * taxLevel) / 1000000;
 		currentPeriod = toRedistributionPeriod(currentRedistribution);
 		nextRedistribution = toRedistribution(0, totalSupply, currentPeriod + 1);
 		redistributions.push(nextRedistribution);
 
 		currentParticipants = toRedistributionParticipants(currentRedistribution);
-		currentRemainder = remainder(currentParticipants, totalSupply); // we can use totalSupply directly because it will always be the same as the recorded supply on the current redistribution
-		applyRemainderOnPeriod(currentRemainder, currentPeriod);
-		emit Taxed(currentPeriod, currentRemainder);
+		if (currentParticipants == 0) {
+			currentRemainder = applyDefaultRedistribution(currentRedistribution);
+		} else {
+			currentRemainder = remainder(currentParticipants, totalSupply); // we can use totalSupply directly because it will always be the same as the recorded supply on the current redistribution
+			applyRemainderOnPeriod(currentRemainder, currentPeriod);
+		}
 		return demurrageModifier;
 	}
 
 	// Calculate a value reduced by demurrage by the given period
 	function toTaxPeriodAmount(uint256 _value, uint256 _period) public view returns (uint256) {
 		uint256 valueFactor;
+		uint256 truncatedTaxLevel;
 	      
-	       	// TODO: doesn't work for solidity as floats are missing and using ints linearly increases the order of magnitude  	
-		// valueFactor = 1000000 * (((1000000-taxLevel)/1000000) ** _period);
+		// TODO: if can't get to work, reverse the iteration from current period.
 		valueFactor = 1000000;
-		for (uint256 i = 0; i < _period; i++) {
-			valueFactor = (valueFactor * taxLevel) / 1000000;
-		}
+		truncatedTaxLevel = taxLevel / ppmDivider;
 
+		for (uint256 i = 0; i < _period; i++) {
+			valueFactor = valueFactor - ((valueFactor * truncatedTaxLevel) / 1000000);
+		}
 		return (valueFactor * _value) / 1000000;
 	}
 
@@ -282,9 +364,8 @@ contract RedistributedDemurrageToken {
 		}
 
 		supply = toRedistributionSupply(periodRedistribution);
-		// TODO: Make sure value for balance increases round down, and that we can do a single allocation to a sink account with the difference. We can use the highest bit in "participants" for that.
-		baseValue = supply / participants;
-		value = toTaxPeriodAmount(baseValue, period-1);
+		baseValue = ((supply / participants) * (taxLevel / 1000000)) / ppmDivider;
+		value = toTaxPeriodAmount(baseValue, period - 1);
 
 		account[_account] &= bytes32(0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff);
 		increaseBaseBalance(_account, value);
@@ -295,7 +376,21 @@ contract RedistributedDemurrageToken {
 
 	// Inflates the given amount according to the current demurrage modifier
 	function toBaseAmount(uint256 _value) public view returns (uint256) {
-		return (_value * 1000000) / demurrageModifier;
+		return (_value * ppmDivider * 1000000) / toDemurrageAmount(demurrageModifier);
+	}
+
+	// ERC20, triggers tax and/or redistribution
+	function approve(address _spender, uint256 _value) public returns (bool) {
+		uint256 baseValue;
+
+		applyDemurrage();
+		changePeriod();
+		applyRedistributionOnAccount(msg.sender);
+
+		baseValue = toBaseAmount(_value);
+		allowance[msg.sender][_spender] += baseValue;
+		emit Approval(msg.sender, _spender, _value);
+		return true;
 	}
 
 	// ERC20, triggers tax and/or redistribution
@@ -303,7 +398,8 @@ contract RedistributedDemurrageToken {
 		uint256 baseValue;
 		bool result;
 
-		applyTax();
+		applyDemurrage();
+		changePeriod();
 		applyRedistributionOnAccount(msg.sender);
 
 		// TODO: Prefer to truncate the result, instead it seems to round to nearest :/
@@ -313,29 +409,14 @@ contract RedistributedDemurrageToken {
 		return result;
 	}
 
-	// ERC20 transfer backend for transfer, transferFrom
-	function transferBase(address _from, address _to, uint256 _value) private returns (bool) {
-		uint256 period;
-
-		if (!decreaseBaseBalance(_from, _value)) {
-			revert('ERR_TX_DECREASEBALANCE');
-		}
-		if (!increaseBaseBalance(_to, _value)) {
-			revert('ERR_TX_INCREASEBALANCE');
-		}
-		period = actualPeriod();
-		if (_value > 0 && accountPeriod(_from) != period) {
-			registerAccountPeriod(_from, period);
-		}
-		return true;
-	}
 
 	// ERC20, triggers tax and/or redistribution
 	function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
 		uint256 baseValue;
 		bool result;
 
-		applyTax();
+		applyDemurrage();
+		changePeriod();
 		applyRedistributionOnAccount(msg.sender);
 
 		baseValue = toBaseAmount(_value);
@@ -345,16 +426,17 @@ contract RedistributedDemurrageToken {
 		return result;
 	}
 
-	// ERC20, triggers tax and/or redistribution
-	function approve(address _spender, uint256 _value) public returns (bool) {
-		uint256 baseValue;
+	// ERC20 transfer backend for transfer, transferFrom
+	function transferBase(address _from, address _to, uint256 _value) private returns (bool) {
+		uint256 period;
 
-		applyTax();
-		applyRedistributionOnAccount(msg.sender);
+		decreaseBaseBalance(_from, _value);
+		increaseBaseBalance(_to, _value);
 
-		baseValue = toBaseAmount(_value);
-		allowance[msg.sender][_spender] += baseValue;
-		emit Approval(msg.sender, _spender, _value);
+		period = actualPeriod();
+		if (_value >= minimumParticipantSpend && accountPeriod(_from) != period && _from != _to) {
+			registerAccountPeriod(_from, period);
+		}
 		return true;
 	}
 }
