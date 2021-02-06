@@ -147,7 +147,7 @@ class Test(unittest.TestCase):
         r = self.w3.eth.getTransactionReceipt(tx_hash)
         # No cheating!
         self.contract.functions.transfer(self.w3.eth.accounts[3], spend_amount).transact({'from': self.w3.eth.accounts[3]})
-        # Cheapskate!
+        # No cheapskating!
         self.contract.functions.transfer(external_address, spend_amount-1).transact({'from': self.w3.eth.accounts[4]})
 
         self.assertEqual(r.status, 1)

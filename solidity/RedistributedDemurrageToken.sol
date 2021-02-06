@@ -117,12 +117,15 @@ contract RedistributedDemurrageToken {
 	// Creates new tokens out of thin air, and allocates them to the given address
 	// Triggers tax
 	function mintTo(address _beneficiary, uint256 _amount) external returns (bool) {
+		uint256 baseAmount;
+
 		require(minter[msg.sender]);
 
 		applyDemurrage();
 		changePeriod();
+		baseAmount = _amount;
 		totalSupply += _amount;
-		increaseBaseBalance(_beneficiary, _amount);
+		increaseBaseBalance(_beneficiary, baseAmount);
 		emit Mint(msg.sender, _beneficiary, _amount);
 		saveRedistributionSupply();
 		return true;
