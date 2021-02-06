@@ -30,6 +30,7 @@ contract RedistributedDemurrageToken {
 	event Mint(address indexed _minter, address indexed _beneficiary, uint256 _value);
 	event Debug(bytes32 _foo);
 	event Decayed(uint256 indexed _period, uint256 indexed _periodCount, uint256 indexed _oldAmount, uint256 _newAmount);
+	event Period(uint256 _period);
 	event Redistribution(address indexed _account, uint256 indexed _period, uint256 _value);
 
 	constructor(string memory _name, string memory _symbol, uint8 _decimals, uint256 _taxLevelMinute, uint256 _periodMinutes, address _defaultSinkAddress) public {
@@ -344,6 +345,7 @@ contract RedistributedDemurrageToken {
 		uint256 nextRedistributionDemurrage;
 		uint256 demurrageCounts;
 		uint256 periodTimestamp;
+		uint256 nextPeriod;
 
 		currentRedistribution = checkPeriod();
 		if (currentRedistribution == bytes32(0x00)) {
@@ -351,6 +353,7 @@ contract RedistributedDemurrageToken {
 		}
 
 		currentPeriod = toRedistributionPeriod(currentRedistribution);
+		nextPeriod = currentPeriod + 1;
 		periodTimestamp = getPeriodTimeDelta(currentPeriod);
 
 		applyDemurrage();
@@ -363,8 +366,7 @@ contract RedistributedDemurrageToken {
 			nextRedistributionDemurrage = currentDemurrageAmount / ppmDivider;
 		}
 		
-		nextRedistribution = toRedistribution(0, nextRedistributionDemurrage, totalSupply, currentPeriod + 1);
-		emit Debug(bytes32(currentDemurrageAmount));
+		nextRedistribution = toRedistribution(0, nextRedistributionDemurrage, totalSupply, nextPeriod);
 		redistributions.push(nextRedistribution);
 
 		currentParticipants = toRedistributionParticipants(currentRedistribution);
@@ -374,6 +376,7 @@ contract RedistributedDemurrageToken {
 			currentRemainder = remainder(currentParticipants, totalSupply); // we can use totalSupply directly because it will always be the same as the recorded supply on the current redistribution
 			applyRemainderOnPeriod(currentRemainder, currentPeriod);
 		}
+		emit Period(nextPeriod);
 		return true;
 	}
 
@@ -416,6 +419,7 @@ contract RedistributedDemurrageToken {
 		uint256 baseValue;
 		uint256 value;
 		uint256 period;
+		uint256 demurrage;
 	       
 		period = accountPeriod(_account);
 		if (period == 0 || period >= actualPeriod()) {
@@ -428,8 +432,9 @@ contract RedistributedDemurrageToken {
 		}
 
 		supply = toRedistributionSupply(periodRedistribution);
+		demurrage = toRedistributionDemurrageModifier(periodRedistribution);
 		baseValue = ((supply / participants) * (taxLevel / 1000000)) / ppmDivider;
-		value = decayBy(baseValue, period - 1);
+		value = (baseValue * demurrage) / 1000000;
 
 		account[_account] &= bytes32(0xffffffffffffffffffffffffffffffffffffff00000000ffffffffffffffffff);
 		increaseBaseBalance(_account, value);
@@ -467,7 +472,7 @@ contract RedistributedDemurrageToken {
 		// TODO: Prefer to truncate the result, instead it seems to round to nearest :/
 		baseValue = toBaseAmount(_value);
 		result = transferBase(msg.sender, _to, baseValue);
-
+		emit Transfer(msg.sender, _to, _value);
 		return result;
 	}
 
@@ -484,6 +489,7 @@ contract RedistributedDemurrageToken {
 		require(allowance[_from][msg.sender] >= baseValue);
 
 		result = transferBase(_from, _to, baseValue);
+		emit Transfer(_from, _to, _value);
 		return result;
 	}
 
