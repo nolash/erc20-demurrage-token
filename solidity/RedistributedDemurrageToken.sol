@@ -10,6 +10,7 @@ contract RedistributedDemurrageToken {
 	string public symbol;
 	uint256 public decimals;
 	uint256 public totalSupply;
+	uint256 public minimumParticipantSpend;
 
 	uint256 public periodStart;
 	uint256 public periodDuration;
@@ -43,6 +44,7 @@ contract RedistributedDemurrageToken {
 		sinkAddress = _defaultSinkAddress;
 		bytes32 initialRedistribution = toRedistribution(0, 0, 1);
 		redistributions.push(initialRedistribution);
+		minimumParticipantSpend = 10 ** uint256(_decimals);
 	}
 
 	// Given address will be allowed to call the mintTo() function
@@ -347,7 +349,7 @@ contract RedistributedDemurrageToken {
 		increaseBaseBalance(_to, _value);
 
 		period = actualPeriod();
-		if (_value > 0 && accountPeriod(_from) != period) {
+		if (_value >= minimumParticipantSpend && accountPeriod(_from) != period && _from != _to) {
 			registerAccountPeriod(_from, period);
 		}
 		return true;

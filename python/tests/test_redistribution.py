@@ -90,7 +90,6 @@ class Test(unittest.TestCase):
         self.assertEqual(redistribution.hex(), '000000000000000000000000000000000000000000000f4a1000000000000002')
     
 
-    @unittest.skip('foo')
     def test_redistribution_balance_on_zero_participants(self):
         supply = 1000000000000
         tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], supply).transact()
@@ -232,6 +231,10 @@ class Test(unittest.TestCase):
         tx_hash = self.contract.functions.transfer(self.w3.eth.accounts[6], 2000000).transact({'from': self.w3.eth.accounts[1]})
         r = self.w3.eth.getTransactionReceipt(tx_hash)
 
+        # No cheating!
+        tx_hash = self.contract.functions.transfer(self.w3.eth.accounts[2], 3000000).transact({'from': self.w3.eth.accounts[2]})
+        r = self.w3.eth.getTransactionReceipt(tx_hash)
+
         balance = self.contract.functions.balanceOf(self.w3.eth.accounts[0]).call()
         self.assertEqual(balance, 0)
 
@@ -248,7 +251,6 @@ class Test(unittest.TestCase):
         r = self.w3.eth.getTransactionReceipt(tx_hash)
 
         balance = self.contract.functions.balanceOf(self.w3.eth.accounts[0]).call()
-        #self.assertEqual(balance, 117600)
         self.assertEqual(balance, int((z * 0.02 * 0.98) / 2))
 
         redistribution = self.contract.functions.redistributions(1).call();

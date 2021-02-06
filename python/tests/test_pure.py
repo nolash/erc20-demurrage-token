@@ -72,7 +72,6 @@ class Test(unittest.TestCase):
         self.assertEqual(960400, a)
 
 
-    @unittest.skip('foo')
     def test_fractional_state(self):
         with self.assertRaises(eth_tester.exceptions.TransactionFailed):
             self.contract.functions.remainder(2, 1).call();
