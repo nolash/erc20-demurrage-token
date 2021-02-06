@@ -56,10 +56,23 @@ class Test(unittest.TestCase):
 
         self.start_block = self.w3.eth.blockNumber
 
+
     def tearDown(self):
         pass
 
 
+    def test_tax_period(self):
+        a = self.contract.functions.toTaxPeriodAmount(1000000, 0).call()
+        self.assertEqual(1000000, a)
+
+        a = self.contract.functions.toTaxPeriodAmount(1000000, 1).call()
+        self.assertEqual(980000, a)
+
+        a = self.contract.functions.toTaxPeriodAmount(1000000, 2).call()
+        self.assertEqual(960400, a)
+
+
+    @unittest.skip('foo')
     def test_fractional_state(self):
         with self.assertRaises(eth_tester.exceptions.TransactionFailed):
             self.contract.functions.remainder(2, 1).call();

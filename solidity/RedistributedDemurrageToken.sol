@@ -218,7 +218,6 @@ contract RedistributedDemurrageToken {
 		redistributionSupply = toRedistributionSupply(_redistribution);
 
 		unit = (redistributionSupply * taxLevel) / 1000000;
-		//truncatedResult = (unit * taxLevel) / 1000000;
 		truncatedResult = (unit * 1000000) / taxLevel;
 
 		if (truncatedResult < redistributionSupply) {
@@ -284,9 +283,8 @@ contract RedistributedDemurrageToken {
 		// valueFactor = 1000000 * (((1000000-taxLevel)/1000000) ** _period);
 		valueFactor = 1000000;
 		for (uint256 i = 0; i < _period; i++) {
-			valueFactor = (valueFactor * taxLevel) / 1000000;
+			valueFactor = valueFactor - ((valueFactor * taxLevel) / 1000000);
 		}
-
 		return (valueFactor * _value) / 1000000;
 	}
 
@@ -311,9 +309,8 @@ contract RedistributedDemurrageToken {
 		}
 
 		supply = toRedistributionSupply(periodRedistribution);
-		// TODO: Make sure value for balance increases round down, and that we can do a single allocation to a sink account with the difference. We can use the highest bit in "participants" for that.
-		baseValue = supply / participants;
-		value = toTaxPeriodAmount(baseValue, period-1);
+		baseValue = ((supply / participants) * (taxLevel) / 1000000);
+		value = toTaxPeriodAmount(baseValue, period - 1);
 
 		account[_account] &= bytes32(0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff);
 		increaseBaseBalance(_account, value);

@@ -20,7 +20,7 @@ testdir = os.path.dirname(__file__)
 #BLOCKTIME = 5 # seconds
 TAX_LEVEL = 10000 * 2 # 2%
 #PERIOD = int(60/BLOCKTIME) * 60 * 24 * 30 # month
-PERIOD = 10
+PERIOD = 20
 
 
 class Test(unittest.TestCase):
@@ -90,6 +90,7 @@ class Test(unittest.TestCase):
         self.assertEqual(redistribution.hex(), '000000000000000000000000000000000000000000000f4a1000000000000002')
     
 
+    @unittest.skip('foo')
     def test_redistribution_balance_on_zero_participants(self):
         supply = 1000000000000
         tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], supply).transact()
@@ -122,6 +123,62 @@ class Test(unittest.TestCase):
 
         balance = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call()
         self.assertEqual(balance, supply - sink_increment)
+
+
+    def test_redistribution_two_of_ten(self):
+        mint_amount = 100000000
+        z = 0
+        for i in range(10):
+            self.contract.functions.mintTo(self.w3.eth.accounts[i], mint_amount).transact()
+            z += mint_amount
+
+        initial_balance = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call()
+
+        spend_amount = 1000000
+        external_address = web3.Web3.toChecksumAddress('0x' + os.urandom(20).hex())
+        self.contract.functions.transfer(external_address, spend_amount).transact({'from': self.w3.eth.accounts[1]})
+        tx_hash = self.contract.functions.transfer(external_address, spend_amount).transact({'from': self.w3.eth.accounts[2]})
+        r = self.w3.eth.getTransactionReceipt(tx_hash)
+
+        self.assertEqual(r.status, 1)
+
+        self.eth_tester.mine_blocks(PERIOD)
+
+        self.contract.functions.applyTax().transact()
+
+        bummer_balance = self.contract.functions.balanceOf(self.w3.eth.accounts[3]).call()
+        self.assertEqual(bummer_balance, mint_amount - (mint_amount * (TAX_LEVEL / 1000000)))
+        logg.debug('bal {} '.format(bummer_balance))
+
+        bummer_balance = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call()
+        spender_balance = mint_amount - spend_amount
+        spender_decayed_balance = int(spender_balance - (spender_balance * (TAX_LEVEL / 1000000)))
+        self.assertEqual(bummer_balance, spender_decayed_balance)
+        logg.debug('bal {} '.format(bummer_balance))
+
+        tx_hash = self.contract.functions.applyRedistributionOnAccount(self.w3.eth.accounts[1]).transact()
+        r = self.w3.eth.getTransactionReceipt(tx_hash)
+        logg.debug('log {}'.format(r.logs))
+
+        self.contract.functions.applyRedistributionOnAccount(self.w3.eth.accounts[2]).transact()
+
+        redistribution_data = self.contract.functions.redistributions(0).call()
+        logg.debug('redist data {}'.format(redistribution_data.hex()))
+
+        account_period_data = self.contract.functions.accountPeriod(self.w3.eth.accounts[1]).call()
+        logg.debug('account period {}'.format(account_period_data))
+
+        actual_period = self.contract.functions.actualPeriod().call()
+        logg.debug('period {}'.format(actual_period))
+
+        redistribution = int((z / 2) * (TAX_LEVEL / 1000000))
+        spender_new_base_balance = ((mint_amount - spend_amount) + redistribution)
+        spender_new_decayed_balance = int(spender_new_base_balance - (spender_new_base_balance * (TAX_LEVEL / 1000000)))
+
+        spender_actual_balance = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call()
+        logg.debug('rrr {} {}'.format(redistribution, spender_new_decayed_balance))
+
+        self.assertEqual(spender_actual_balance, spender_new_decayed_balance)
 
 
     @unittest.skip('foo')
@@ -158,7 +215,6 @@ class Test(unittest.TestCase):
         self.assertEqual(redistribution.hex(), '000000000000000000000000000000000000000000005b8d8000000000000002')
 
 
-    #@unittest.expectedFailure
     @unittest.skip('foo')
     def test_redistribution_balance_to_two(self):
         z = 0
