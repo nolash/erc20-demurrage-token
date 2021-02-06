@@ -30,7 +30,7 @@ contract RedistributedDemurrageToken {
 	event Transfer(address indexed _from, address indexed _to, uint256 _value);
 	event Approval(address indexed _owner, address indexed _spender, uint256 _value);
 	event Mint(address indexed _minter, address indexed _beneficiary, uint256 _value);
-	//event Debug(uint256 _foo);
+	event Debug(bytes32 _foo);
 	event Decayed(uint256 indexed _period, uint256 indexed _periodCount, uint256 indexed _oldAmount, uint256 _newAmount);
 	event Redistribution(address indexed _account, uint256 indexed _period, uint256 _value);
 
@@ -72,7 +72,7 @@ contract RedistributedDemurrageToken {
 
 		periodCount = actualPeriod() - toDemurragePeriod(demurrageModifier);
 
-		currentDemurrageAmount = toTaxPeriodAmount(anchorDemurrageAmount, periodCount);
+		currentDemurrageAmount = decayBy(anchorDemurrageAmount, periodCount);
 
 		return (baseBalance * currentDemurrageAmount) / (ppmDivider * 1000000);
 	}
@@ -137,7 +137,6 @@ contract RedistributedDemurrageToken {
 
 		require(minter[msg.sender]);
 
-		applyDemurrage();
 		changePeriod();
 		baseAmount = _amount;
 		totalSupply += _amount;
@@ -197,6 +196,8 @@ contract RedistributedDemurrageToken {
 		tmpRedistribution |= (participants & 0x0fffffffff) << 104;
 
 		redistributions[redistributions.length-1] = bytes32(tmpRedistribution);
+
+		return true;
 	}
 
 	// Save the current total supply amount to the current redistribution period
@@ -208,6 +209,7 @@ contract RedistributedDemurrageToken {
 		currentRedistribution |= totalSupply << 32;
 
 		redistributions[redistributions.length-1] = bytes32(currentRedistribution);
+		return true;
 	}
 
 	// Get the demurrage period of the current block number
@@ -240,6 +242,7 @@ contract RedistributedDemurrageToken {
 		account[_account] &= 0xffffffffffffffffffffffffffffffffffffff00000000ffffffffffffffffff;
 		account[_account] |= bytes32(_period << 72);
 		incrementRedistributionParticipants();
+		return true;
 	}
 
 	// Determine whether the unit number is rounded down, rounded up or evenly divides.
@@ -274,9 +277,7 @@ contract RedistributedDemurrageToken {
 
 		if (truncatedResult < redistributionSupply) {
 			redistributionPeriod = toRedistributionPeriod(_redistribution); // since we reuse period here, can possibly be optimized by passing period instead
-			//redistributions[redistributionPeriod-1] &= 0x0000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffff; // just to be safe, zero out all participant count data, in this case there will be only one
 			redistributions[redistributionPeriod-1] &= 0xfffffffffffffffffffffffffffff000000000ffffffffffffffffffffffffff; // just to be safe, zero out all participant count data, in this case there will be only one
-			//redistributions[redistributionPeriod-1] |= 0x8000000001000000000000000000000000000000000000000000000000000000;
 			redistributions[redistributionPeriod-1] |= 0x8000000000000000000000000000000000000100000000000000000000000000;
 		}
 
@@ -323,7 +324,7 @@ contract RedistributedDemurrageToken {
 			return false;
 		}
 		lastDemurrageAmount = toDemurrageAmount(demurrageModifier);
-		newDemurrageAmount = toTaxPeriodAmount(lastDemurrageAmount, periodCount);
+		newDemurrageAmount = decayBy(lastDemurrageAmount, periodCount);
 		demurrageModifier = 0;
 		demurrageModifier |= (newDemurrageAmount & 0x00000000000000000000000000000000ffffffffffffffffffffffffffffffff);
 		demurrageModifier |= (epochPeriodCount << 128);
@@ -350,7 +351,8 @@ contract RedistributedDemurrageToken {
 		uint256 currentPeriod;
 		uint256 currentParticipants;
 		uint256 currentRemainder;
-		uint256 currentRedistributionDemurrage;
+		uint256 currentDemurrageAmount;
+		uint256 nextRedistributionDemurrage;
 		uint256 demurrageCounts;
 		uint256 periodTimestamp;
 
@@ -358,12 +360,22 @@ contract RedistributedDemurrageToken {
 		if (currentRedistribution == bytes32(0x00)) {
 			return false;
 		}
-		periodTimestamp = getPeriodTimeDelta(currentPeriod);
-		demurrageCounts = demurrageCycles(periodTimestamp);
-		currentRedistributionDemurrage = toRedistributionDemurrageModifier(currentRedistribution);
-		
+
 		currentPeriod = toRedistributionPeriod(currentRedistribution);
-		nextRedistribution = toRedistribution(0, toTaxPeriodAmount(currentRedistributionDemurrage, demurrageCounts), totalSupply, currentPeriod + 1);
+		periodTimestamp = getPeriodTimeDelta(currentPeriod);
+
+		applyDemurrage();
+		currentDemurrageAmount = toDemurrageAmount(demurrageModifier);
+
+		demurrageCounts = demurrageCycles(periodTimestamp);
+		if (demurrageCounts > 0) {
+			nextRedistributionDemurrage = growBy(currentDemurrageAmount, demurrageCounts) / ppmDivider;
+		} else {
+			nextRedistributionDemurrage = currentDemurrageAmount / ppmDivider;
+		}
+		
+		nextRedistribution = toRedistribution(0, nextRedistributionDemurrage, totalSupply, currentPeriod + 1);
+		emit Debug(bytes32(currentDemurrageAmount));
 		redistributions.push(nextRedistribution);
 
 		currentParticipants = toRedistributionParticipants(currentRedistribution);
@@ -376,9 +388,23 @@ contract RedistributedDemurrageToken {
 		return true;
 	}
 
+	function growBy(uint256 _value, uint256 _period) public view returns (uint256) {
+		uint256 valueFactor;
+		uint256 truncatedTaxLevel;
+	      
+		// TODO: if can't get to work, reverse the iteration from current period.
+		valueFactor = 1000000;
+		truncatedTaxLevel = taxLevel / ppmDivider;
+
+		for (uint256 i = 0; i < _period; i++) {
+			valueFactor = valueFactor + ((valueFactor * truncatedTaxLevel) / 1000000);
+		}
+		return (valueFactor * _value) / 1000000;
+	}
+
 	// Calculate a value reduced by demurrage by the given period
 	// TODO: higher precision
-	function toTaxPeriodAmount(uint256 _value, uint256 _period) public view returns (uint256) {
+	function decayBy(uint256 _value, uint256 _period) public view returns (uint256) {
 		uint256 valueFactor;
 		uint256 truncatedTaxLevel;
 	      
@@ -414,7 +440,7 @@ contract RedistributedDemurrageToken {
 
 		supply = toRedistributionSupply(periodRedistribution);
 		baseValue = ((supply / participants) * (taxLevel / 1000000)) / ppmDivider;
-		value = toTaxPeriodAmount(baseValue, period - 1);
+		value = decayBy(baseValue, period - 1);
 
 		//account[_account] &= bytes32(0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff);
 		account[_account] &= bytes32(0xffffffffffffffffffffffffffffffffffffff00000000ffffffffffffffffff);
@@ -433,7 +459,6 @@ contract RedistributedDemurrageToken {
 	function approve(address _spender, uint256 _value) public returns (bool) {
 		uint256 baseValue;
 
-		applyDemurrage();
 		changePeriod();
 		applyRedistributionOnAccount(msg.sender);
 
@@ -448,7 +473,6 @@ contract RedistributedDemurrageToken {
 		uint256 baseValue;
 		bool result;
 
-		applyDemurrage();
 		changePeriod();
 		applyRedistributionOnAccount(msg.sender);
 
@@ -465,7 +489,6 @@ contract RedistributedDemurrageToken {
 		uint256 baseValue;
 		bool result;
 
-		applyDemurrage();
 		changePeriod();
 		applyRedistributionOnAccount(msg.sender);
 
