@@ -18,9 +18,7 @@ contract RedistributedDemurrageToken {
 	uint256 public immutable taxLevel; // PPM per MINUTE
 	uint256 public demurrageModifier; // PPM uint128(block) | uint128(ppm)
 
-	//bytes32[] public redistributions; // uint1(isFractional) | uint1(unused) | uint38(participants) | uint160(value) | uint56(period)
 	bytes32[] public redistributions; // uint1(isFractional) | uint95(unused) | uint20(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
-	//mapping (address => bytes32) account; // uint20(unused) | uint56(period) | uint160(value)
 	mapping (address => bytes32) account; // uint152(unused) | uint32(period) | uint72(value)
 	mapping (address => bool) minter;
 	mapping (address => mapping (address => uint256 ) ) allowance; // holder -> spender -> amount (amount is subject to demurrage)
@@ -42,9 +40,9 @@ contract RedistributedDemurrageToken {
 		name = _name;
 		symbol = _symbol;
 		decimals = _decimals;
-		demurrageModifier = ppmDivider * 1000000; // Emulates 38 decimal places
+		demurrageModifier = ppmDivider * 1000000; // Represents 38 decimal places
 		demurrageModifier |= (1 << 128);
-		taxLevel = _taxLevelMinute; // 38 decimal places
+		taxLevel = _taxLevelMinute; // Represents 38 decimal places
 		sinkAddress = _defaultSinkAddress;
 		bytes32 initialRedistribution = toRedistribution(0, 1000000, 0, 1);
 		redistributions.push(initialRedistribution);
@@ -79,7 +77,6 @@ contract RedistributedDemurrageToken {
 
 	/// Balance unmodified by demurrage
 	function getBaseBalance(address _account) private view returns (uint256) {
-		//return uint256(account[_account]) & 0x00ffffffffffffffffffffffffffffffffffffffff;
 		return uint256(account[_account]) & 0xffffffffffffffffff;
 	}
 
@@ -89,7 +86,7 @@ contract RedistributedDemurrageToken {
 		uint256 newBalance;
 		uint256 workAccount;
 
-		workAccount = uint256(account[_account]); // | (newBalance & 0xffffffffffffffffff);
+		workAccount = uint256(account[_account]);
 	
 		if (_delta == 0) {
 			return false;
@@ -98,10 +95,7 @@ contract RedistributedDemurrageToken {
 		oldBalance = getBaseBalance(_account);
 		newBalance = oldBalance + _delta;
 		require(uint160(newBalance) > uint160(oldBalance), 'ERR_WOULDWRAP'); // revert if increase would result in a wrapped value
-		//account[_account] &= bytes32(0xfffffffffffffffffffffff0000000000000000000000000000000000000000);
-		//account[_account] = bytes32(uint256(account[_account]) & 0xfffffffffffffffffffffffffffffffffffffffffffff000000000000000000);
 		workAccount &= 0xfffffffffffffffffffffffffffffffffffffffffffff000000000000000000;
-		//account[_account] |= bytes32(newBalance & 0x00ffffffffffffffffffffffffffffffffffffffff);
 		workAccount |= newBalance & 0xffffffffffffffffff;
 		account[_account] = bytes32(workAccount);
 		return true;
@@ -113,7 +107,7 @@ contract RedistributedDemurrageToken {
 	       	uint256 newBalance;
 		uint256 workAccount;
 
-		workAccount = uint256(account[_account]); // | (newBalance & 0xffffffffffffffffff);
+		workAccount = uint256(account[_account]);
 
 		if (_delta == 0) {
 			return false;
@@ -122,9 +116,7 @@ contract RedistributedDemurrageToken {
 		oldBalance = getBaseBalance(_account);	
 		require(oldBalance >= _delta, 'ERR_OVERSPEND'); // overspend guard
 		newBalance = oldBalance - _delta;
-		//account[_account] &= bytes32(0xffffffffffffffffffffffff0000000000000000000000000000000000000000);
 		workAccount &= 0xfffffffffffffffffffffffffffffffffffffffffffff000000000000000000;
-		//account[_account] |= bytes32(newBalance & 0x00ffffffffffffffffffffffffffffffffffffffff);
 		workAccount |= newBalance & 0xffffffffffffffffff;
 		account[_account] = bytes32(workAccount);
 		return true;
@@ -232,13 +224,11 @@ contract RedistributedDemurrageToken {
 
 	// Deserialize the pemurrage period for the given account is participating in
 	function accountPeriod(address _account) public view returns (uint256) {
-		//return (uint256(account[_account]) & 0xffffffffffffffffffffffff0000000000000000000000000000000000000000) >> 160;
 		return (uint256(account[_account]) & 0x00000000000000000000000000000000000000ffffffff000000000000000000) >> 72;
 	}
 
 	// Save the given demurrage period as the currently participation period for the given address
 	function registerAccountPeriod(address _account, uint256 _period) private returns (bool) {
-		//account[_account] &= 0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff;
 		account[_account] &= 0xffffffffffffffffffffffffffffffffffffff00000000ffffffffffffffffff;
 		account[_account] |= bytes32(_period << 72);
 		incrementRedistributionParticipants();
@@ -318,7 +308,6 @@ contract RedistributedDemurrageToken {
 		uint256 newDemurrageAmount;
 
 		epochPeriodCount = actualPeriod();
-		//epochPeriodCount = (block.timestamp - periodStart) / periodDuration; // toDemurrageTime(demurrageModifier);
 		periodCount = epochPeriodCount - toDemurragePeriod(demurrageModifier);
 		if (periodCount == 0) {
 			return false;
@@ -442,7 +431,6 @@ contract RedistributedDemurrageToken {
 		baseValue = ((supply / participants) * (taxLevel / 1000000)) / ppmDivider;
 		value = decayBy(baseValue, period - 1);
 
-		//account[_account] &= bytes32(0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff);
 		account[_account] &= bytes32(0xffffffffffffffffffffffffffffffffffffff00000000ffffffffffffffffff);
 		increaseBaseBalance(_account, value);
 
