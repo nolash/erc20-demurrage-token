@@ -84,14 +84,14 @@ class Test(unittest.TestCase):
         self.eth_tester.time_travel(self.start_time + 61)
 
         redistribution = self.contract.functions.redistributions(0).call();
-        self.assertEqual(redistribution.hex(), '000000000100000000000000000000000000000000001e848000000000000001')
+        self.assertEqual(redistribution.hex(), '000000000000000000000000f42400000000010000000000001e848000000001')
 
         tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[0], 1000000).transact()
         r = self.w3.eth.getTransactionReceipt(tx_hash)
         self.assertEqual(r.status, 1)
 
         redistribution = self.contract.functions.redistributions(1).call()
-        self.assertEqual(redistribution.hex(), '000000000000000000000000000000000000000000002dc6c000000000000002')
+        self.assertEqual(redistribution.hex(), '000000000000000000000000ef4200000000000000000000002dc6c000000002')
     
 
     def test_redistribution_balance_on_zero_participants(self):
