@@ -18,8 +18,10 @@ contract RedistributedDemurrageToken {
 	uint256 public immutable taxLevel; // PPM per MINUTE
 	uint256 public demurrageModifier; // PPM uint128(block) | uint128(ppm)
 
-	bytes32[] public redistributions; // uint1(isFractional) | uint1(unused) | uint38(participants) | uint160(value) | uint56(period)
-	mapping (address => bytes32) account; // uint20(unused) | uint56(period) | uint160(value)
+	//bytes32[] public redistributions; // uint1(isFractional) | uint1(unused) | uint38(participants) | uint160(value) | uint56(period)
+	bytes32[] public redistributions; // uint1(isFractional) | uint95(unused) | uint20(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
+	//mapping (address => bytes32) account; // uint20(unused) | uint56(period) | uint160(value)
+	mapping (address => bytes32) account; // uint152(unused) | uint32(period) | uint72(value)
 	mapping (address => bool) minter;
 	mapping (address => mapping (address => uint256 ) ) allowance; // holder -> spender -> amount (amount is subject to demurrage)
 
@@ -44,7 +46,7 @@ contract RedistributedDemurrageToken {
 		demurrageModifier |= (1 << 128);
 		taxLevel = _taxLevelMinute; // 38 decimal places
 		sinkAddress = _defaultSinkAddress;
-		bytes32 initialRedistribution = toRedistribution(0, 0, 1);
+		bytes32 initialRedistribution = toRedistribution(0, 1000000, 0, 1);
 		redistributions.push(initialRedistribution);
 		minimumParticipantSpend = 10 ** uint256(_decimals);
 	}
@@ -77,13 +79,17 @@ contract RedistributedDemurrageToken {
 
 	/// Balance unmodified by demurrage
 	function getBaseBalance(address _account) private view returns (uint256) {
-		return uint256(account[_account]) & 0x00ffffffffffffffffffffffffffffffffffffffff;
+		//return uint256(account[_account]) & 0x00ffffffffffffffffffffffffffffffffffffffff;
+		return uint256(account[_account]) & 0xffffffffffffffffff;
 	}
 
 	/// Increases base balance for a single account
 	function increaseBaseBalance(address _account, uint256 _delta) private returns (bool) {
 		uint256 oldBalance;
 		uint256 newBalance;
+		uint256 workAccount;
+
+		workAccount = uint256(account[_account]); // | (newBalance & 0xffffffffffffffffff);
 	
 		if (_delta == 0) {
 			return false;
@@ -92,8 +98,12 @@ contract RedistributedDemurrageToken {
 		oldBalance = getBaseBalance(_account);
 		newBalance = oldBalance + _delta;
 		require(uint160(newBalance) > uint160(oldBalance), 'ERR_WOULDWRAP'); // revert if increase would result in a wrapped value
-		account[_account] &= bytes32(0xffffffffffffffffffffffff0000000000000000000000000000000000000000);
-		account[_account] |= bytes32(newBalance & 0x00ffffffffffffffffffffffffffffffffffffffff);
+		//account[_account] &= bytes32(0xfffffffffffffffffffffff0000000000000000000000000000000000000000);
+		//account[_account] = bytes32(uint256(account[_account]) & 0xfffffffffffffffffffffffffffffffffffffffffffff000000000000000000);
+		workAccount &= 0xfffffffffffffffffffffffffffffffffffffffffffff000000000000000000;
+		//account[_account] |= bytes32(newBalance & 0x00ffffffffffffffffffffffffffffffffffffffff);
+		workAccount |= newBalance & 0xffffffffffffffffff;
+		account[_account] = bytes32(workAccount);
 		return true;
 	}
 
@@ -101,6 +111,9 @@ contract RedistributedDemurrageToken {
 	function decreaseBaseBalance(address _account, uint256 _delta) private returns (bool) {
 		uint256 oldBalance;
 	       	uint256 newBalance;
+		uint256 workAccount;
+
+		workAccount = uint256(account[_account]); // | (newBalance & 0xffffffffffffffffff);
 
 		if (_delta == 0) {
 			return false;
@@ -109,8 +122,11 @@ contract RedistributedDemurrageToken {
 		oldBalance = getBaseBalance(_account);	
 		require(oldBalance >= _delta, 'ERR_OVERSPEND'); // overspend guard
 		newBalance = oldBalance - _delta;
-		account[_account] &= bytes32(0xffffffffffffffffffffffff0000000000000000000000000000000000000000);
-		account[_account] |= bytes32(newBalance & 0x00ffffffffffffffffffffffffffffffffffffffff);
+		//account[_account] &= bytes32(0xffffffffffffffffffffffff0000000000000000000000000000000000000000);
+		workAccount &= 0xfffffffffffffffffffffffffffffffffffffffffffff000000000000000000;
+		//account[_account] |= bytes32(newBalance & 0x00ffffffffffffffffffffffffffffffffffffffff);
+		workAccount |= newBalance & 0xffffffffffffffffff;
+		account[_account] = bytes32(workAccount);
 		return true;
 	}
 
@@ -132,28 +148,35 @@ contract RedistributedDemurrageToken {
 	}
 
 	// Deserializes the redistribution word
-	function toRedistribution(uint256 _participants, uint256 _value, uint256 _period) private pure returns(bytes32) {
+	// uint1(isFractional) | uint95(unused) | uint20(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
+	function toRedistribution(uint256 _participants, uint256 _demurrageModifierPpm, uint256 _value, uint256 _period) private pure returns(bytes32) {
 		bytes32 redistribution;
 
-		redistribution |= bytes32((_participants & 0x7fffffffff) << 216);
-		redistribution |= bytes32((_value & 0xffffffffffffffffffffffff) << 56);
-		redistribution |= bytes32(_period & 0xffffffffffffff);
+		redistribution |= bytes32((_demurrageModifierPpm & 0x0fffff) << 140);
+		redistribution |= bytes32((_participants & 0x0fffffffff) << 104);
+		redistribution |= bytes32((_value & 0xffffffffffffffffff) << 32);
+		redistribution |= bytes32(_period & 0xffffffff);
 		return redistribution;
 	}
 
 	// Serializes the demurrage period part of the redistribution word
 	function toRedistributionPeriod(bytes32 redistribution) public pure returns (uint256) {
-		return uint256(redistribution & 0x00000000000000000000000000000000000000000000000000ffffffffffffff);
+		return uint256(redistribution) & 0xffffffff;
 	}
 
 	// Serializes the supply part of the redistribution word
 	function toRedistributionSupply(bytes32 redistribution) public pure returns (uint256) {
-		return uint256(redistribution & 0x0000000000ffffffffffffffffffffffffffffffffffffffff00000000000000) >> 56;
+		return uint256(redistribution & 0x00000000000000000000000000000000000000ffffffffffffffffff00000000) >> 32;
 	}
 
 	// Serializes the number of participants part of the redistribution word
 	function toRedistributionParticipants(bytes32 redistribution) public pure returns (uint256) {
-		return uint256(redistribution & 0x7fffffffff000000000000000000000000000000000000000000000000000000) >> 216;
+		return uint256(redistribution & 0x00000000000000000000000000000fffffffff00000000000000000000000000) >> 104;
+	}
+
+	// Serializes the number of participants part of the redistribution word
+	function toRedistributionDemurrageModifier(bytes32 redistribution) public pure returns (uint256) {
+		return uint256(redistribution & 0x000000000000000000000000fffff00000000000000000000000000000000000) >> 140;
 	}
 
 	// Client accessor to the redistributions array length
@@ -163,16 +186,17 @@ contract RedistributedDemurrageToken {
 
 	// Add number of participants for the current redistribution period by one
 	function incrementRedistributionParticipants() private returns (bool) {
-		uint256 currentRedistribution;
+		bytes32 currentRedistribution;
+		uint256 tmpRedistribution;
 		uint256 participants;
 
-		currentRedistribution = uint256(redistributions[redistributions.length-1]);
-		participants = ((currentRedistribution & 0x7fffffffff000000000000000000000000000000000000000000000000000000) >> 216) + 1;
-		currentRedistribution &= 0x8000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffff;
-		currentRedistribution |= participants << 216;
+		currentRedistribution = redistributions[redistributions.length-1];
+		participants = toRedistributionParticipants(currentRedistribution) + 1;
+		tmpRedistribution = uint256(currentRedistribution);
+		tmpRedistribution &= 0xfffffffffffffffffffffffffffff000000000ffffffffffffffffffffffffff;
+		tmpRedistribution |= (participants & 0x0fffffffff) << 104;
 
-		//emit Debug(participants);
-		redistributions[redistributions.length-1] = bytes32(currentRedistribution);
+		redistributions[redistributions.length-1] = bytes32(tmpRedistribution);
 	}
 
 	// Save the current total supply amount to the current redistribution period
@@ -180,8 +204,8 @@ contract RedistributedDemurrageToken {
 		uint256 currentRedistribution;
 
 		currentRedistribution = uint256(redistributions[redistributions.length-1]);
-		currentRedistribution &= 0xffffffffff0000000000000000000000000000000000000000ffffffffffffff;
-		currentRedistribution |= totalSupply << 56;
+		currentRedistribution &= 0xffffffffffffffffffffffffffffffffffffff000000000000000000ffffffff;
+		currentRedistribution |= totalSupply << 32;
 
 		redistributions[redistributions.length-1] = bytes32(currentRedistribution);
 	}
@@ -206,13 +230,15 @@ contract RedistributedDemurrageToken {
 
 	// Deserialize the pemurrage period for the given account is participating in
 	function accountPeriod(address _account) public view returns (uint256) {
-		return (uint256(account[_account]) & 0xffffffffffffffffffffffff0000000000000000000000000000000000000000) >> 160;
+		//return (uint256(account[_account]) & 0xffffffffffffffffffffffff0000000000000000000000000000000000000000) >> 160;
+		return (uint256(account[_account]) & 0x00000000000000000000000000000000000000ffffffff000000000000000000) >> 72;
 	}
 
 	// Save the given demurrage period as the currently participation period for the given address
 	function registerAccountPeriod(address _account, uint256 _period) private returns (bool) {
-		account[_account] &= 0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff;
-		account[_account] |= bytes32(_period << 160);
+		//account[_account] &= 0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff;
+		account[_account] &= 0xffffffffffffffffffffffffffffffffffffff00000000ffffffffffffffffff;
+		account[_account] |= bytes32(_period << 72);
 		incrementRedistributionParticipants();
 	}
 
@@ -248,8 +274,10 @@ contract RedistributedDemurrageToken {
 
 		if (truncatedResult < redistributionSupply) {
 			redistributionPeriod = toRedistributionPeriod(_redistribution); // since we reuse period here, can possibly be optimized by passing period instead
-			redistributions[redistributionPeriod-1] &= 0x0000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffff; // just to be safe, zero out all participant count data, in this case there will be only one
-			redistributions[redistributionPeriod-1] |= 0x8000000001000000000000000000000000000000000000000000000000000000;
+			//redistributions[redistributionPeriod-1] &= 0x0000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffff; // just to be safe, zero out all participant count data, in this case there will be only one
+			redistributions[redistributionPeriod-1] &= 0xfffffffffffffffffffffffffffff000000000ffffffffffffffffffffffffff; // just to be safe, zero out all participant count data, in this case there will be only one
+			//redistributions[redistributionPeriod-1] |= 0x8000000001000000000000000000000000000000000000000000000000000000;
+			redistributions[redistributionPeriod-1] |= 0x8000000000000000000000000000000000000100000000000000000000000000;
 		}
 
 		increaseBaseBalance(sinkAddress, unit / ppmDivider); //truncatedResult);
@@ -265,6 +293,7 @@ contract RedistributedDemurrageToken {
 			return false;
 		}
 
+		// is this needed?
 		redistributions[_period-1] |= 0x8000000000000000000000000000000000000000000000000000000000000000;
 
 		periodSupply = toRedistributionSupply(redistributions[_period-1]);
@@ -302,23 +331,39 @@ contract RedistributedDemurrageToken {
 		return true;
 	}
 
+	// Return timestamp of start of period threshold
+	function getPeriodTimeDelta(uint256 _periodCount) public view returns (uint256) {
+		return periodStart + (_periodCount * periodDuration);
+	}
+
+	// Amount of demurrage cycles inbetween the current timestamp and the given target time
+	function demurrageCycles(uint256 _target) public view returns (uint256) {
+		return (block.timestamp - _target) / 60;
+	}
+
 	// Recalculate the demurrage modifier for the new period
 	// After this, all REPORTED balances will have been reduced by the corresponding ratio (but the effecive totalsupply stays the same)
 	//function applyTax() public returns (uint256) {
-	function changePeriod() public returns (uint256) {
+	function changePeriod() public returns (bool) {
 		bytes32 currentRedistribution;
 		bytes32 nextRedistribution;
 		uint256 currentPeriod;
 		uint256 currentParticipants;
 		uint256 currentRemainder;
+		uint256 currentRedistributionDemurrage;
+		uint256 demurrageCounts;
+		uint256 periodTimestamp;
 
 		currentRedistribution = checkPeriod();
 		if (currentRedistribution == bytes32(0x00)) {
-			return demurrageModifier;
+			return false;
 		}
-		//demurrageModifier -= (demurrageModifier * taxLevel) / 1000000;
+		periodTimestamp = getPeriodTimeDelta(currentPeriod);
+		demurrageCounts = demurrageCycles(periodTimestamp);
+		currentRedistributionDemurrage = toRedistributionDemurrageModifier(currentRedistribution);
+		
 		currentPeriod = toRedistributionPeriod(currentRedistribution);
-		nextRedistribution = toRedistribution(0, totalSupply, currentPeriod + 1);
+		nextRedistribution = toRedistribution(0, toTaxPeriodAmount(currentRedistributionDemurrage, demurrageCounts), totalSupply, currentPeriod + 1);
 		redistributions.push(nextRedistribution);
 
 		currentParticipants = toRedistributionParticipants(currentRedistribution);
@@ -328,10 +373,11 @@ contract RedistributedDemurrageToken {
 			currentRemainder = remainder(currentParticipants, totalSupply); // we can use totalSupply directly because it will always be the same as the recorded supply on the current redistribution
 			applyRemainderOnPeriod(currentRemainder, currentPeriod);
 		}
-		return demurrageModifier;
+		return true;
 	}
 
 	// Calculate a value reduced by demurrage by the given period
+	// TODO: higher precision
 	function toTaxPeriodAmount(uint256 _value, uint256 _period) public view returns (uint256) {
 		uint256 valueFactor;
 		uint256 truncatedTaxLevel;
@@ -370,7 +416,8 @@ contract RedistributedDemurrageToken {
 		baseValue = ((supply / participants) * (taxLevel / 1000000)) / ppmDivider;
 		value = toTaxPeriodAmount(baseValue, period - 1);
 
-		account[_account] &= bytes32(0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff);
+		//account[_account] &= bytes32(0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff);
+		account[_account] &= bytes32(0xffffffffffffffffffffffffffffffffffffff00000000ffffffffffffffffff);
 		increaseBaseBalance(_account, value);
 
 		emit Redistribution(_account, period, value);
