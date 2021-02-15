@@ -65,7 +65,7 @@ contract RedistributedDemurrageToken {
 		uint256 currentDemurrageAmount;
 		uint256 periodCount;
 
-		baseBalance = getBaseBalance(_account);
+		baseBalance = baseBalanceOf(_account);
 		anchorDemurrageAmount = toDemurrageAmount(demurrageModifier);
 		anchorDemurragePeriod = toDemurragePeriod(demurrageModifier);
 
@@ -77,7 +77,7 @@ contract RedistributedDemurrageToken {
 	}
 
 	/// Balance unmodified by demurrage
-	function getBaseBalance(address _account) private view returns (uint256) {
+	function baseBalanceOf(address _account) public view returns (uint256) {
 		return uint256(account[_account]) & 0xffffffffffffffffff;
 	}
 
@@ -93,7 +93,7 @@ contract RedistributedDemurrageToken {
 			return false;
 		}
 
-		oldBalance = getBaseBalance(_account);
+		oldBalance = baseBalanceOf(_account);
 		newBalance = oldBalance + _delta;
 		require(uint160(newBalance) > uint160(oldBalance), 'ERR_WOULDWRAP'); // revert if increase would result in a wrapped value
 		workAccount &= 0xfffffffffffffffffffffffffffffffffffffffffffff000000000000000000;
@@ -114,7 +114,7 @@ contract RedistributedDemurrageToken {
 			return false;
 		}
 
-		oldBalance = getBaseBalance(_account);	
+		oldBalance = baseBalanceOf(_account);	
 		require(oldBalance >= _delta, 'ERR_OVERSPEND'); // overspend guard
 		newBalance = oldBalance - _delta;
 		workAccount &= 0xfffffffffffffffffffffffffffffffffffffffffffff000000000000000000;
