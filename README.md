@@ -14,29 +14,26 @@
     - Then the resulting balances after one tax period of those two trading would be 1080 Sarafu while the remaining non-active users would be 980 Sarafu. If this behaviour continued in the next tax period, with the same two users only trading (with no net balance changes), they would have 1158.39999968 Sarafu and those users that are not trading would have their balances further reduced to 960.40 Sarafu. If this continued on ~forever those two active trading users would have the entire token supply and the non-trading users would eventually reach a zero balance.
     - this example calculation for 3 tax periods can be found here: https://gitlab.com/grassrootseconomics/cic-docs/-/blob/master/demurrage-redist-sarafu.ods
 
+## Nomenclature
 
-## Variables
-
-* Inputs to Constructor (Set only once during contract deployment can't be changed )  
-  * `Demurrage` aka Decay amount: A percentage of token supply that will be charged once per minute and evenly redistributed to _active_ users every Demurrage Period (minutes)
-  * Demurrage Period (minutes)- aka `period`: The number of minutes over which a user must be _active_ to receive tax-redistibution. 
-  * Inflated Balance: The inflated balance of each user is stored for bookkeeping.
-  * Number of Decimals: Resolution on token (TODO) (Default 6)
-  * Minimum Activity Volume: (TODO) the minimum transaction amount to be considered active
-  * Sink Token Address: Rounding errors and if no one trades the tax goes to this address
+* `Demurrage` aka Decay amount: A percentage of token supply that will be charged once per minute and evenly redistributed to _active_ users every Demurrage Period (minutes)
+* Base balance: The inflated balance of each user is stored for bookkeeping.
+* Sink Token Address: Rounding errors and if no one trades the tax goes to this address
+* Demurrage Period (minutes)- aka `period`: The number of minutes over which a user must be _active_ to receive tax-redistibution. 
 
 
 ## Ownership
 
 * Contract creator is owner
-* Ownership can be transferred (also to ownership void contract "no more changes can be made")
+* Ownership can be transferred
 
 
 ## Mint
 
-* Owner can add minters
+* Owner can add minters and remove
   - A faucet contract would be a minter and choose the amount of tokens to mint and distribute to new _validated_ users.
   - The interface says the amount and is at the caller's discretion per contract call. _validation_ is outside of this contract.
+* A minter can remove itself
 * Minters can mint any amount
 
 
@@ -49,7 +46,6 @@
       - e.g. a `demurrage` after the 2nd minute would be give a `demurrageModifier = (1-0.02)^2 = 0.9604`.
 * All client-facing values (_balance output_ , _transfer inputs_) are adjusted with `demurrageModifier`.
   - e.g. `_balance output_ = user_balance - user_balance * demurrageModifier`
-* Edge case: `approve` call, which may be called on either side of a period.
 
 
 ## Redistribution
@@ -62,27 +58,39 @@
   - Check if user has participated in `period`. (_active_ user heartbeat)
   - Each _active_ user balance in the `period` is increased by `(total supply at end of period * demurrageModifier ) / number_of_active_participants` via minting
   - Participation field is zeroed out for that user.
-* Fractions must be rounded down (TODO)
-  - Remainder is "dust" and should be sent to a dedicated "sink" token address (TODO)
-  - If no one is _active_ all taxes go to the same sink address
+* Fractions must be rounded down
+  - Remainder is "dust" and should be sent to a dedicated Sink Token Address.
+  - If no one is _active_ all taxes go to the Sink Token Address.
 
 
 ## Data structures
 
-* One word per account:
-  - bits 000-159: value
-  - bits 160-255: period
-  - (we have more room here in case we want to cram something else in)
-* One word per redistribution period:
-  - bits 000-055: period
-  - bits 056-215: supply
-  - bits 216-253: participant count
-  - bits     254: Set if individual redistribution amounts are fractions (TODO)
-  - bits     255: Set if "dust" has been transferred to sink (TODO)
+* One word per `account`:
+  - bits 000-071: value
+  - bits 072-103: period
+  - bits 104-255: (Unused)
+* One word per `redistributions` period:
+  - bits 000-031: period
+  - bits 032-103: supply
+  - bits 104-139: participant count
+  - bits 140-159: demurrage modifier
+  - bits 160-254: (Unused)
+  - bits     255: Set if individual redistribution amounts are fractions
+* One word for the `demurrageModifier` (should be replaced with 2 x uint128 instead):
+  - bits 000-127: Accumulated demurrage modifier from last calculation
+  - bits 128-255: Period of last calculated demurrage modifier
+
+### Notes
+
+Accumulated demurrage modifier in `demurrageModifier` is 128 bit, but will be _truncated_ do 20 bits in `redistributions`. The 128 bit resolution is to used to reduce the impact of fractional drift of the long-term accumulation of the demurrage modifier. However, the demurrage snapshot values used in `redistributions` are parts-per-million and can be fully contained within a 20-bit value.
 
 
 ## QA
 
 * Basic python tests in place
-* How to determine and generate test vectors, and how to adapt them to scripts.
+* How to determine and generate sufficient test vectors, and how to adapt them to scripts.
 * Audit sources?
+
+## Known issues
+
+* A `transferFrom` following an `approve` call, when called across period thresholds, may fail if margin to demurraged amount is insufficient.

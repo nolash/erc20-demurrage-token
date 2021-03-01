@@ -2,51 +2,121 @@ pragma solidity > 0.6.11;
 
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// TODO: assign bitmask values to contants 
 contract RedistributedDemurrageToken {
 
+	// Redistribution bit field, with associated shifts and masks
+	// (Uses sub-byte boundaries)
+	bytes32[] public redistributions; // uint1(isFractional) | uint95(unused) | uint20(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
+	uint8 constant shiftRedistributionPeriod 	= 0;
+	uint256 constant maskRedistributionPeriod 	= 0x00000000000000000000000000000000000000000000000000000000ffffffff; // (1 << 32) - 1
+	uint8 constant shiftRedistributionValue 	= 32;
+	uint256 constant maskRedistributionValue	= 0x00000000000000000000000000000000000000ffffffffffffffffff00000000; // ((1 << 72) - 1) << 32
+	uint8 constant shiftRedistributionParticipants	= 104;
+	uint256 constant maskRedistributionParticipants	= 0x00000000000000000000000000000fffffffff00000000000000000000000000; // ((1 << 36) - 1) << 104
+	uint8 constant shiftRedistributionDemurrage	= 140;
+	uint256 constant maskRedistributionDemurrage	= 0x000000000000000000000000fffff00000000000000000000000000000000000; // ((1 << 20) - 1) << 140
+	uint8 constant shiftRedistributionIsFractional	= 255;
+	uint256 constant maskRedistributionIsFractional	= 0x8000000000000000000000000000000000000000000000000000000000000000; // 1 << 255
+
+	// Account bit field, with associated shifts and masks
+	// Mirrors structure of redistributions for consistency
+	mapping (address => bytes32) account; // uint152(unused) | uint32(period) | uint72(value)
+	uint8 constant shiftAccountValue		= 0;
+	uint256 constant maskAccountValue 		= 0x0000000000000000000000000000000000000000000000ffffffffffffffffff; // (1 << 72) - 1
+	uint8 constant shiftAccountPeriod		= 72;
+	uint256 constant maskAccountPeriod 		= 0x00000000000000000000000000000000000000ffffffff000000000000000000; // ((1 << 32) - 1) << 72
+
+
+	// TODO: use 2 x uint128 instead
+	// Demurrage cache bit field, with associated  shifts and masks
+	uint256 public demurrageModifier; // PPM uint128(block) | uint128(periodppm)
+	uint8 constant shiftDemurrageValue		= 0;
+	uint256 constant maskDemurrageValue		= 0x00000000000000000000000000000000ffffffffffffffffffffffffffffffff;
+	uint8 constant shiftDemurragePeriod		= 128;
+	uint256 constant maskDemurragePeriod		= 0xffffffffffffffffffffffffffffffff00000000000000000000000000000000;
+
+	// Implements EIP172
 	address public owner;
+
+	// Implements ERC20
 	string public name;
+
+	// Implements ERC20
 	string public symbol;
+
+	// Implements ERC20
 	uint256 public decimals;
+
+	// Implements ERC20
 	uint256 public totalSupply;
+
+	// Minimum amount of (demurraged) tokens an account must spend to participate in redistribution for a particular period
 	uint256 public minimumParticipantSpend;
+
+	// 128 bit resolution of the demurrage divisor
+	// (this constant x 1000000 is contained within 128 bits)
 	uint256 constant ppmDivider = 100000000000000000000000000000000;
 
-	uint256 public immutable periodStart; // timestamp
-	uint256 public immutable periodDuration; // duration in SECONDS
-	uint256 public immutable taxLevel; // PPM per MINUTE
-	uint256 public demurrageModifier; // PPM uint128(block) | uint128(ppm)
+	// Timestamp of start of periods (time which contract constructor was called)
+	uint256 public immutable periodStart;
 
-	bytes32[] public redistributions; // uint1(isFractional) | uint95(unused) | uint20(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
-	mapping (address => bytes32) account; // uint152(unused) | uint32(period) | uint72(value)
+	// Duration of a single redistribution period in seconds
+	uint256 public immutable periodDuration;
+
+	// Demurrage in ppm per minute
+	uint256 public immutable taxLevel;
+
+	// Addresses allowed to mint new tokens
 	mapping (address => bool) minter;
+
+	// Storage for ERC20 approve/transferFrom methods
 	mapping (address => mapping (address => uint256 ) ) allowance; // holder -> spender -> amount (amount is subject to demurrage)
 
-	address sinkAddress; // receives redistribuion remainders
+	// Address to send unallocated redistribution tokens
+	address sinkAddress; 
 
+	// Implements ERC20
 	event Transfer(address indexed _from, address indexed _to, uint256 _value);
+
+	// Implements ERC20
 	event Approval(address indexed _owner, address indexed _spender, uint256 _value);
+
+	// New tokens minted
 	event Mint(address indexed _minter, address indexed _beneficiary, uint256 _value);
-	event Debug(bytes32 _foo);
+
+	// New demurrage cache milestone calculated
 	event Decayed(uint256 indexed _period, uint256 indexed _periodCount, uint256 indexed _oldAmount, uint256 _newAmount);
+
+	// When a new period threshold has been crossed
 	event Period(uint256 _period);
+
+	// Redistribution applied on a single eligible account
 	event Redistribution(address indexed _account, uint256 indexed _period, uint256 _value);
 
+	// Temporary event used in development, will be removed on prod
+	event Debug(bytes32 _foo);
+
 	constructor(string memory _name, string memory _symbol, uint8 _decimals, uint256 _taxLevelMinute, uint256 _periodMinutes, address _defaultSinkAddress) public {
+		// ACL setup
 		owner = msg.sender;
 		minter[owner] = true;
-		periodStart = block.timestamp;
-		periodDuration = _periodMinutes * 60;
+
+		// ERC20 setup
 		name = _name;
 		symbol = _symbol;
 		decimals = _decimals;
+
+		// Demurrage setup
+		periodStart = block.timestamp;
+		periodDuration = _periodMinutes * 60;
 		demurrageModifier = ppmDivider * 1000000; // Represents 38 decimal places
 		demurrageModifier |= (1 << 128);
 		taxLevel = _taxLevelMinute; // Represents 38 decimal places
-		sinkAddress = _defaultSinkAddress;
 		bytes32 initialRedistribution = toRedistribution(0, 1000000, 0, 1);
 		redistributions.push(initialRedistribution);
+
+		// Misc settings
+		sinkAddress = _defaultSinkAddress;
 		minimumParticipantSpend = 10 ** uint256(_decimals);
 	}
 
@@ -57,7 +127,14 @@ contract RedistributedDemurrageToken {
 		return true;
 	}
 
-	/// ERC20
+	// Given address will no longer be allowed to call the mintTo() function
+	function removeMinter(address _minter) public returns (bool) {
+		require(msg.sender == owner || _minter == msg.sender);
+		minter[_minter] = false;
+		return true;
+	}
+
+	/// Implements ERC20
 	function balanceOf(address _account) public view returns (uint256) {
 		uint256 baseBalance;
 		uint256 anchorDemurrageAmount;
@@ -78,7 +155,7 @@ contract RedistributedDemurrageToken {
 
 	/// Balance unmodified by demurrage
 	function baseBalanceOf(address _account) public view returns (uint256) {
-		return uint256(account[_account]) & 0xffffffffffffffffff;
+		return uint256(account[_account]) & maskAccountValue;
 	}
 
 	/// Increases base balance for a single account
@@ -96,8 +173,8 @@ contract RedistributedDemurrageToken {
 		oldBalance = baseBalanceOf(_account);
 		newBalance = oldBalance + _delta;
 		require(uint160(newBalance) > uint160(oldBalance), 'ERR_WOULDWRAP'); // revert if increase would result in a wrapped value
-		workAccount &= 0xfffffffffffffffffffffffffffffffffffffffffffff000000000000000000;
-		workAccount |= newBalance & 0xffffffffffffffffff;
+		workAccount &= (~maskAccountValue); 
+		workAccount |= (newBalance & maskAccountValue);
 		account[_account] = bytes32(workAccount);
 		return true;
 	}
@@ -117,8 +194,8 @@ contract RedistributedDemurrageToken {
 		oldBalance = baseBalanceOf(_account);	
 		require(oldBalance >= _delta, 'ERR_OVERSPEND'); // overspend guard
 		newBalance = oldBalance - _delta;
-		workAccount &= 0xfffffffffffffffffffffffffffffffffffffffffffff000000000000000000;
-		workAccount |= newBalance & 0xffffffffffffffffff;
+		workAccount &= (~maskAccountValue);
+		workAccount |= (newBalance & maskAccountValue);
 		account[_account] = bytes32(workAccount);
 		return true;
 	}
@@ -144,31 +221,31 @@ contract RedistributedDemurrageToken {
 	function toRedistribution(uint256 _participants, uint256 _demurrageModifierPpm, uint256 _value, uint256 _period) private pure returns(bytes32) {
 		bytes32 redistribution;
 
-		redistribution |= bytes32((_demurrageModifierPpm & 0x0fffff) << 140);
-		redistribution |= bytes32((_participants & 0x0fffffffff) << 104);
-		redistribution |= bytes32((_value & 0xffffffffffffffffff) << 32);
-		redistribution |= bytes32(_period & 0xffffffff);
+		redistribution |= bytes32((_demurrageModifierPpm << shiftRedistributionDemurrage) & maskRedistributionDemurrage);
+		redistribution |= bytes32((_participants << shiftRedistributionParticipants) & maskRedistributionParticipants);
+		redistribution |= bytes32((_value << shiftRedistributionValue) & maskRedistributionValue); 
+		redistribution |= bytes32(_period & maskRedistributionPeriod);
 		return redistribution;
 	}
 
 	// Serializes the demurrage period part of the redistribution word
 	function toRedistributionPeriod(bytes32 redistribution) public pure returns (uint256) {
-		return uint256(redistribution) & 0xffffffff;
+		return uint256(redistribution) & maskRedistributionPeriod;
 	}
 
 	// Serializes the supply part of the redistribution word
 	function toRedistributionSupply(bytes32 redistribution) public pure returns (uint256) {
-		return uint256(redistribution & 0x00000000000000000000000000000000000000ffffffffffffffffff00000000) >> 32;
+		return (uint256(redistribution) & maskRedistributionValue) >> shiftRedistributionValue;
 	}
 
 	// Serializes the number of participants part of the redistribution word
 	function toRedistributionParticipants(bytes32 redistribution) public pure returns (uint256) {
-		return uint256(redistribution & 0x00000000000000000000000000000fffffffff00000000000000000000000000) >> 104;
+		return (uint256(redistribution) & maskRedistributionParticipants) >> shiftRedistributionParticipants;
 	}
 
 	// Serializes the number of participants part of the redistribution word
 	function toRedistributionDemurrageModifier(bytes32 redistribution) public pure returns (uint256) {
-		return uint256(redistribution & 0x000000000000000000000000fffff00000000000000000000000000000000000) >> 140;
+		return (uint256(redistribution) & maskRedistributionDemurrage) >> shiftRedistributionDemurrage;
 	}
 
 	// Client accessor to the redistributions array length
@@ -185,8 +262,8 @@ contract RedistributedDemurrageToken {
 		currentRedistribution = redistributions[redistributions.length-1];
 		participants = toRedistributionParticipants(currentRedistribution) + 1;
 		tmpRedistribution = uint256(currentRedistribution);
-		tmpRedistribution &= 0xfffffffffffffffffffffffffffff000000000ffffffffffffffffffffffffff;
-		tmpRedistribution |= (participants & 0x0fffffffff) << 104;
+		tmpRedistribution &= (~maskRedistributionParticipants);
+		tmpRedistribution |= ((participants << shiftRedistributionParticipants) & maskRedistributionParticipants);
 
 		redistributions[redistributions.length-1] = bytes32(tmpRedistribution);
 
@@ -198,8 +275,8 @@ contract RedistributedDemurrageToken {
 		uint256 currentRedistribution;
 
 		currentRedistribution = uint256(redistributions[redistributions.length-1]);
-		currentRedistribution &= 0xffffffffffffffffffffffffffffffffffffff000000000000000000ffffffff;
-		currentRedistribution |= totalSupply << 32;
+		currentRedistribution &= (~maskRedistributionValue);
+		currentRedistribution |= (totalSupply << shiftRedistributionValue);
 
 		redistributions[redistributions.length-1] = bytes32(currentRedistribution);
 		return true;
@@ -225,13 +302,13 @@ contract RedistributedDemurrageToken {
 
 	// Deserialize the pemurrage period for the given account is participating in
 	function accountPeriod(address _account) public view returns (uint256) {
-		return (uint256(account[_account]) & 0x00000000000000000000000000000000000000ffffffff000000000000000000) >> 72;
+		return (uint256(account[_account]) & maskAccountPeriod) >> shiftAccountPeriod;
 	}
 
 	// Save the given demurrage period as the currently participation period for the given address
 	function registerAccountPeriod(address _account, uint256 _period) private returns (bool) {
-		account[_account] &= 0xffffffffffffffffffffffffffffffffffffff00000000ffffffffffffffffff;
-		account[_account] |= bytes32(_period << 72);
+		account[_account] &= bytes32(~maskAccountPeriod);
+		account[_account] |= bytes32((_period << shiftAccountPeriod) & maskAccountPeriod);
 		incrementRedistributionParticipants();
 		return true;
 	}
@@ -268,11 +345,11 @@ contract RedistributedDemurrageToken {
 
 		if (truncatedResult < redistributionSupply) {
 			redistributionPeriod = toRedistributionPeriod(_redistribution); // since we reuse period here, can possibly be optimized by passing period instead
-			redistributions[redistributionPeriod-1] &= 0xfffffffffffffffffffffffffffff000000000ffffffffffffffffffffffffff; // just to be safe, zero out all participant count data, in this case there will be only one
-			redistributions[redistributionPeriod-1] |= 0x8000000000000000000000000000000000000100000000000000000000000000;
+			redistributions[redistributionPeriod-1] &= bytes32(~maskRedistributionParticipants); // just to be safe, zero out all participant count data, in this case there will be only one
+			redistributions[redistributionPeriod-1] |= bytes32(maskRedistributionIsFractional | (1 << shiftRedistributionParticipants));
 		}
 
-		increaseBaseBalance(sinkAddress, unit / ppmDivider); //truncatedResult);
+		increaseBaseBalance(sinkAddress, unit / ppmDivider);
 		return unit;
 	}
 
@@ -285,8 +362,8 @@ contract RedistributedDemurrageToken {
 			return false;
 		}
 
-		// is this needed?
-		redistributions[_period-1] |= 0x8000000000000000000000000000000000000000000000000000000000000000;
+		// TODO: is this needed?
+		redistributions[_period-1] |= bytes32(maskRedistributionIsFractional);
 
 		periodSupply = toRedistributionSupply(redistributions[_period-1]);
 		increaseBaseBalance(sinkAddress, periodSupply - _remainder);
@@ -294,14 +371,17 @@ contract RedistributedDemurrageToken {
 	}
 
 
+	// Deserialize demurrage amount from demurrage bitfield
 	function toDemurrageAmount(uint256 _demurrage) public pure returns (uint256) {
-		return _demurrage & 0x00000000000000000000000000000000ffffffffffffffffffffffffffffffff;
+		return _demurrage & maskDemurrageValue;
 	}
 
+	// Deserialize demurrage period from demurrage bitfield
 	function toDemurragePeriod(uint256 _demurrage) public pure returns (uint256) {
-		return (_demurrage & 0xffffffffffffffffffffffffffffffff00000000000000000000000000000000) >> 128;
+		return (_demurrage & maskDemurragePeriod) >> shiftDemurragePeriod;
 	}
 
+	// Calculate and cache the demurrage value corresponding to the (period of the) time of the method call
 	function applyDemurrage() public returns (bool) {
 		uint256 epochPeriodCount;
 		uint256 periodCount;
@@ -316,8 +396,8 @@ contract RedistributedDemurrageToken {
 		lastDemurrageAmount = toDemurrageAmount(demurrageModifier);
 		newDemurrageAmount = decayBy(lastDemurrageAmount, periodCount);
 		demurrageModifier = 0;
-		demurrageModifier |= (newDemurrageAmount & 0x00000000000000000000000000000000ffffffffffffffffffffffffffffffff);
-		demurrageModifier |= (epochPeriodCount << 128);
+		demurrageModifier |= (newDemurrageAmount & maskDemurrageValue);
+		demurrageModifier |= ((epochPeriodCount << shiftDemurragePeriod) & maskDemurragePeriod);
 		emit Decayed(epochPeriodCount, periodCount, lastDemurrageAmount, newDemurrageAmount);
 		return true;
 	}
@@ -334,7 +414,6 @@ contract RedistributedDemurrageToken {
 
 	// Recalculate the demurrage modifier for the new period
 	// After this, all REPORTED balances will have been reduced by the corresponding ratio (but the effecive totalsupply stays the same)
-	//function applyTax() public returns (uint256) {
 	function changePeriod() public returns (bool) {
 		bytes32 currentRedistribution;
 		bytes32 nextRedistribution;
@@ -380,11 +459,11 @@ contract RedistributedDemurrageToken {
 		return true;
 	}
 
+	// Reverse a value reduced by demurrage by the given period to its original value
 	function growBy(uint256 _value, uint256 _period) public view returns (uint256) {
 		uint256 valueFactor;
 		uint256 truncatedTaxLevel;
 	      
-		// TODO: if can't get to work, reverse the iteration from current period.
 		valueFactor = 1000000;
 		truncatedTaxLevel = taxLevel / ppmDivider;
 
@@ -395,12 +474,11 @@ contract RedistributedDemurrageToken {
 	}
 
 	// Calculate a value reduced by demurrage by the given period
-	// TODO: higher precision
+	// TODO: higher precision if possible
 	function decayBy(uint256 _value, uint256 _period) public view returns (uint256) {
 		uint256 valueFactor;
 		uint256 truncatedTaxLevel;
 	      
-		// TODO: if can't get to work, reverse the iteration from current period.
 		valueFactor = 1000000;
 		truncatedTaxLevel = taxLevel / ppmDivider;
 
@@ -436,7 +514,8 @@ contract RedistributedDemurrageToken {
 		baseValue = ((supply / participants) * (taxLevel / 1000000)) / ppmDivider;
 		value = (baseValue * demurrage) / 1000000;
 
-		account[_account] &= bytes32(0xffffffffffffffffffffffffffffffffffffff00000000ffffffffffffffffff);
+		// zero out period for the account
+		account[_account] &= bytes32(~maskAccountPeriod); 
 		increaseBaseBalance(_account, value);
 
 		emit Redistribution(_account, period, value);
@@ -469,7 +548,6 @@ contract RedistributedDemurrageToken {
 		changePeriod();
 		applyRedistributionOnAccount(msg.sender);
 
-		// TODO: Prefer to truncate the result, instead it seems to round to nearest :/
 		baseValue = toBaseAmount(_value);
 		result = transferBase(msg.sender, _to, baseValue);
 		emit Transfer(msg.sender, _to, _value);

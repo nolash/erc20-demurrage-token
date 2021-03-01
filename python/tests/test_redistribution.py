@@ -71,6 +71,9 @@ class Test(unittest.TestCase):
 
     # TODO: check receipt log outputs
     def test_redistribution_storage(self):
+        redistribution = self.contract.functions.redistributions(0).call();
+        self.assertEqual(redistribution.hex(), '000000000000000000000000f424000000000000000000000000000000000001')
+
         self.contract.functions.mintTo(self.w3.eth.accounts[1], 1000000).transact()
         self.contract.functions.mintTo(self.w3.eth.accounts[2], 1000000).transact()
 

@@ -111,7 +111,33 @@ class Test(unittest.TestCase):
         balance = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call()
         self.assertEqual(balance, int(2000 * 0.98))
 
-    
+
+    def test_minter_control(self):
+        with self.assertRaises(eth_tester.exceptions.TransactionFailed):
+            tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[2], 1024).transact({'from': self.w3.eth.accounts[1]})
+           
+        with self.assertRaises(eth_tester.exceptions.TransactionFailed):
+            tx_hash = self.contract.functions.addMinter(self.w3.eth.accounts[1]).transact({'from': self.w3.eth.accounts[1]})
+
+        tx_hash = self.contract.functions.addMinter(self.w3.eth.accounts[1]).transact({'from': self.w3.eth.accounts[0]})
+        r = self.w3.eth.getTransactionReceipt(tx_hash)
+        self.assertEqual(r.status, 1)
+
+        with self.assertRaises(eth_tester.exceptions.TransactionFailed):
+            tx_hash = self.contract.functions.addMinter(self.w3.eth.accounts[2]).transact({'from': self.w3.eth.accounts[1]})
+
+        tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[2], 1024).transact({'from': self.w3.eth.accounts[1]})
+
+        with self.assertRaises(eth_tester.exceptions.TransactionFailed):
+            tx_hash = self.contract.functions.addMinter(self.w3.eth.accounts[1]).transact({'from': self.w3.eth.accounts[2]})
+
+        tx_hash = self.contract.functions.removeMinter(self.w3.eth.accounts[1]).transact({'from': self.w3.eth.accounts[1]})
+        r = self.w3.eth.getTransactionReceipt(tx_hash)
+        self.assertEqual(r.status, 1)
+
+        with self.assertRaises(eth_tester.exceptions.TransactionFailed):
+            tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[2], 1024).transact({'from': self.w3.eth.accounts[1]})
+
     def test_base_amount(self):
         tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], 1000).transact()
         r = self.w3.eth.getTransactionReceipt(tx_hash)
