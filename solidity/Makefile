@@ -11,6 +11,6 @@ test: all
 	python ../python/tests/test_redistribution.py
 
 install: all
-	cp -v RedistributedDemurrageToken.{json,bin} ../python/eth_address_declarator/data/
+	cp -v RedistributedDemurrageToken.{json,bin} ../python/sarafu_token/data/
 	
 .PHONY: test install

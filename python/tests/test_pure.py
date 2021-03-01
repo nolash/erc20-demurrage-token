@@ -60,20 +60,21 @@ class Test(unittest.TestCase):
         pass
 
 
+    @unittest.skip('this function has been removed from contract')
     def test_tax_period(self):
         t = self.contract.functions.taxLevel().call()
         logg.debug('taxlevel {}'.format(t))
 
-        a = self.contract.functions.toTaxPeriodAmount(1000000, 0).call()
+        a = self.contract.functions.toDemurrageAmount(1000000, 0).call()
         self.assertEqual(a, 1000000)
 
-        a = self.contract.functions.toTaxPeriodAmount(1000000, 1).call()
+        a = self.contract.functions.toDemurrageAmount(1000000, 1).call()
         self.assertEqual(a, 980000)
 
-        a = self.contract.functions.toTaxPeriodAmount(1000000, 2).call()
+        a = self.contract.functions.toDemurrageAmount(1000000, 2).call()
         self.assertEqual(a, 960400)
 
-        a = self.contract.functions.toTaxPeriodAmount(980000, 1).call()
+        a = self.contract.functions.toDemurrageAmount(980000, 1).call()
         self.assertEqual(a, 960400)
 
 
