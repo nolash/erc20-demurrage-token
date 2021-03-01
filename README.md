@@ -76,9 +76,6 @@
   - bits 140-159: demurrage modifier
   - bits 160-254: (Unused)
   - bits     255: Set if individual redistribution amounts are fractions
-* One word for the `demurrageModifier` (should be replaced with 2 x uint128 instead):
-  - bits 000-127: Accumulated demurrage modifier from last calculation
-  - bits 128-255: Period of last calculated demurrage modifier
 
 ### Notes
 

@@ -26,14 +26,11 @@ contract RedistributedDemurrageToken {
 	uint8 constant shiftAccountPeriod		= 72;
 	uint256 constant maskAccountPeriod 		= 0x00000000000000000000000000000000000000ffffffff000000000000000000; // ((1 << 32) - 1) << 72
 
+	// Cached demurrage amount, ppm with 38 digit resolution
+	uint128 public demurrageAmount;
 
-	// TODO: use 2 x uint128 instead
-	// Demurrage cache bit field, with associated  shifts and masks
-	uint256 public demurrageModifier; // PPM uint128(block) | uint128(periodppm)
-	uint8 constant shiftDemurrageValue		= 0;
-	uint256 constant maskDemurrageValue		= 0x00000000000000000000000000000000ffffffffffffffffffffffffffffffff;
-	uint8 constant shiftDemurragePeriod		= 128;
-	uint256 constant maskDemurragePeriod		= 0xffffffffffffffffffffffffffffffff00000000000000000000000000000000;
+	// Cached demurrage period; the period for which demurrageAmount was calculated
+	uint128 public demurragePeriod;
 
 	// Implements EIP172
 	address public owner;
@@ -109,8 +106,8 @@ contract RedistributedDemurrageToken {
 		// Demurrage setup
 		periodStart = block.timestamp;
 		periodDuration = _periodMinutes * 60;
-		demurrageModifier = ppmDivider * 1000000; // Represents 38 decimal places
-		demurrageModifier |= (1 << 128);
+		demurrageAmount = uint128(ppmDivider * 1000000); // Represents 38 decimal places
+		demurragePeriod = 1;
 		taxLevel = _taxLevelMinute; // Represents 38 decimal places
 		bytes32 initialRedistribution = toRedistribution(0, 1000000, 0, 1);
 		redistributions.push(initialRedistribution);
@@ -137,20 +134,16 @@ contract RedistributedDemurrageToken {
 	/// Implements ERC20
 	function balanceOf(address _account) public view returns (uint256) {
 		uint256 baseBalance;
-		uint256 anchorDemurrageAmount;
-		uint256 anchorDemurragePeriod;
-		uint256 currentDemurrageAmount;
+		uint256 currentDemurragedAmount;
 		uint256 periodCount;
 
 		baseBalance = baseBalanceOf(_account);
-		anchorDemurrageAmount = toDemurrageAmount(demurrageModifier);
-		anchorDemurragePeriod = toDemurragePeriod(demurrageModifier);
 
-		periodCount = actualPeriod() - toDemurragePeriod(demurrageModifier);
+		periodCount = actualPeriod() - demurragePeriod; 
 
-		currentDemurrageAmount = decayBy(anchorDemurrageAmount, periodCount);
+		currentDemurragedAmount = uint128(decayBy(demurrageAmount, periodCount));
 
-		return (baseBalance * currentDemurrageAmount) / (ppmDivider * 1000000);
+		return (baseBalance * currentDemurragedAmount) / (ppmDivider * 1000000);
 	}
 
 	/// Balance unmodified by demurrage
@@ -283,8 +276,8 @@ contract RedistributedDemurrageToken {
 	}
 
 	// Get the demurrage period of the current block number
-	function actualPeriod() public view returns (uint256) {
-		return (block.timestamp - periodStart) / periodDuration + 1;
+	function actualPeriod() public view returns (uint128) {
+		return uint128((block.timestamp - periodStart) / periodDuration + 1);
 	}
 
 	// Add an entered demurrage period to the redistribution array
@@ -371,34 +364,22 @@ contract RedistributedDemurrageToken {
 	}
 
 
-	// Deserialize demurrage amount from demurrage bitfield
-	function toDemurrageAmount(uint256 _demurrage) public pure returns (uint256) {
-		return _demurrage & maskDemurrageValue;
-	}
-
-	// Deserialize demurrage period from demurrage bitfield
-	function toDemurragePeriod(uint256 _demurrage) public pure returns (uint256) {
-		return (_demurrage & maskDemurragePeriod) >> shiftDemurragePeriod;
-	}
-
 	// Calculate and cache the demurrage value corresponding to the (period of the) time of the method call
 	function applyDemurrage() public returns (bool) {
-		uint256 epochPeriodCount;
-		uint256 periodCount;
+		uint128 epochPeriodCount;
+		uint128 periodCount;
 		uint256 lastDemurrageAmount;
 		uint256 newDemurrageAmount;
 
 		epochPeriodCount = actualPeriod();
-		periodCount = epochPeriodCount - toDemurragePeriod(demurrageModifier);
+		periodCount = epochPeriodCount - demurragePeriod;
 		if (periodCount == 0) {
 			return false;
 		}
-		lastDemurrageAmount = toDemurrageAmount(demurrageModifier);
-		newDemurrageAmount = decayBy(lastDemurrageAmount, periodCount);
-		demurrageModifier = 0;
-		demurrageModifier |= (newDemurrageAmount & maskDemurrageValue);
-		demurrageModifier |= ((epochPeriodCount << shiftDemurragePeriod) & maskDemurragePeriod);
-		emit Decayed(epochPeriodCount, periodCount, lastDemurrageAmount, newDemurrageAmount);
+		lastDemurrageAmount = demurrageAmount;
+		demurrageAmount = uint128(decayBy(lastDemurrageAmount, periodCount));
+		demurragePeriod = epochPeriodCount; 
+		emit Decayed(epochPeriodCount, periodCount, lastDemurrageAmount, demurrageAmount);
 		return true;
 	}
 
@@ -436,7 +417,7 @@ contract RedistributedDemurrageToken {
 		periodTimestamp = getPeriodTimeDelta(currentPeriod);
 
 		applyDemurrage();
-		currentDemurrageAmount = toDemurrageAmount(demurrageModifier);
+		currentDemurrageAmount = demurrageAmount; 
 
 		demurrageCounts = demurrageCycles(periodTimestamp);
 		if (demurrageCounts > 0) {
@@ -524,7 +505,8 @@ contract RedistributedDemurrageToken {
 
 	// Inflates the given amount according to the current demurrage modifier
 	function toBaseAmount(uint256 _value) public view returns (uint256) {
-		return (_value * ppmDivider * 1000000) / toDemurrageAmount(demurrageModifier);
+		//return (_value * ppmDivider * 1000000) / toDemurrageAmount(demurrageModifier);
+		return (_value * ppmDivider * 1000000) / demurrageAmount;
 	}
 
 	// ERC20, triggers tax and/or redistribution

@@ -71,25 +71,30 @@ class Test(unittest.TestCase):
         self.assertEqual(self.contract.functions.actualPeriod().call(), 2)
 
 
-
     def test_apply_demurrage(self):
         modifier = 10 * (10 ** 37)
-        demurrage_modifier = self.contract.functions.demurrageModifier().call()
-        demurrage_modifier &= (1 << 128) - 1
-        self.assertEqual(modifier, demurrage_modifier)
+        #demurrage_modifier = self.contract.functions.demurrageModifier().call()
+        #demurrage_modifier &= (1 << 128) - 1
+        demurrage_amount = self.contract.functions.demurrageAmount().call()
+        #self.assertEqual(modifier, demurrage_modifier)
+        self.assertEqual(modifier, demurrage_amount)
 
         self.eth_tester.time_travel(self.start_time + 59)
-        demurrage_modifier = self.contract.functions.demurrageModifier().call()
-        demurrage_modifier &= (1 << 128) - 1
-        self.assertEqual(modifier, demurrage_modifier)
+        #demurrage_modifier = self.contract.functions.demurrageModifier().call()
+        demurrage_amount = self.contract.functions.demurrageAmount().call()
+        #demurrage_modifier &= (1 << 128) - 1
+        #self.assertEqual(modifier, demurrage_modifier)
+        self.assertEqual(modifier, demurrage_amount)
 
         self.eth_tester.time_travel(self.start_time + 61)
         tx_hash = self.contract.functions.applyDemurrage().transact()
         r = self.w3.eth.getTransactionReceipt(tx_hash)
 
-        demurrage_modifier = self.contract.functions.demurrageModifier().call()
-        demurrage_modifier &= (1 << 128) - 1
-        self.assertEqual(int(98 * (10 ** 36)), demurrage_modifier)
+        #demurrage_modifier = self.contract.functions.demurrageModifier().call()
+        demurrage_amount = self.contract.functions.demurrageAmount().call()
+        #demurrage_modifier &= (1 << 128) - 1
+        #self.assertEqual(int(98 * (10 ** 36)), demurrage_modifier)
+        self.assertEqual(int(98 * (10 ** 36)), demurrage_amount)
 
 
     def test_mint(self):
@@ -138,6 +143,7 @@ class Test(unittest.TestCase):
         with self.assertRaises(eth_tester.exceptions.TransactionFailed):
             tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[2], 1024).transact({'from': self.w3.eth.accounts[1]})
 
+
     def test_base_amount(self):
         tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], 1000).transact()
         r = self.w3.eth.getTransactionReceipt(tx_hash)
@@ -146,9 +152,9 @@ class Test(unittest.TestCase):
         self.eth_tester.time_travel(self.start_time + 61)
 
         self.contract.functions.applyDemurrage().transact()
-        demurrage_modifier = self.contract.functions.demurrageModifier().call()
-        demurrage_amount = self.contract.functions.toDemurrageAmount(demurrage_modifier).call()
-        logg.debug('d {} {}'.format(demurrage_modifier.to_bytes(32, 'big').hex(), demurrage_amount))
+        #demurrage_modifier = self.contract.functions.demurrageModifier().call()
+        #demurrage_amount = self.contract.functions.toDemurrageAmount(demurrage_modifier).call()
+        demurrage_amount = self.contract.functions.demurrageAmount().call()
 
         a = self.contract.functions.toBaseAmount(1000).call();
         self.assertEqual(a, 1020)
