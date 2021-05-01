@@ -1,2 +1,2 @@
-chainlib~=0.0.2a10
-crypto-dev-signer~=0.4.14b1
+chainlib~=0.0.2b1
+crypto-dev-signer~=0.4.14b3
