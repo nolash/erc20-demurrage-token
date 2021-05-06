@@ -35,6 +35,8 @@ contract RedistributedDemurrageToken {
 	// Implements EIP172
 	address public owner;
 
+	address newOwner;
+
 	// Implements ERC20
 	string public name;
 
@@ -92,6 +94,9 @@ contract RedistributedDemurrageToken {
 
 	// Temporary event used in development, will be removed on prod
 	event Debug(bytes32 _foo);
+
+	// EIP173
+	event OwnershipTransferred(address indexed previousOwner, address indexed newOwner); // EIP173
 
 	constructor(string memory _name, string memory _symbol, uint8 _decimals, uint256 _taxLevelMinute, uint256 _periodMinutes, address _defaultSinkAddress) public {
 		// ACL setup
@@ -509,7 +514,7 @@ contract RedistributedDemurrageToken {
 		return (_value * ppmDivider * 1000000) / demurrageAmount;
 	}
 
-	// ERC20, triggers tax and/or redistribution
+	// Implements ERC20, triggers tax and/or redistribution
 	function approve(address _spender, uint256 _value) public returns (bool) {
 		uint256 baseValue;
 
@@ -522,7 +527,7 @@ contract RedistributedDemurrageToken {
 		return true;
 	}
 
-	// ERC20, triggers tax and/or redistribution
+	// Implements ERC20, triggers tax and/or redistribution
 	function transfer(address _to, uint256 _value) public returns (bool) {
 		uint256 baseValue;
 		bool result;
@@ -537,7 +542,7 @@ contract RedistributedDemurrageToken {
 	}
 
 
-	// ERC20, triggers tax and/or redistribution
+	// Implements ERC20, triggers tax and/or redistribution
 	function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
 		uint256 baseValue;
 		bool result;
@@ -565,5 +570,42 @@ contract RedistributedDemurrageToken {
 			registerAccountPeriod(_from, period);
 		}
 		return true;
+	}
+
+	// Implements EIP173
+	function transferOwnership(address _newOwner) public returns (bool) {
+		require(msg.sender == owner);
+		newOwner = _newOwner;
+	}
+
+	// Implements OwnedAccepter
+	function acceptOwnership() public returns (bool) {
+		address oldOwner;
+
+		require(msg.sender == newOwner);
+		oldOwner = owner; 
+		owner = newOwner;
+		newOwner = address(0);
+		emit OwnershipTransferred(oldOwner, owner);
+	}
+
+	// Implements EIP165
+	function supportsInterface(bytes4 _sum) public pure returns (bool) {
+		if (_sum == 0xc6bb4b70) { // ERC20
+			return true;
+		}
+		if (_sum == 0x449a52f8) { // Minter
+			return true;
+		}
+		if (_sum == 0x01ffc9a7) { // EIP165
+			return true;
+		}
+		if (_sum == 0x9493f8b2) { // EIP173
+			return true;
+		}
+		if (_sum == 0x37a47be4) { // OwnedAccepter
+			return true;
+		}
+		return false;
 	}
 }
