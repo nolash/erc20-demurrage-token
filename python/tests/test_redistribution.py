@@ -103,17 +103,21 @@ class TestRedistribution(TestDemurrageDefault):
         self.assertEqual(strip_0x(r), '000000000000000000000000ef4200000000000000000000002dc6c000000002')
 
 
-#    def test_redistribution_balance_on_zero_participants(self):
-#        supply = 1000000000000
-#        tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], supply).transact()
-#        r = self.w3.eth.getTransactionReceipt(tx_hash)
-#
-#        self.eth_tester.time_travel(self.start_time + 61)
-#
-#        tx_hash = self.contract.functions.applyDemurrage().transact()
-#        r = self.w3.eth.getTransactionReceipt(tx_hash)
-#        logg.debug('r {}'.format(r))
-#        self.assertEqual(r.status, 1)
+    def test_redistribution_balance_on_zero_participants(self):
+        supply = 1000000000000
+
+        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+        (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[1], supply)
+        r = self.rpc.do(o)
+
+
+        self.backend.time_travel(self.start_time + 61)
+        (tx_hash, o) = c.apply_demurrage(self.address, self.accounts[0])
+        self.rpc.do(o)
+        (tx_hash, o) = c.change_period(self.address, self.accounts[0])
+        self.rpc.do(o)
+
 #        tx_hash = self.contract.functions.changePeriod().transact()
 #        rr = self.w3.eth.getTransactionReceipt(tx_hash)
 #        self.assertEqual(rr.status, 1)
