@@ -222,11 +222,11 @@ class DemurrageToken(ERC20):
 
 
     def period_start(self, contract_address, sender_address=ZERO_ADDRESS):
-        return self.call_noarg('actualPeriod', contract_address, sender_address=sender_address)
+        return self.call_noarg('periodStart', contract_address, sender_address=sender_address)
 
 
     def period_duration(self, contract_address, sender_address=ZERO_ADDRESS):
-        return self.call_noarg('actualPeriod', contract_address, sender_address=sender_address)
+        return self.call_noarg('periodDuration', contract_address, sender_address=sender_address)
 
 
     def demurrage_amount(self, contract_address, sender_address=ZERO_ADDRESS):

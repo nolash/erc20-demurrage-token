@@ -34,7 +34,6 @@ PERIOD = 1
 
 class TestRedistribution(TestDemurrageDefault):
 
-    @unittest.skip('foo')
     def test_debug_periods(self):
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
@@ -58,7 +57,6 @@ class TestRedistribution(TestDemurrageDefault):
 
 
     # TODO: check receipt log outputs
-    @unittest.skip('foo')
     def test_redistribution_storage(self):
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
@@ -105,7 +103,6 @@ class TestRedistribution(TestDemurrageDefault):
         self.assertEqual(strip_0x(r), '000000000000000000000000ef4200000000000000000000002dc6c000000002')
 
 
-    @unittest.skip('foo')
     def test_redistribution_balance_on_zero_participants(self):
         supply = 1000000000000
 
@@ -114,39 +111,45 @@ class TestRedistribution(TestDemurrageDefault):
         (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[1], supply)
         r = self.rpc.do(o)
 
-
         self.backend.time_travel(self.start_time + 61)
         (tx_hash, o) = c.apply_demurrage(self.address, self.accounts[0])
         self.rpc.do(o)
+        o = receipt(tx_hash)
+        rcpt = self.rpc.do(o)
+        self.assertEqual(rcpt['status'], 1)
+
         (tx_hash, o) = c.change_period(self.address, self.accounts[0])
         self.rpc.do(o)
-
-        o = c.redistributions(self.address, 0, sender_address=self.accounts[0])
+        o = receipt(tx_hash)
         r = self.rpc.do(o)
-        redistributions = c.parse_redistributions(r)
+        self.assertEqual(r['status'], 1)
 
         o = c.total_supply(self.address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
-        supply = c.parse_total_supply(r)
+        total_supply = c.parse_total_supply(r)
+        sink_increment = int(total_supply * (TAX_LEVEL / 1000000))
+        self.assertEqual(supply, total_supply)
 
-        sink_increment = int(supply * (TAX_LEVEL / 1000000))
-#        for l in r['logs']:
-#            if l.topics[0].hex() == '0xa0717e54e02bd9829db5e6e998aec0ae9de796b8d150a3cc46a92ab869697755': # event Decayed(uint256,uint256,uint256,uint256)
-#                period = int.from_bytes(l.topics[1], 'big')
-#                self.assertEqual(period, 2)
-#                b = bytes.fromhex(l.data[2:])
-#                remainder = int.from_bytes(b, 'big')
-#                self.assertEqual(remainder, int((1000000 - TAX_LEVEL) * (10 ** 32)))
-#                logg.debug('period {} remainder {}'.format(period, remainder))
-#
-#        sink_balance = self.contract.functions.balanceOf(self.sink_address).call()
-#        logg.debug('{} {}'.format(sink_increment, sink_balance))
-#        self.assertEqual(sink_balance, int(sink_increment * 0.98))
-#        self.assertEqual(sink_balance, int(sink_increment * (1000000 - TAX_LEVEL) / 1000000))
-#
-#        balance = self.contract.functions.balanceOf(self.w3.eth.accounts[1]).call()
-#        self.assertEqual(balance, supply - sink_increment)
-#
+        for l in rcpt['logs']:
+            if l['topics'][0] == '0xa0717e54e02bd9829db5e6e998aec0ae9de796b8d150a3cc46a92ab869697755': # event Decayed(uint256,uint256,uint256,uint256)
+                period = int.from_bytes(bytes.fromhex(strip_0x(l['topics'][1])), 'big')
+                self.assertEqual(period, 2)
+                b = bytes.fromhex(strip_0x(l['data']))
+                remainder = int.from_bytes(b, 'big')
+                self.assertEqual(remainder, int((1000000 - TAX_LEVEL) * (10 ** 32)))
+
+        o = c.balance_of(self.address, self.sink_address, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        sink_balance = c.parse_balance_of(r)
+
+        self.assertEqual(sink_balance, int(sink_increment * 0.98))
+        self.assertEqual(sink_balance, int(sink_increment * (1000000 - TAX_LEVEL) / 1000000))
+
+        o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        balance = c.parse_balance_of(r)
+        self.assertEqual(balance, supply - sink_increment)
+
 
     def test_redistribution_two_of_ten(self):
         mint_amount = 100000000

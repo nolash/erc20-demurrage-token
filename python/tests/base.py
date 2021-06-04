@@ -42,7 +42,8 @@ class TestDemurrage(EthTesterCase):
         self.settings.decimals = 6
         self.settings.demurrage_level = TAX_LEVEL * (10 ** 32)
         self.settings.period_minutes = PERIOD
-        self.settings.sink_address = self.accounts[1]
+        self.settings.sink_address = self.accounts[9]
+        self.sink_address = self.settings.sink_address
 
         o = block_latest()
         self.start_block = self.rpc.do(o)
