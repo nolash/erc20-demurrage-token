@@ -4,76 +4,64 @@ import unittest
 import json
 import logging
 
-# third-party imports
-import web3
-import eth_tester
-import eth_abi
+# external imports
+from chainlib.eth.constant import ZERO_ADDRESS
+from chainlib.eth.nonce import RPCNonceOracle
+from chainlib.eth.tx import receipt
+
+# local imports
+from erc20_demurrage_token import DemurrageToken
+
+# test imports
+from tests.base import TestDemurrageDefault
 
 logging.basicConfig(level=logging.DEBUG)
 logg = logging.getLogger()
 
-logging.getLogger('web3').setLevel(logging.WARNING)
-logging.getLogger('eth.vm').setLevel(logging.WARNING)
-
 testdir = os.path.dirname(__file__)
 
-#BLOCKTIME = 5 # seconds
-TAX_LEVEL = 10000 * 2 # 2%
-#PERIOD = int(60/BLOCKTIME) * 60 * 24 * 30 # month
-PERIOD = 1
-
-
-class Test(unittest.TestCase):
-
-    contract = None
-
-    def setUp(self):
-        eth_params = eth_tester.backends.pyevm.main.get_default_genesis_params({
-            'gas_limit': 9000000,
-            })
-
-        f = open(os.path.join(testdir, '../../solidity/RedistributedDemurrageToken.bin'), 'r')
-        self.bytecode = f.read()
-        f.close()
-
-        f = open(os.path.join(testdir, '../../solidity/RedistributedDemurrageToken.json'), 'r')
-        self.abi = json.load(f)
-        f.close()
-
-        backend = eth_tester.PyEVMBackend(eth_params)
-        self.eth_tester =  eth_tester.EthereumTester(backend)
-        provider = web3.Web3.EthereumTesterProvider(self.eth_tester)
-        self.w3 = web3.Web3(provider)
-        self.sink_address = self.w3.eth.accounts[9]
-
-        c = self.w3.eth.contract(abi=self.abi, bytecode=self.bytecode)
-        tx_hash = c.constructor('Foo Token', 'FOO', 6, TAX_LEVEL * (10 ** 32), PERIOD, self.sink_address).transact({'from': self.w3.eth.accounts[0]})
-
-        r = self.w3.eth.getTransactionReceipt(tx_hash)
-        self.contract = self.w3.eth.contract(abi=self.abi, address=r.contractAddress)
-
-        self.start_block = self.w3.eth.blockNumber
-        b = self.w3.eth.getBlock(self.start_block)
-        self.start_time = b['timestamp']
-
-
-    def tearDown(self):
-        pass
-
+class TestPeriod(TestDemurrageDefault):
 
     def test_period(self):
-        tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], 1024).transact()
-        r = self.w3.eth.getTransactionReceipt(tx_hash)
-        self.assertEqual(r.status, 1)
+        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+        (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[1], 1024)
+        r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
 
-        self.eth_tester.time_travel(self.start_time + 61)
-        tx_hash = self.contract.functions.changePeriod().transact()
-        r = self.w3.eth.getTransactionReceipt(tx_hash)
-        self.assertEqual(r.status, 1)
+        self.backend.time_travel(self.start_time + 61)
 
-        redistribution = self.contract.functions.redistributions(1).call()
-        self.assertEqual(2, self.contract.functions.toRedistributionPeriod(redistribution).call())
-        self.assertEqual(2, self.contract.functions.actualPeriod().call())
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+        (tx_hash, o) = c.change_period(self.address, self.accounts[0])
+        r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+
+        o = c.redistributions(self.address, 1, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        redistribution = c.parse_redistributions(r)
+
+        o = c.to_redistribution_period(self.address, redistribution, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        period = c.parse_to_redistribution_period(r)
+        self.assertEqual(2, period)
+
+        o = c.redistributions(self.address, 1, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        redistribution = c.parse_redistributions(r)
+
+        o = c.to_redistribution_period(self.address, redistribution, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        period = c.parse_to_redistribution_period(r)
+        self.assertEqual(2, period)
+
+        o = c.actual_period(self.address, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        period = c.parse_actual_period(r)
+        self.assertEqual(2, period)
 
 
 if __name__ == '__main__':

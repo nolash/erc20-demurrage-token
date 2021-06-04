@@ -9,7 +9,6 @@ import datetime
 from chainlib.eth.constant import ZERO_ADDRESS
 from chainlib.eth.nonce import RPCNonceOracle
 from chainlib.eth.tx import receipt
-import eth_tester
 
 # local imports
 from erc20_demurrage_token import DemurrageToken

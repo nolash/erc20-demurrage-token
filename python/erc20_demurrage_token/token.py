@@ -152,8 +152,42 @@ class DemurrageToken(ERC20):
         return o
 
 
+    def redistributions(self, contract_address, idx, sender_address=ZERO_ADDRESS):
+        o = jsonrpc_template()
+        o['method'] = 'eth_call'
+        enc = ABIContractEncoder()
+        enc.method('redistributions')
+        enc.typ(ABIContractType.UINT256)
+        enc.uint256(idx)
+        data = add_0x(enc.get())
+        tx = self.template(sender_address, contract_address)
+        tx = self.set_code(tx, data)
+        o['params'].append(self.normalize(tx))
+        o['params'].append('latest')
+        return o
+
+
+    def to_redistribution_period(self, contract_address, redistribution, sender_address=ZERO_ADDRESS):
+        o = jsonrpc_template()
+        o['method'] = 'eth_call'
+        enc = ABIContractEncoder()
+        enc.method('toRedistributionPeriod')
+        enc.typ(ABIContractType.BYTES32)
+        enc.bytes32(redistribution)
+        data = add_0x(enc.get())
+        tx = self.template(sender_address, contract_address)
+        tx = self.set_code(tx, data)
+        o['params'].append(self.normalize(tx))
+        o['params'].append('latest')
+        return o
+
+
     def apply_demurrage(self, contract_address, sender_address):
         return self.transact_noarg('applyDemurrage', contract_address, sender_address)
+
+
+    def change_period(self, contract_address, sender_address):
+        return self.transact_noarg('changePeriod', contract_address, sender_address)
 
 
     def actual_period(self, contract_address, sender_address=ZERO_ADDRESS):
@@ -177,6 +211,14 @@ class DemurrageToken(ERC20):
 
 
     def parse_to_base_amount(self, v):
+        return abi_decode_single(ABIContractType.UINT256, v)
+
+    
+    def parse_redistributions(self, v):
+        return abi_decode_single(ABIContractType.BYTES32, v)
+
+
+    def parse_to_redistribution_period(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)
 
 
