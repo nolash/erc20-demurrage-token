@@ -102,6 +102,7 @@ class TestBasic(TestDemurrageDefault):
         self.assertEqual(balance, int(2000 * 0.98))
 
 
+    @unittest.skip('foo')
     def test_minter_control(self):
 
         nonce_oracle = RPCNonceOracle(self.accounts[1], self.rpc)
@@ -154,30 +155,23 @@ class TestBasic(TestDemurrageDefault):
         self.assertEqual(r['status'], 0)
             
 
-#        tx_hash = self.contract.functions.removeMinter(self.w3.eth.accounts[1]).transact({'from': self.w3.eth.accounts[1]})
-#        r = self.w3.eth.getTransactionReceipt(tx_hash)
-#        self.assertEqual(r.status, 1)
-#
-#        with self.assertRaises(eth_tester.exceptions.TransactionFailed):
-#            tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[2], 1024).transact({'from': self.w3.eth.accounts[1]})
-#
-#
-#    def test_base_amount(self):
-#        tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], 1000).transact()
-#        r = self.w3.eth.getTransactionReceipt(tx_hash)
-#        self.assertEqual(r.status, 1)
-#
-#        self.eth_tester.time_travel(self.start_time + 61)
-#
-#        self.contract.functions.applyDemurrage().transact()
-#        #demurrage_modifier = self.contract.functions.demurrageModifier().call()
-#        #demurrage_amount = self.contract.functions.toDemurrageAmount(demurrage_modifier).call()
-#        demurrage_amount = self.contract.functions.demurrageAmount().call()
-#
-#        a = self.contract.functions.toBaseAmount(1000).call();
-#        self.assertEqual(a, 1020)
-#
-#
+
+    def test_base_amount(self):
+        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+
+        (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[1], 1024)
+        self.rpc.do(o)
+
+        self.backend.time_travel(self.start_time + 61)
+        (tx_hash, o) = c.apply_demurrage(self.address, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        o = c.to_base_amount(self.address, 1000, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        amount = c.parse_to_base_amount(r)
+        self.assertEqual(amount, 1020)
+
+
 #    def test_transfer(self):
 #        tx_hash = self.contract.functions.mintTo(self.w3.eth.accounts[1], 1024).transact()
 #        r = self.w3.eth.getTransactionReceipt(tx_hash)

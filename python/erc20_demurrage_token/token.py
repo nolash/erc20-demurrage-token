@@ -120,6 +120,21 @@ class DemurrageToken(ERC20):
         return tx
 
 
+    def to_base_amount(self, contract_address, value, sender_address=ZERO_ADDRESS):
+        o = jsonrpc_template()
+        o['method'] = 'eth_call'
+        enc = ABIContractEncoder()
+        enc.method('toBaseAmount')
+        enc.typ(ABIContractType.UINT256)
+        enc.uint256(value)
+        data = add_0x(enc.get())
+        tx = self.template(sender_address, contract_address)
+        tx = self.set_code(tx, data)
+        o['params'].append(self.normalize(tx))
+        o['params'].append('latest')
+        return o
+
+
     def apply_demurrage(self, contract_address, sender_address):
         return self.transact_noarg('applyDemurrage', contract_address, sender_address)
 
@@ -138,3 +153,9 @@ class DemurrageToken(ERC20):
 
     def parse_demurrage_amount(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)
+
+
+    def parse_to_base_amount(self, v):
+        return abi_decode_single(ABIContractType.UINT256, v)
+
+
