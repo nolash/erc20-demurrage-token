@@ -167,6 +167,21 @@ class DemurrageToken(ERC20):
         return o
 
 
+    def account_period(self, contract_address, address, sender_address=ZERO_ADDRESS):
+        o = jsonrpc_template()
+        o['method'] = 'eth_call'
+        enc = ABIContractEncoder()
+        enc.method('accountPeriod')
+        enc.typ(ABIContractType.ADDRESS)
+        enc.address(address)
+        data = add_0x(enc.get())
+        tx = self.template(sender_address, contract_address)
+        tx = self.set_code(tx, data)
+        o['params'].append(self.normalize(tx))
+        o['params'].append('latest')
+        return o
+
+
     def to_redistribution_period(self, contract_address, redistribution, sender_address=ZERO_ADDRESS):
         o = jsonrpc_template()
         o['method'] = 'eth_call'
@@ -190,6 +205,18 @@ class DemurrageToken(ERC20):
         return self.transact_noarg('changePeriod', contract_address, sender_address)
 
 
+    def apply_redistribution_on_account(self, contract_address, sender_address, address, tx_format=TxFormat.JSONRPC):
+        enc = ABIContractEncoder()
+        enc.method('applyRedistributionOnAccount')
+        enc.typ(ABIContractType.ADDRESS)
+        enc.address(address)
+        data = enc.get()
+        tx = self.template(sender_address, contract_address, use_nonce=True)
+        tx = self.set_code(tx, data)
+        tx = self.finalize(tx, tx_format)
+        return tx
+       
+
     def actual_period(self, contract_address, sender_address=ZERO_ADDRESS):
         return self.call_noarg('actualPeriod', contract_address, sender_address=sender_address)
 
@@ -206,35 +233,46 @@ class DemurrageToken(ERC20):
         return self.call_noarg('demurrageAmount', contract_address, sender_address=sender_address)
 
 
+    @classmethod
     def parse_actual_period(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)
 
 
+    @classmethod
     def parse_period_start(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)
 
 
+    @classmethod
     def parse_period_duration(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)
 
 
+    @classmethod
     def parse_demurrage_amount(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)
 
 
+    @classmethod
     def parse_remainder(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)
 
 
+    @classmethod
     def parse_to_base_amount(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)
 
     
+    @classmethod
     def parse_redistributions(self, v):
         return abi_decode_single(ABIContractType.BYTES32, v)
 
 
+    @classmethod
+    def parse_account_period(self, v):
+        return abi_decode_single(ABIContractType.ADDRESS, v)
+
+
+    @classmethod
     def parse_to_redistribution_period(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)
-
-
