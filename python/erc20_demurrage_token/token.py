@@ -194,11 +194,27 @@ class DemurrageToken(ERC20):
         return self.call_noarg('actualPeriod', contract_address, sender_address=sender_address)
 
 
+    def period_start(self, contract_address, sender_address=ZERO_ADDRESS):
+        return self.call_noarg('actualPeriod', contract_address, sender_address=sender_address)
+
+
+    def period_duration(self, contract_address, sender_address=ZERO_ADDRESS):
+        return self.call_noarg('actualPeriod', contract_address, sender_address=sender_address)
+
+
     def demurrage_amount(self, contract_address, sender_address=ZERO_ADDRESS):
         return self.call_noarg('demurrageAmount', contract_address, sender_address=sender_address)
 
 
     def parse_actual_period(self, v):
+        return abi_decode_single(ABIContractType.UINT256, v)
+
+
+    def parse_period_start(self, v):
+        return abi_decode_single(ABIContractType.UINT256, v)
+
+
+    def parse_period_duration(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)
 
 
