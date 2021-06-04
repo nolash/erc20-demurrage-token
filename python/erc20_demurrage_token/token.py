@@ -94,6 +94,18 @@ class DemurrageToken(ERC20):
         return tx
 
 
+    def remove_minter(self, contract_address, sender_address, address, tx_format=TxFormat.JSONRPC):
+        enc = ABIContractEncoder()
+        enc.method('removeMinter')
+        enc.typ(ABIContractType.ADDRESS)
+        enc.address(address)
+        data = enc.get()
+        tx = self.template(sender_address, contract_address, use_nonce=True)
+        tx = self.set_code(tx, data)
+        tx = self.finalize(tx, tx_format)
+        return tx
+
+
     def mint_to(self, contract_address, sender_address, address, value, tx_format=TxFormat.JSONRPC):
         enc = ABIContractEncoder()
         enc.method('mintTo')
