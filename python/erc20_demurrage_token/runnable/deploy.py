@@ -29,7 +29,7 @@ from chainlib.eth.tx import receipt
 from chainlib.eth.constant import ZERO_ADDRESS
 
 # local imports
-from sarafu_token import RedistributedDemurrageToken
+from erc20_demurrage_token import DemurrageToken
 
 logging.basicConfig(level=logging.WARNING)
 logg = logging.getLogger()
@@ -92,9 +92,9 @@ else:
 
 gas_oracle = None
 if args.gas_price !=None:
-    gas_oracle = OverrideGasOracle(price=args.gas_price, conn=rpc, code_callback=RedistributedDemurrageToken.gas)
+    gas_oracle = OverrideGasOracle(price=args.gas_price, conn=rpc, code_callback=DemurrageToken.gas)
 else:
-    gas_oracle = RPCGasOracle(rpc, code_callback=RedistributedDemurrageToken.gas)
+    gas_oracle = RPCGasOracle(rpc, code_callback=DemurrageToken.gas)
 
 dummy = args.d
 
@@ -103,7 +103,7 @@ if token_name == None:
     token_name = args.symbol
 
 def main():
-    c = RedistributedDemurrageToken(chain_spec, signer=signer, gas_oracle=gas_oracle, nonce_oracle=nonce_oracle)
+    c = DemurrageToken(chain_spec, signer=signer, gas_oracle=gas_oracle, nonce_oracle=nonce_oracle)
     (tx_hash_hex, o) = c.constructor(
             signer_address,
             token_name,
