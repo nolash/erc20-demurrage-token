@@ -16,7 +16,7 @@ from erc20_demurrage_token import DemurrageToken
 # test imports
 from tests.base import TestDemurrageDefault
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logg = logging.getLogger()
 
 testdir = os.path.dirname(__file__)

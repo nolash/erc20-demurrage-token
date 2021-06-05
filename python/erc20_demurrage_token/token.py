@@ -46,6 +46,7 @@ class DemurrageToken(ERC20):
                 'MultiNocap',
                 'SingleNocap',
                 'MultiCap',
+                'SingleCap',
                 ]
 
     def constructor(self, sender_address, settings, redistribute=True, cap=0, tx_format=TxFormat.JSONRPC):
@@ -59,6 +60,8 @@ class DemurrageToken(ERC20):
         enc.uint256(settings.demurrage_level)
         enc.uint256(settings.period_minutes)
         enc.address(settings.sink_address)
+        if cap > 0:
+            enc.uint256(cap)
         code += enc.get()
         tx = self.template(sender_address, None, use_nonce=True)
         tx = self.set_code(tx, code)
@@ -255,6 +258,10 @@ class DemurrageToken(ERC20):
         return self.call_noarg('demurrageAmount', contract_address, sender_address=sender_address)
 
 
+    def supply_cap(self, contract_address, sender_address=ZERO_ADDRESS):
+        return self.call_noarg('supplyCap', contract_address, sender_address=sender_address)
+
+
     @classmethod
     def parse_actual_period(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)
@@ -297,4 +304,9 @@ class DemurrageToken(ERC20):
 
     @classmethod
     def parse_to_redistribution_period(self, v):
+        return abi_decode_single(ABIContractType.UINT256, v)
+
+
+    @classmethod
+    def parse_supply_cap(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)

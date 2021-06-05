@@ -62,7 +62,7 @@ class TestDemurrage(EthTesterCase):
             self.start_time = int(r['timestamp'])
 
         self.default_supply = 1000000000000
-        self.default_supply_cap = self.default_supply * 10
+        self.default_supply_cap = int(self.default_supply * 10)
 
 
     def deploy(self, interface, mode):
@@ -73,9 +73,11 @@ class TestDemurrage(EthTesterCase):
         elif mode == 'SingleNocap':
             (tx_hash, o) = interface.constructor(self.accounts[0], self.settings, redistribute=False, cap=0)
         elif mode == 'MultiCap':
+            (tx_hash, o) = interface.constructor(self.accounts[0], self.settings, redistribute=True, cap=self.default_supply_cap)
+        elif mode == 'SingleCap':
             (tx_hash, o) = interface.constructor(self.accounts[0], self.settings, redistribute=False, cap=self.default_supply_cap)
         else:
-            raise ValueError('Invalid mode "{}", valid are {}'.format(mode, DeurrageToken.valid_modes))
+            raise ValueError('Invalid mode "{}", valid are {}'.format(self.mode, DemurrageToken.valid_modes))
 
         r = self.rpc.do(o)
         o = receipt(tx_hash)
@@ -88,9 +90,11 @@ class TestDemurrage(EthTesterCase):
         r = self.rpc.do(o)
         self.start_time = r['timestamp']
 
+        logg.debug('contract address {} start block {} start time {}'.format(self.address, self.start_block, self.start_time))
+
+
     def tearDown(self):
         pass
-
 
 
 class TestDemurrageDefault(TestDemurrage):
@@ -104,24 +108,58 @@ class TestDemurrageDefault(TestDemurrage):
         self.mode = os.environ.get('ERC20_DEMURRAGE_TOKEN_TEST_MODE')
         if self.mode == None:
             self.mode = 'MultiNocap'
+        logg.debug('executing test setup default mode {}'.format(self.mode))
 
         self.deploy(c, self.mode)
 
         logg.info('deployed with mode {}'.format(self.mode))
 
 
-class TestDemurrageSingleNocap(TestDemurrage):
+class TestDemurrageSingle(TestDemurrage):
 
     def setUp(self):
-        super(TestDemurrageSingleNocap, self).setUp()
+        super(TestDemurrageSingle, self).setUp()
    
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
-        self.mode = 'SingleNocap'
+        self.mode = os.environ.get('ERC20_DEMURRAGE_TOKEN_TEST_MODE')
+        single_valid_modes = [
+                    'SingleNocap',
+                    'SingleCap',
+                    ]
+        if self.mode != None:
+            if self.mode not in single_valid_modes:
+                raise ValueError('Invalid mode "{}" for "single" contract tests, valid are {}'.format(self.mode, single_valid_modes))
+        else:
+            self.mode = 'SingleNocap'
+        logg.debug('executing test setup demurragesingle mode {}'.format(self.mode))
 
         self.deploy(c, self.mode)
 
         logg.info('deployed with mode {}'.format(self.mode))
 
 
+class TestDemurrageCap(TestDemurrage):
+
+    def setUp(self):
+        super(TestDemurrageCap, self).setUp()
+   
+        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+
+        self.mode = os.environ.get('ERC20_DEMURRAGE_TOKEN_TEST_MODE')
+        cap_valid_modes = [
+                    'MultiCap',
+                    'SingleCap',
+                    ]
+        if self.mode != None:
+            if self.mode not in cap_valid_modes:
+                raise ValueError('Invalid mode "{}" for "cap" contract tests, valid are {}'.format(self.mode, cap_valid_modes))
+        else:
+            self.mode = 'MultiCap'
+        logg.debug('executing test setup demurragecap mode {}'.format(self.mode))
+
+        self.deploy(c, self.mode)
+
+        logg.info('deployed with mode {}'.format(self.mode))

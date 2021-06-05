@@ -2,7 +2,7 @@ pragma solidity > 0.6.11;
 
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-contract DemurrageTokenMultiCap {
+contract DemurrageTokenSingleNocap {
 
 	// Redistribution bit field, with associated shifts and masks
 	// (Uses sub-byte boundaries)
@@ -25,7 +25,7 @@ contract DemurrageTokenMultiCap {
 	uint256 constant maskAccountValue 		= 0x0000000000000000000000000000000000000000000000ffffffffffffffffff; // (1 << 72) - 1
 	uint8 constant shiftAccountPeriod		= 72;
 	uint256 constant maskAccountPeriod 		= 0x00000000000000000000000000000000000000ffffffff000000000000000000; // ((1 << 32) - 1) << 72
-
+	
 	// Cached demurrage amount, ppm with 38 digit resolution
 	uint128 public demurrageAmount;
 
@@ -333,8 +333,7 @@ contract DemurrageTokenMultiCap {
 		return _sumWhole - truncatedResult;
 	}
 
-	// Called in the edge case where participant number is 0. It will override the participant count to 1.
-	// Returns the remainder sent to the sink address
+	// Returns the amount sent to the sink address
 	function applyDefaultRedistribution(bytes32 _redistribution) private returns (uint256) {
 		uint256 redistributionSupply;
 		uint256 redistributionPeriod;
@@ -404,7 +403,6 @@ contract DemurrageTokenMultiCap {
 	}
 
 	// Recalculate the demurrage modifier for the new period
-	// After this, all REPORTED balances will have been reduced by the corresponding ratio (but the effecive totalsupply stays the same)
 	function changePeriod() public returns (bool) {
 		bytes32 currentRedistribution;
 		bytes32 nextRedistribution;
@@ -439,13 +437,13 @@ contract DemurrageTokenMultiCap {
 		nextRedistribution = toRedistribution(0, nextRedistributionDemurrage, totalSupply, nextPeriod);
 		redistributions.push(nextRedistribution);
 
-		currentParticipants = toRedistributionParticipants(currentRedistribution);
-		if (currentParticipants == 0) {
-			currentRemainder = applyDefaultRedistribution(currentRedistribution);
-		} else {
-			currentRemainder = remainder(currentParticipants, totalSupply); // we can use totalSupply directly because it will always be the same as the recorded supply on the current redistribution
-			applyRemainderOnPeriod(currentRemainder, currentPeriod);
-		}
+		//currentParticipants = toRedistributionParticipants(currentRedistribution);
+		//if (currentParticipants == 0) {
+		currentRemainder = applyDefaultRedistribution(currentRedistribution);
+		//} else {
+		//	currentRemainder = remainder(currentParticipants, totalSupply); // we can use totalSupply directly because it will always be the same as the recorded supply on the current redistribution
+		//	applyRemainderOnPeriod(currentRemainder, currentPeriod);
+		//}
 		emit Period(nextPeriod);
 		return true;
 	}
@@ -482,34 +480,34 @@ contract DemurrageTokenMultiCap {
 	// If the given account is participating in a period and that period has been crossed
 	// THEN increase the base value of the account with its share of the value reduction of the period
 	function applyRedistributionOnAccount(address _account) public returns (bool) {
-		bytes32 periodRedistribution;
-		uint256 supply;
-		uint256 participants;
-		uint256 baseValue;
-		uint256 value;
+//		bytes32 periodRedistribution;
+//		uint256 supply;
+//		uint256 participants;
+//		uint256 baseValue;
+//		uint256 value;
 		uint256 period;
-		uint256 demurrage;
-	       
+//		uint256 demurrage;
+//	       
 		period = accountPeriod(_account);
 		if (period == 0 || period >= actualPeriod()) {
 			return false;
 		}
-		periodRedistribution = redistributions[period-1];
-		participants = toRedistributionParticipants(periodRedistribution);
-		if (participants == 0) {
-			return false;
-		}
-
-		supply = toRedistributionSupply(periodRedistribution);
-		demurrage = toRedistributionDemurrageModifier(periodRedistribution);
-		baseValue = ((supply / participants) * (taxLevel / 1000000)) / ppmDivider;
-		value = (baseValue * demurrage) / 1000000;
-
-		// zero out period for the account
+//		periodRedistribution = redistributions[period-1];
+//		participants = toRedistributionParticipants(periodRedistribution);
+//		if (participants == 0) {
+//			return false;
+//		}
+//
+//		supply = toRedistributionSupply(periodRedistribution);
+//		demurrage = toRedistributionDemurrageModifier(periodRedistribution);
+//		baseValue = ((supply / participants) * (taxLevel / 1000000)) / ppmDivider;
+//		value = (baseValue * demurrage) / 1000000;
+//
+//		// zero out period for the account
 		account[_account] &= bytes32(~maskAccountPeriod); 
-		increaseBaseBalance(_account, value);
-
-		emit Redistribution(_account, period, value);
+//		increaseBaseBalance(_account, value);
+//
+//		emit Redistribution(_account, period, value);
 		return true;
 	}
 
@@ -524,7 +522,7 @@ contract DemurrageTokenMultiCap {
 		uint256 baseValue;
 
 		changePeriod();
-		applyRedistributionOnAccount(msg.sender);
+		//applyRedistributionOnAccount(msg.sender);
 
 		baseValue = toBaseAmount(_value);
 		allowance[msg.sender][_spender] += baseValue;
@@ -538,7 +536,7 @@ contract DemurrageTokenMultiCap {
 		bool result;
 
 		changePeriod();
-		applyRedistributionOnAccount(msg.sender);
+		//applyRedistributionOnAccount(msg.sender);
 
 		baseValue = toBaseAmount(_value);
 		result = transferBase(msg.sender, _to, baseValue);
@@ -553,7 +551,7 @@ contract DemurrageTokenMultiCap {
 		bool result;
 
 		changePeriod();
-		applyRedistributionOnAccount(msg.sender);
+		//applyRedistributionOnAccount(msg.sender);
 
 		baseValue = toBaseAmount(_value);
 		require(allowance[_from][msg.sender] >= baseValue);

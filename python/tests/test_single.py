@@ -18,7 +18,7 @@ from hexathon import (
 from erc20_demurrage_token import DemurrageToken
 
 # test imports
-from tests.base import TestDemurrageSingleNocap
+from tests.base import TestDemurrageSingle
 
 logging.basicConfig(level=logging.DEBUG)
 logg = logging.getLogger()
@@ -26,7 +26,7 @@ logg = logging.getLogger()
 testdir = os.path.dirname(__file__)
 
 
-class TestRedistributionSingle(TestDemurrageSingleNocap):
+class TestRedistributionSingle(TestDemurrageSingle):
 
     def test_single_even_if_multiple(self):
 
