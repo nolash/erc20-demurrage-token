@@ -1,5 +1,6 @@
 # standard imports
 import logging
+import os
 
 # external imports
 from chainlib.eth.unittest.ethtester import EthTesterCase
@@ -37,7 +38,7 @@ class TestDemurrage(EthTesterCase):
         super(TestDemurrage, self).setUp()
 
         self.tax_level = TAX_LEVEL
-        self.period = PERIOD
+        self.period_seconds = PERIOD * 60
 
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         self.settings = DemurrageTokenSettings()
@@ -54,12 +55,38 @@ class TestDemurrage(EthTesterCase):
         
         o = block_by_number(self.start_block, include_tx=False)
         r = self.rpc.do(o)
-        logg.debug('r {}'.format(r))
+
         try:
             self.start_time = int(r['timestamp'], 16)
         except TypeError:
             self.start_time = int(r['timestamp'])
 
+        self.default_supply = 1000000000000
+        self.default_supply_cap = self.default_supply * 10
+
+
+    def deploy(self, interface, mode):
+        tx_hash = None
+        o = None
+        if mode == 'MultiNocap':
+            (tx_hash, o) = interface.constructor(self.accounts[0], self.settings, redistribute=True, cap=0)
+        elif mode == 'SingleNocap':
+            (tx_hash, o) = interface.constructor(self.accounts[0], self.settings, redistribute=False, cap=0)
+        elif mode == 'MultiCap':
+            (tx_hash, o) = interface.constructor(self.accounts[0], self.settings, redistribute=False, cap=self.default_supply_cap)
+        else:
+            raise ValueError('Invalid mode "{}", valid are {}'.format(mode, DeurrageToken.valid_modes))
+
+        r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+        self.start_block = r['block_number']
+        self.address = r['contract_address']
+
+        o = block_by_number(r['block_number'])
+        r = self.rpc.do(o)
+        self.start_time = r['timestamp']
 
     def tearDown(self):
         pass
@@ -68,31 +95,33 @@ class TestDemurrage(EthTesterCase):
 
 class TestDemurrageDefault(TestDemurrage):
 
-    def __deploy(self, interface):
-        self.default_supply = 1000000000000
-        self.supply_cap = self.default_supply * 10
-
-        (tx_hash, o) = interface.constructor(self.accounts[0], self.settings, redistribute=True, cap=0)
-        r = self.rpc.do(o)
-        o = receipt(tx_hash)
-        r = self.rpc.do(o)
-        self.assertEqual(r['status'], 1)
-        self.addresses['MultiNocap'] = r['contract_address']
-
-        (tx_hash, o) = interface.constructor(self.accounts[0], self.settings, redistribute=False, cap=0)
-        r = self.rpc.do(o)
-        o = receipt(tx_hash)
-        r = self.rpc.do(o)
-        self.assertEqual(r['status'], 1)
-        self.addresses['SingleNocap'] = r['contract_address']
-
-
     def setUp(self):
         super(TestDemurrageDefault, self).setUp()
    
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
-        self.addresses = {}
-        self.__deploy(c)
-        self.address = self.addresses['MultiNocap']
+        self.mode = os.environ.get('ERC20_DEMURRAGE_TOKEN_TEST_MODE')
+        if self.mode == None:
+            self.mode = 'MultiNocap'
+
+        self.deploy(c, self.mode)
+
+        logg.info('deployed with mode {}'.format(self.mode))
+
+
+class TestDemurrageSingleNocap(TestDemurrage):
+
+    def setUp(self):
+        super(TestDemurrageSingleNocap, self).setUp()
+   
+        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+
+        self.mode = 'SingleNocap'
+
+        self.deploy(c, self.mode)
+
+        logg.info('deployed with mode {}'.format(self.mode))
+
+

@@ -16,7 +16,7 @@ from erc20_demurrage_token import DemurrageToken
 # test imports
 from tests.base import TestDemurrageDefault
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logg = logging.getLogger()
 
 testdir = os.path.dirname(__file__)
@@ -25,13 +25,12 @@ testdir = os.path.dirname(__file__)
 class TestBasic(TestDemurrageDefault):
 
     def test_hello(self):
-
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
         o = c.actual_period(self.address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         
-        self.backend.time_travel(self.start_time + 61)
+        self.backend.time_travel(self.start_time + self.period_seconds + 1)
         o = c.actual_period(self.address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
 
@@ -47,13 +46,13 @@ class TestBasic(TestDemurrageDefault):
         demurrage_amount = c.parse_demurrage_amount(r)
         self.assertEqual(modifier, demurrage_amount)
 
-        self.backend.time_travel(self.start_time + 59)
+        self.backend.time_travel(self.start_time + self.period_seconds - 1)
         o = c.demurrage_amount(self.address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         demurrage_amount = c.parse_demurrage_amount(r)
         self.assertEqual(modifier, demurrage_amount)
 
-        self.backend.time_travel(self.start_time + 61)
+        self.backend.time_travel(self.start_time + self.period_seconds + 1)
         (tx_hash, o) = c.apply_demurrage(self.address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         o = c.demurrage_amount(self.address, sender_address=self.accounts[0])
@@ -99,7 +98,6 @@ class TestBasic(TestDemurrageDefault):
 
 
     def test_minter_control(self):
-
         nonce_oracle = RPCNonceOracle(self.accounts[1], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 

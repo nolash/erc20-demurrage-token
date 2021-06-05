@@ -18,7 +18,7 @@ from hexathon import (
 from erc20_demurrage_token import DemurrageToken
 
 # test imports
-from tests.base import TestDemurrageDefault
+from tests.base import TestDemurrageSingleNocap
 
 logging.basicConfig(level=logging.DEBUG)
 logg = logging.getLogger()
@@ -26,36 +26,48 @@ logg = logging.getLogger()
 testdir = os.path.dirname(__file__)
 
 
-class TestRedistributionSingle(TestDemurrageDefault):
+class TestRedistributionSingle(TestDemurrageSingleNocap):
 
     def test_single_even_if_multiple(self):
+
+        mint_amount = 100000000
+
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
-        (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[1], 100000000)
-        r = self.rpc.do(o)
+        for i in range(3):
+            (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[i+1], mint_amount)
+            r = self.rpc.do(o)
 
         external_address = to_checksum_address('0x' + os.urandom(20).hex())
         nonce_oracle = RPCNonceOracle(self.accounts[2], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
-        (tx_hash, o) = c.transfer(self.address, self.accounts[1], external_address, 10000000)
+        (tx_hash, o) = c.transfer(self.address, self.accounts[2], external_address, int(mint_amount) * 0.1)
         r = self.rpc.do(o)
 
         nonce_oracle = RPCNonceOracle(self.accounts[3], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
-        (tx_hash, o) = c.transfer(self.address, self.accounts[2], external_address, 20000000)
+        (tx_hash, o) = c.transfer(self.address, self.accounts[3], external_address, int(mint_amount) * 0.2)
         r = self.rpc.do(o)
 
-        self.backend.time_travel(self.start_time + 61)
-        (tx_hash, o) = c.apply_demurrage(self.address, self.accounts[0])
+        self.backend.time_travel(self.start_time + self.period_seconds + 1)
+        (tx_hash, o) = c.apply_demurrage(self.address, self.accounts[3])
         self.rpc.do(o)
         o = receipt(tx_hash)
         rcpt = self.rpc.do(o)
         self.assertEqual(rcpt['status'], 1)
 
-        (tx_hash, o) = c.change_period(self.address, self.accounts[0])
+        (tx_hash, o) = c.change_period(self.address, self.accounts[3])
         self.rpc.do(o)
         o = receipt(tx_hash)
         r = self.rpc.do(o)
         self.assertEqual(r['status'], 1)
 
+        o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        balance = c.parse_balance_of(r)
+        self.assertEqual(balance, mint_amount - (mint_amount * (self.tax_level / 1000000)))
+
+
+if __name__ == '__main__':
+    unittest.main()

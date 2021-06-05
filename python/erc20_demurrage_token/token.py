@@ -42,6 +42,11 @@ class DemurrageToken(ERC20):
 
     __abi = {}
     __bytecode = {}
+    valid_modes = [
+                'MultiNocap',
+                'SingleNocap',
+                'MultiCap',
+                ]
 
     def constructor(self, sender_address, settings, redistribute=True, cap=0, tx_format=TxFormat.JSONRPC):
         if int(cap) < 0:

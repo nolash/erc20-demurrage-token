@@ -154,7 +154,6 @@ contract DemurrageTokenSingleNocap {
 	/// Balance unmodified by demurrage
 	function baseBalanceOf(address _account) public view returns (uint256) {
 		return uint256(account[_account]) & maskAccountValue;
-		//return uint256(account[_account]);
 	}
 
 	/// Increases base balance for a single account
@@ -174,6 +173,7 @@ contract DemurrageTokenSingleNocap {
 		require(uint160(newBalance) > uint160(oldBalance), 'ERR_WOULDWRAP'); // revert if increase would result in a wrapped value
 		workAccount &= (~maskAccountValue); 
 		workAccount |= (newBalance & maskAccountValue);
+		account[_account] = bytes32(workAccount);
 		return true;
 	}
 

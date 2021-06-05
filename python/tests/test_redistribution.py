@@ -77,7 +77,7 @@ class TestRedistribution(TestDemurrageDefault):
         (tx_hash, o) = c.transfer(self.address, self.accounts[1], external_address, 999999)
         r = self.rpc.do(o)
 
-        self.backend.time_travel(self.start_time + 61)
+        self.backend.time_travel(self.start_time + self.period_seconds + 1)
 
         o = c.redistributions(self.address, 0, sender_address=self.accounts[0])
         r = self.rpc.do(o)
@@ -106,7 +106,7 @@ class TestRedistribution(TestDemurrageDefault):
         (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[1], supply)
         r = self.rpc.do(o)
 
-        self.backend.time_travel(self.start_time + 61)
+        self.backend.time_travel(self.start_time + self.period_seconds + 1)
         (tx_hash, o) = c.apply_demurrage(self.address, self.accounts[0])
         self.rpc.do(o)
         o = receipt(tx_hash)
@@ -198,7 +198,7 @@ class TestRedistribution(TestDemurrageDefault):
         self.assertEqual(r['status'], 1)
 
 
-        self.backend.time_travel(self.start_time + 61)
+        self.backend.time_travel(self.start_time + self.period_seconds + 1)
 
         (tx_hash, o) = c.apply_demurrage(self.address, self.accounts[4])
         self.rpc.do(o)
@@ -261,7 +261,3 @@ class TestRedistribution(TestDemurrageDefault):
         self.assertEqual(spender_actual_balance, spender_new_decayed_balance)
 
 
-if __name__ == '__main__':
-    unittest.main()
-
- 
