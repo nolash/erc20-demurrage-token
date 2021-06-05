@@ -68,6 +68,28 @@ class TestRedistributionSingle(TestDemurrageSingleNocap):
         balance = c.parse_balance_of(r)
         self.assertEqual(balance, mint_amount - (mint_amount * (self.tax_level / 1000000)))
 
+        o = c.balance_of(self.address, self.accounts[2], sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        balance = c.parse_balance_of(r)
+        base_amount = mint_amount - int(mint_amount * 0.1)
+        self.assertEqual(balance, (base_amount - (base_amount * (self.tax_level / 1000000))))
+
+        o = c.balance_of(self.address, self.accounts[3], sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        balance = c.parse_balance_of(r)
+        base_amount = mint_amount - int(mint_amount * 0.2)
+        self.assertEqual(balance, (base_amount - (base_amount * (self.tax_level / 1000000))))
+
+        o = c.total_supply(self.address, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        new_supply = c.parse_total_supply(r)
+
+        o = c.balance_of(self.address, self.sink_address, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        balance = c.parse_balance_of(r)
+        base_amount = new_supply * (self.tax_level / 1000000)
+        self.assertEqual(balance, base_amount - (base_amount * (self.tax_level / 1000000)))
+
 
 if __name__ == '__main__':
     unittest.main()
