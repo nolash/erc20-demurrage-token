@@ -9,7 +9,7 @@ from chainlib.chain import ChainSpec
 from erc20_demurrage_token import DemurrageTokenSettings
 from erc20_demurrage_token.sim import DemurrageTokenSimulation
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logg = logging.getLogger()
 
 
@@ -39,6 +39,22 @@ class TestSim(unittest.TestCase):
         self.sim.mint(self.sim.actors[0], 1024)
         self.sim.transfer(self.sim.actors[0], self.sim.actors[1], 500)
         self.sim.next()
+        balance = self.sim.balance(self.sim.actors[0])
+        self.assertEqual(balance, 524)
+
+        balance = self.sim.balance(self.sim.actors[1])
+        self.assertEqual(balance, 500)
+
+
+    def test_more_periods(self):
+        self.sim.mint(self.sim.actors[0], 1024)
+        self.sim.next()
+
+        self.sim.mint(self.sim.actors[0], 1024)
+        self.sim.next()
+
+        balance = self.sim.balance(self.sim.actors[0])
+        self.assertEqual(balance, 2048)
 
 
 if __name__ == '__main__':

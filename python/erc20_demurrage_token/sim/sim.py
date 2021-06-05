@@ -42,29 +42,11 @@ class DemurrageTokenSimulation:
         self.eth_backend = self.eth_helper.backend
         self.gas_oracle = OverrideGasOracle(limit=100000, price=1)
         self.rpc = TestRPCConnection(None, self.eth_helper, self.signer)
+        self.period = 1
         for a in self.keystore.list():
             self.accounts.append(add_0x(to_checksum_address(a)))
         settings.sink_address = self.accounts[0]
 
-        nonce_oracle = RPCNonceOracle(self.accounts[0], conn=self.rpc)
-        c = DemurrageToken(chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
-        (tx_hash, o) = c.constructor(self.accounts[0], settings, redistribute=redistribute, cap=cap)
-        self.rpc.do(o)
-        o = receipt(tx_hash)
-        r = self.rpc.do(o)
-        if (r['status'] != 1):
-            raise RuntimeError('contract deployment failed')
-        self.address = r['contract_address']
-
-        self.period_seconds = settings.period_minutes * 60
-
-        o = block_latest()
-        r = self.rpc.do(o)
-        self.last_block = r
-
-        o = block_by_number(r)
-        r = self.rpc.do(o)
-        self.last_timestamp = r['timestamp']
 
         self.actors = []
         for i in range(actors):
@@ -83,7 +65,30 @@ class DemurrageTokenSimulation:
                 raise RuntimeError('failed gas transfer to account #{}: {} from {}'.format(i, address, self.accounts[idx]))
             logg.debug('added actor account #{}: {}'.format(i, address))
 
-        self.eth_helper.disable_auto_mine_transactions()
+        o = block_latest()
+        r = self.rpc.do(o)
+        self.last_block = r
+        self.start_block = self.last_block
+
+        o = block_by_number(r)
+        r = self.rpc.do(o)
+        self.last_timestamp = r['timestamp']
+        self.start_timestamp = self.last_timestamp
+        nonce_oracle = RPCNonceOracle(self.accounts[0], conn=self.rpc)
+
+        c = DemurrageToken(chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+        (tx_hash, o) = c.constructor(self.accounts[0], settings, redistribute=redistribute, cap=cap)
+        self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        if (r['status'] != 1):
+            raise RuntimeError('contract deployment failed')
+        self.address = r['contract_address']
+
+        self.period_seconds = settings.period_minutes * 60
+
+        self.last_block += 1
+        self.last_timestamp += 1
 
         logg.info('intialized at block {} timestamp {} period {} demurrage level {} sink address {} (first address in keystore)'.format(
                 self.last_block,
@@ -94,7 +99,10 @@ class DemurrageTokenSimulation:
                 )
             )
 
+        self.eth_helper.disable_auto_mine_transactions()
+
         self.caller_contract = DemurrageToken(self.chain_spec)
+
 
 
     def mint(self, recipient, value):
@@ -102,6 +110,7 @@ class DemurrageTokenSimulation:
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle, gas_oracle=self.gas_oracle)
         (tx_hash, o) = c.mint_to(self.address, self.accounts[0], recipient, value)
         self.rpc.do(o)
+        logg.info('tx hash {}'.format(tx_hash))
         return tx_hash
 
 
@@ -114,24 +123,69 @@ class DemurrageTokenSimulation:
 
 
     def balance(self, holder):
-        o = self.caller_contract.balance_of(self.address, holder, sender_address=self.accounts[0])
+        #o = self.caller_contract.balance_of(self.address, holder, sender_address=self.accounts[0])
+        c = DemurrageToken(self.chain_spec)
+        o = c.balance_of(self.address, holder, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         return self.caller_contract.parse_balance_of(r)
 
 
     def next(self):
-        self.last_timestamp += self.period_seconds
+        target_timestamp = self.period * self.period_seconds
+        self.last_timestamp = target_timestamp
+
         self.eth_helper.mine_block()
-        self.eth_helper.time_travel(self.last_timestamp)
-        self.last_block += 1
+    
+        self.last_timestamp += 1
         o = block_by_number(self.last_block)
         r = self.rpc.do(o)
+        self.last_block = r['number']
+        block_base = self.last_block
 
         for tx_hash in r['transactions']:
             o = receipt(tx_hash)
             rcpt = self.rpc.do(o)
             if rcpt['status'] == 0:
                 raise RuntimeError('tx {} (block {} index {}) failed'.format(tx_hash, self.last_block, rcpt['transaction_index']))
-            logg.debug('tx {} (block {} index {}) verified'.format(tx_hash, self.last_block, rcpt['transaction_index']))
-       
+            logg.info('tx {} (block {} index {}) verified'.format(tx_hash, self.last_block, rcpt['transaction_index']))
+
+        #self.eth_helper.time_travel(self.start_timestamp + self.last_timestamp)
+
+        nonce_oracle = RPCNonceOracle(self.accounts[0], conn=self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle, gas_oracle=self.gas_oracle)
+        (tx_hash, o) = c.apply_demurrage(self.address, self.accounts[0])
+        self.rpc.do(o)
+        #self.eth_helper.time_travel(self.start_timestamp + self.last_timestamp + 9)
+        self.eth_helper.mine_block()
+        self.last_block += 1
+
+        (tx_hash, o) = c.change_period(self.address, self.accounts[0])
+        self.rpc.do(o)
+        #self.eth_helper.time_travel(self.start_timestamp + self.last_timestamp + 10)
+        self.eth_helper.mine_block()
+        self.last_block += 1
+
+        o = block_by_number(self.last_block)
+        r = self.rpc.do(o)
+        for tx_hash in r['transactions']:
+            o = receipt(tx_hash)
+            rcpt = self.rpc.do(o)
+            if rcpt['status'] == 0:
+                raise RuntimeError('demurrage step failed on block {}'.format(self.last_block))
+
+#        while True:
+#            self.eth_helper.mine_block()
+#            o = block_latest()
+#            r = self.rpc.do(o)
+#            self.last_block = r
+#
+#            o = block_by_number(r, include_tx=False)
+#            r = self.rpc.do(o)
+#            self.last_block =r['number']
+#            if r['timestamp'] == target_timestamp:
+#                break
+
+        self.last_timestamp += self.last_block - block_base
+        self.period += 1
+
         return (self.last_block, self.last_timestamp)
