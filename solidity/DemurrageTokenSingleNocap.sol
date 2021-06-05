@@ -432,13 +432,7 @@ contract DemurrageTokenSingleNocap {
 		nextRedistribution = toRedistribution(0, nextRedistributionDemurrage, totalSupply, nextPeriod);
 		redistributions.push(nextRedistribution);
 
-		//currentParticipants = toRedistributionParticipants(currentRedistribution);
-		//if (currentParticipants == 0) {
 		currentRemainder = applyDefaultRedistribution(currentRedistribution);
-		//} else {
-		//	currentRemainder = remainder(currentParticipants, totalSupply); // we can use totalSupply directly because it will always be the same as the recorded supply on the current redistribution
-		//	applyRemainderOnPeriod(currentRemainder, currentPeriod);
-		//}
 		emit Period(nextPeriod);
 		return true;
 	}
@@ -475,34 +469,15 @@ contract DemurrageTokenSingleNocap {
 	// If the given account is participating in a period and that period has been crossed
 	// THEN increase the base value of the account with its share of the value reduction of the period
 	function applyRedistributionOnAccount(address _account) public returns (bool) {
-//		bytes32 periodRedistribution;
-//		uint256 supply;
-//		uint256 participants;
-//		uint256 baseValue;
-//		uint256 value;
 		uint256 period;
-//		uint256 demurrage;
-//	       
+
 		period = accountPeriod(_account);
 		if (period == 0 || period >= actualPeriod()) {
 			return false;
 		}
-//		periodRedistribution = redistributions[period-1];
-//		participants = toRedistributionParticipants(periodRedistribution);
-//		if (participants == 0) {
-//			return false;
-//		}
-//
-//		supply = toRedistributionSupply(periodRedistribution);
-//		demurrage = toRedistributionDemurrageModifier(periodRedistribution);
-//		baseValue = ((supply / participants) * (taxLevel / 1000000)) / ppmDivider;
-//		value = (baseValue * demurrage) / 1000000;
-//
-//		// zero out period for the account
+		// zero out period for the account
 		account[_account] &= bytes32(~maskAccountPeriod); 
-//		increaseBaseBalance(_account, value);
-//
-//		emit Redistribution(_account, period, value);
+
 		return true;
 	}
 
@@ -517,7 +492,6 @@ contract DemurrageTokenSingleNocap {
 		uint256 baseValue;
 
 		changePeriod();
-		//applyRedistributionOnAccount(msg.sender);
 
 		baseValue = toBaseAmount(_value);
 		allowance[msg.sender][_spender] += baseValue;
@@ -531,7 +505,6 @@ contract DemurrageTokenSingleNocap {
 		bool result;
 
 		changePeriod();
-		//applyRedistributionOnAccount(msg.sender);
 
 		baseValue = toBaseAmount(_value);
 		result = transferBase(msg.sender, _to, baseValue);
@@ -546,7 +519,6 @@ contract DemurrageTokenSingleNocap {
 		bool result;
 
 		changePeriod();
-		//applyRedistributionOnAccount(msg.sender);
 
 		baseValue = toBaseAmount(_value);
 		require(allowance[_from][msg.sender] >= baseValue);
