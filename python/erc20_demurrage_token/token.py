@@ -84,6 +84,7 @@ class DemurrageToken(ERC20):
             name += 'Cap'
         else:
             name += 'Nocap'
+        logg.debug('bytecode name {}'.format(name))
         return name
 
 
