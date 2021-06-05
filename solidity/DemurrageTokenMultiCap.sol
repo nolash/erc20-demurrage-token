@@ -2,7 +2,7 @@ pragma solidity > 0.6.11;
 
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-contract DemurrageTokenMultiNocap {
+contract DemurrageTokenMultiCap {
 
 	// Redistribution bit field, with associated shifts and masks
 	// (Uses sub-byte boundaries)
@@ -48,6 +48,9 @@ contract DemurrageTokenMultiNocap {
 
 	// Implements ERC20
 	uint256 public totalSupply;
+
+	// Maximum amount of tokens that can be minted
+	uint256 public supplyCap;
 
 	// Minimum amount of (demurraged) tokens an account must spend to participate in redistribution for a particular period
 	uint256 public minimumParticipantSpend;
@@ -98,7 +101,7 @@ contract DemurrageTokenMultiNocap {
 	// EIP173
 	event OwnershipTransferred(address indexed previousOwner, address indexed newOwner); // EIP173
 
-	constructor(string memory _name, string memory _symbol, uint8 _decimals, uint256 _taxLevelMinute, uint256 _periodMinutes, address _defaultSinkAddress) public {
+	constructor(string memory _name, string memory _symbol, uint8 _decimals, uint256 _taxLevelMinute, uint256 _periodMinutes, address _defaultSinkAddress uint256 _supplyCap) public {
 		// ACL setup
 		owner = msg.sender;
 		minter[owner] = true;
@@ -118,6 +121,7 @@ contract DemurrageTokenMultiNocap {
 		redistributions.push(initialRedistribution);
 
 		// Misc settings
+		supplyCap = supplyCap;
 		sinkAddress = _defaultSinkAddress;
 		minimumParticipantSpend = 10 ** uint256(_decimals);
 	}
@@ -204,6 +208,7 @@ contract DemurrageTokenMultiNocap {
 		uint256 baseAmount;
 
 		require(minter[msg.sender]);
+		require(_amount + totalSupply <= supplyCap);
 
 		changePeriod();
 		baseAmount = _amount;

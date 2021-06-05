@@ -26,11 +26,6 @@ logg = logging.getLogger()
 
 testdir = os.path.dirname(__file__)
 
-#BLOCKTIME = 5 # seconds
-TAX_LEVEL = 10000 * 2 # 2%
-#PERIOD = int(60/BLOCKTIME) * 60 * 24 * 30 # month
-PERIOD = 1
-
 
 class TestRedistribution(TestDemurrageDefault):
 
@@ -104,7 +99,7 @@ class TestRedistribution(TestDemurrageDefault):
 
 
     def test_redistribution_balance_on_zero_participants(self):
-        supply = 1000000000000
+        supply = self.default_supply
 
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
@@ -127,7 +122,7 @@ class TestRedistribution(TestDemurrageDefault):
         o = c.total_supply(self.address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         total_supply = c.parse_total_supply(r)
-        sink_increment = int(total_supply * (TAX_LEVEL / 1000000))
+        sink_increment = int(total_supply * (self.tax_level / 1000000))
         self.assertEqual(supply, total_supply)
 
         for l in rcpt['logs']:
@@ -136,14 +131,14 @@ class TestRedistribution(TestDemurrageDefault):
                 self.assertEqual(period, 2)
                 b = bytes.fromhex(strip_0x(l['data']))
                 remainder = int.from_bytes(b, 'big')
-                self.assertEqual(remainder, int((1000000 - TAX_LEVEL) * (10 ** 32)))
+                self.assertEqual(remainder, int((1000000 - self.tax_level) * (10 ** 32)))
 
         o = c.balance_of(self.address, self.sink_address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         sink_balance = c.parse_balance_of(r)
 
         self.assertEqual(sink_balance, int(sink_increment * 0.98))
-        self.assertEqual(sink_balance, int(sink_increment * (1000000 - TAX_LEVEL) / 1000000))
+        self.assertEqual(sink_balance, int(sink_increment * (1000000 - self.tax_level) / 1000000))
 
         o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
         r = self.rpc.do(o)
@@ -215,14 +210,14 @@ class TestRedistribution(TestDemurrageDefault):
         r = self.rpc.do(o)
         bummer_balance = c.parse_balance_of(r)
 
-        self.assertEqual(bummer_balance, mint_amount - (mint_amount * (TAX_LEVEL / 1000000)))
+        self.assertEqual(bummer_balance, mint_amount - (mint_amount * (self.tax_level / 1000000)))
         logg.debug('bal {} '.format(bummer_balance))
 
         o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
         r = self.rpc.do(o)
         bummer_balance = c.parse_balance_of(r)
         spender_balance = mint_amount - spend_amount
-        spender_decayed_balance = int(spender_balance - (spender_balance * (TAX_LEVEL / 1000000)))
+        spender_decayed_balance = int(spender_balance - (spender_balance * (self.tax_level / 1000000)))
         self.assertEqual(bummer_balance, spender_decayed_balance)
         logg.debug('bal {} '.format(bummer_balance))
 
@@ -254,9 +249,9 @@ class TestRedistribution(TestDemurrageDefault):
         actual_period = c.parse_actual_period(r)
         logg.debug('period {}'.format(actual_period))
 
-        redistribution = int((z / 2) * (TAX_LEVEL / 1000000))
+        redistribution = int((z / 2) * (self.tax_level / 1000000))
         spender_new_base_balance = ((mint_amount - spend_amount) + redistribution)
-        spender_new_decayed_balance = int(spender_new_base_balance - (spender_new_base_balance * (TAX_LEVEL / 1000000)))
+        spender_new_decayed_balance = int(spender_new_base_balance - (spender_new_base_balance * (self.tax_level / 1000000)))
 
         o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
         r = self.rpc.do(o)

@@ -40,13 +40,13 @@ class DemurrageTokenSettings:
 
 class DemurrageToken(ERC20):
 
-    __abi = None
-    __bytecode = None
+    __abi = {}
+    __bytecode = {}
 
     def constructor(self, sender_address, settings, redistribute=True, cap=0, tx_format=TxFormat.JSONRPC):
-        if not redistribute or cap:
-            raise NotImplementedError('token cap and sink only redistribution not yet implemented')
-        code = DemurrageToken.bytecode()
+        if int(cap) < 0:
+            raise ValueError('cap must be 0 or positive integer')
+        code = DemurrageToken.bytecode(multi=redistribute, cap=cap>0)
         enc = ABIContractEncoder()
         enc.string(settings.name)
         enc.string(settings.symbol)
@@ -64,22 +64,39 @@ class DemurrageToken(ERC20):
     def gas(code=None):
         return 3500000
 
+
     @staticmethod
-    def abi():
-        if DemurrageToken.__abi == None:
-            f = open(os.path.join(data_dir, 'DemurrageTokenMultiNocap.json'), 'r')
-            DemurrageToken.__abi = json.load(f)
-            f.close()
-        return DemurrageToken.__abi
+    def __to_contract_name(multi, cap):
+        name = 'DemurrageToken'
+        if multi:
+            name += 'Multi'
+        else:
+            name += 'Single'
+        if cap:
+            name += 'Cap'
+        else:
+            name += 'Nocap'
+        return name
 
 
     @staticmethod
-    def bytecode():
-        if DemurrageToken.__bytecode == None:
-            f = open(os.path.join(data_dir, 'DemurrageTokenMultiNocap.bin'), 'r')
-            DemurrageToken.__bytecode = f.read()
+    def abi(multi=True, cap=False):
+        name = DemurrageToken.__to_contract_name(multi, cap)
+        if DemurrageToken.__abi.get(name) == None:
+            f = open(os.path.join(data_dir, name + '.json'), 'r')
+            DemurrageToken.__abi[name] = json.load(f)
             f.close()
-        return DemurrageToken.__bytecode
+        return DemurrageToken.__abi[name]
+
+
+    @staticmethod
+    def bytecode(multi=True, cap=False):
+        name = DemurrageToken.__to_contract_name(multi, cap)
+        if DemurrageToken.__bytecode.get(name) == None:
+            f = open(os.path.join(data_dir, name + '.bin'), 'r')
+            DemurrageToken.__bytecode[name] = f.read()
+            f.close()
+        return DemurrageToken.__bytecode[name]
 
 
     def add_minter(self, contract_address, sender_address, address, tx_format=TxFormat.JSONRPC):

@@ -35,6 +35,10 @@ class TestDemurrage(EthTesterCase):
 
     def setUp(self):
         super(TestDemurrage, self).setUp()
+
+        self.tax_level = TAX_LEVEL
+        self.period = PERIOD
+
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         self.settings = DemurrageTokenSettings()
         self.settings.name = 'Foo Token'
@@ -64,16 +68,31 @@ class TestDemurrage(EthTesterCase):
 
 class TestDemurrageDefault(TestDemurrage):
 
+    def __deploy(self, interface):
+        self.default_supply = 1000000000000
+        self.supply_cap = self.default_supply * 10
+
+        (tx_hash, o) = interface.constructor(self.accounts[0], self.settings, redistribute=True, cap=0)
+        r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+        self.addresses['MultiNocap'] = r['contract_address']
+
+        (tx_hash, o) = interface.constructor(self.accounts[0], self.settings, redistribute=False, cap=0)
+        r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+        self.addresses['SingleNocap'] = r['contract_address']
+
+
     def setUp(self):
         super(TestDemurrageDefault, self).setUp()
    
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
-        (tx_hash, o) = c.constructor(self.accounts[0], self.settings)
-        r = self.rpc.do(o)
 
-        o = receipt(tx_hash)
-        r = self.rpc.do(o)
-        self.assertEqual(r['status'], 1)
-
-        self.address = r['contract_address']
+        self.addresses = {}
+        self.__deploy(c)
+        self.address = self.addresses['MultiNocap']
