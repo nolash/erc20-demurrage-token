@@ -6,17 +6,13 @@ contract DemurrageTokenSingleCap {
 
 	// Redistribution bit field, with associated shifts and masks
 	// (Uses sub-byte boundaries)
-	bytes32[] public redistributions; // uint1(isFractional) | uint95(unused) | uint20(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
+	bytes32[] public redistributions; // uint95(unused) | uint20(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
 	uint8 constant shiftRedistributionPeriod 	= 0;
 	uint256 constant maskRedistributionPeriod 	= 0x00000000000000000000000000000000000000000000000000000000ffffffff; // (1 << 32) - 1
 	uint8 constant shiftRedistributionValue 	= 32;
 	uint256 constant maskRedistributionValue	= 0x00000000000000000000000000000000000000ffffffffffffffffff00000000; // ((1 << 72) - 1) << 32
-	uint8 constant shiftRedistributionParticipants	= 104;
-	uint256 constant maskRedistributionParticipants	= 0x00000000000000000000000000000fffffffff00000000000000000000000000; // ((1 << 36) - 1) << 104
 	uint8 constant shiftRedistributionDemurrage	= 140;
 	uint256 constant maskRedistributionDemurrage	= 0x000000000000000000000000fffff00000000000000000000000000000000000; // ((1 << 20) - 1) << 140
-	uint8 constant shiftRedistributionIsFractional	= 255;
-	uint256 constant maskRedistributionIsFractional	= 0x8000000000000000000000000000000000000000000000000000000000000000; // 1 << 255
 
 	// Account balances
 	mapping (address => uint256) account;
@@ -208,12 +204,11 @@ contract DemurrageTokenSingleCap {
 	}
 
 	// Deserializes the redistribution word
-	// uint1(isFractional) | uint95(unused) | uint20(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
+	// uint95(unused) | uint20(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
 	function toRedistribution(uint256 _participants, uint256 _demurrageModifierPpm, uint256 _value, uint256 _period) private pure returns(bytes32) {
 		bytes32 redistribution;
 
 		redistribution |= bytes32((_demurrageModifierPpm << shiftRedistributionDemurrage) & maskRedistributionDemurrage);
-		redistribution |= bytes32((_participants << shiftRedistributionParticipants) & maskRedistributionParticipants);
 		redistribution |= bytes32((_value << shiftRedistributionValue) & maskRedistributionValue); 
 		redistribution |= bytes32(_period & maskRedistributionPeriod);
 		return redistribution;
@@ -230,11 +225,6 @@ contract DemurrageTokenSingleCap {
 	}
 
 	// Serializes the number of participants part of the redistribution word
-	function toRedistributionParticipants(bytes32 redistribution) public pure returns (uint256) {
-		return (uint256(redistribution) & maskRedistributionParticipants) >> shiftRedistributionParticipants;
-	}
-
-	// Serializes the number of participants part of the redistribution word
 	function toRedistributionDemurrageModifier(bytes32 redistribution) public pure returns (uint256) {
 		return (uint256(redistribution) & maskRedistributionDemurrage) >> shiftRedistributionDemurrage;
 	}
@@ -242,23 +232,6 @@ contract DemurrageTokenSingleCap {
 	// Client accessor to the redistributions array length
 	function redistributionCount() public view returns (uint256) {
 		return redistributions.length;
-	}
-
-	// Add number of participants for the current redistribution period by one
-	function incrementRedistributionParticipants() private returns (bool) {
-		bytes32 currentRedistribution;
-		uint256 tmpRedistribution;
-		uint256 participants;
-
-		currentRedistribution = redistributions[redistributions.length-1];
-		participants = toRedistributionParticipants(currentRedistribution) + 1;
-		tmpRedistribution = uint256(currentRedistribution);
-		tmpRedistribution &= (~maskRedistributionParticipants);
-		tmpRedistribution |= ((participants << shiftRedistributionParticipants) & maskRedistributionParticipants);
-
-		redistributions[redistributions.length-1] = bytes32(tmpRedistribution);
-
-		return true;
 	}
 
 	// Save the current total supply amount to the current redistribution period
@@ -305,8 +278,6 @@ contract DemurrageTokenSingleCap {
 
 		if (truncatedResult < redistributionSupply) {
 			redistributionPeriod = toRedistributionPeriod(_redistribution); // since we reuse period here, can possibly be optimized by passing period instead
-			redistributions[redistributionPeriod-1] &= bytes32(~maskRedistributionParticipants); // just to be safe, zero out all participant count data, in this case there will be only one
-			redistributions[redistributionPeriod-1] |= bytes32(maskRedistributionIsFractional | (1 << shiftRedistributionParticipants));
 		}
 
 		increaseBaseBalance(sinkAddress, unit / ppmDivider);
@@ -347,7 +318,6 @@ contract DemurrageTokenSingleCap {
 		bytes32 currentRedistribution;
 		bytes32 nextRedistribution;
 		uint256 currentPeriod;
-		uint256 currentParticipants;
 		uint256 currentDemurrageAmount;
 		uint256 nextRedistributionDemurrage;
 		uint256 demurrageCounts;
