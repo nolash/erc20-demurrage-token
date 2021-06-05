@@ -91,6 +91,12 @@ if config.get('TOKEN_NAME') == None:
     logg.info('token name not set, using symbol {} as name'.format(config.get('TOKEN_SYMBOL')))
     config.add(config.get('TOKEN_SYMBOL'), 'TOKEN_NAME', True)
 config.dict_override(args_override, 'cli args')
+
+if config.get('TOKEN_SUPPLY_LIMIT') == None:
+    config.add(0, 'TOKEN_SUPPLY_LIMIT', True)
+
+if config.get('TOKEN_REDISTRIBUTION_PERIOD') == None:
+    config.add(10800, 'TOKEN_REDISTRIBUTION_PERIOD', True)
 logg.debug('config loaded:\n{}'.format(config))
 
 passphrase_env = 'ETH_PASSPHRASE'
