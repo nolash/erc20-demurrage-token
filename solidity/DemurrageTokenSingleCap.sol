@@ -18,13 +18,8 @@ contract DemurrageTokenSingleCap {
 	uint8 constant shiftRedistributionIsFractional	= 255;
 	uint256 constant maskRedistributionIsFractional	= 0x8000000000000000000000000000000000000000000000000000000000000000; // 1 << 255
 
-	// Account bit field, with associated shifts and masks
-	// Mirrors structure of redistributions for consistency
-	mapping (address => bytes32) account; // uint152(unused) | uint32(period) | uint72(value)
-	uint8 constant shiftAccountValue		= 0;
-	uint256 constant maskAccountValue 		= 0x0000000000000000000000000000000000000000000000ffffffffffffffffff; // (1 << 72) - 1
-	uint8 constant shiftAccountPeriod		= 72;
-	uint256 constant maskAccountPeriod 		= 0x00000000000000000000000000000000000000ffffffff000000000000000000; // ((1 << 32) - 1) << 72
+	// Account balances
+	mapping (address => uint256) account;
 	
 	// Cached demurrage amount, ppm with 38 digit resolution
 	uint128 public demurrageAmount;
@@ -157,7 +152,7 @@ contract DemurrageTokenSingleCap {
 
 	/// Balance unmodified by demurrage
 	function baseBalanceOf(address _account) public view returns (uint256) {
-		return uint256(account[_account]) & maskAccountValue;
+		return account[_account];
 	}
 
 	/// Increases base balance for a single account
@@ -173,11 +168,7 @@ contract DemurrageTokenSingleCap {
 		}
 
 		oldBalance = baseBalanceOf(_account);
-		newBalance = oldBalance + _delta;
-		require(uint160(newBalance) > uint160(oldBalance), 'ERR_WOULDWRAP'); // revert if increase would result in a wrapped value
-		workAccount &= (~maskAccountValue); 
-		workAccount |= (newBalance & maskAccountValue);
-		account[_account] = bytes32(workAccount);
+		account[_account] = oldBalance + _delta;
 		return true;
 	}
 
@@ -195,10 +186,7 @@ contract DemurrageTokenSingleCap {
 
 		oldBalance = baseBalanceOf(_account);	
 		require(oldBalance >= _delta, 'ERR_OVERSPEND'); // overspend guard
-		newBalance = oldBalance - _delta;
-		workAccount &= (~maskAccountValue);
-		workAccount |= (newBalance & maskAccountValue);
-		account[_account] = bytes32(workAccount);
+		account[_account] = oldBalance - _delta;
 		return true;
 	}
 
@@ -207,8 +195,8 @@ contract DemurrageTokenSingleCap {
 	function mintTo(address _beneficiary, uint256 _amount) external returns (bool) {
 		uint256 baseAmount;
 
-		require(minter[msg.sender]);
-		require(_amount + totalSupply <= supplyCap);
+		require(minter[msg.sender], 'ERR_ACCESS');
+		require(_amount + totalSupply <= supplyCap, 'ERR_CAP');
 
 		changePeriod();
 		baseAmount = _amount;
@@ -303,36 +291,6 @@ contract DemurrageTokenSingleCap {
 		return lastRedistribution;
 	}
 
-	// Deserialize the pemurrage period for the given account is participating in
-	function accountPeriod(address _account) public view returns (uint256) {
-		return (uint256(account[_account]) & maskAccountPeriod) >> shiftAccountPeriod;
-	}
-
-	// Save the given demurrage period as the currently participation period for the given address
-	function registerAccountPeriod(address _account, uint256 _period) private returns (bool) {
-		account[_account] &= bytes32(~maskAccountPeriod);
-		account[_account] |= bytes32((_period << shiftAccountPeriod) & maskAccountPeriod);
-		incrementRedistributionParticipants();
-		return true;
-	}
-
-	// Determine whether the unit number is rounded down, rounded up or evenly divides.
-	// Returns 0 if evenly distributed, or the remainder as a positive number
-	// A _numParts value 0 will be interpreted as the value 1
-	function remainder(uint256 _numParts, uint256 _sumWhole) public pure returns (uint256) {
-		uint256 unit;
-		uint256 truncatedResult;
-
-		if (_numParts == 0) { // no division by zero please
-			revert('ERR_NUMPARTS_ZERO');
-		}
-		require(_numParts < _sumWhole); // At least you are never LESS than the sum of your parts. Think about that.
-
-		unit = _sumWhole / _numParts;
-		truncatedResult = unit * _numParts;
-		return _sumWhole - truncatedResult;
-	}
-
 	// Returns the amount sent to the sink address
 	function applyDefaultRedistribution(bytes32 _redistribution) private returns (uint256) {
 		uint256 redistributionSupply;
@@ -354,24 +312,6 @@ contract DemurrageTokenSingleCap {
 		increaseBaseBalance(sinkAddress, unit / ppmDivider);
 		return unit;
 	}
-
-	// sets the remainder bit for the given period and books the remainder to the sink address balance
-	// returns false if no change was made
-	function applyRemainderOnPeriod(uint256 _remainder, uint256 _period) private returns (bool) {
-		uint256 periodSupply;
-
-		if (_remainder == 0) {
-			return false;
-		}
-
-		// TODO: is this needed?
-		redistributions[_period-1] |= bytes32(maskRedistributionIsFractional);
-
-		periodSupply = toRedistributionSupply(redistributions[_period-1]);
-		increaseBaseBalance(sinkAddress, periodSupply - _remainder);
-		return true;
-	}
-
 
 	// Calculate and cache the demurrage value corresponding to the (period of the) time of the method call
 	function applyDemurrage() public returns (bool) {
@@ -408,7 +348,6 @@ contract DemurrageTokenSingleCap {
 		bytes32 nextRedistribution;
 		uint256 currentPeriod;
 		uint256 currentParticipants;
-		uint256 currentRemainder;
 		uint256 currentDemurrageAmount;
 		uint256 nextRedistributionDemurrage;
 		uint256 demurrageCounts;
@@ -437,7 +376,7 @@ contract DemurrageTokenSingleCap {
 		nextRedistribution = toRedistribution(0, nextRedistributionDemurrage, totalSupply, nextPeriod);
 		redistributions.push(nextRedistribution);
 
-		currentRemainder = applyDefaultRedistribution(currentRedistribution);
+		applyDefaultRedistribution(currentRedistribution);
 		emit Period(nextPeriod);
 		return true;
 	}
@@ -471,22 +410,6 @@ contract DemurrageTokenSingleCap {
 		return (valueFactor * _value) / 1000000;
 	}
 
-	// If the given account is participating in a period and that period has been crossed
-	// THEN increase the base value of the account with its share of the value reduction of the period
-	function applyRedistributionOnAccount(address _account) public returns (bool) {
-		uint256 period;
-
-		period = accountPeriod(_account);
-		if (period == 0 || period >= actualPeriod()) {
-			return false;
-		}
-
-		// zero out period for the account
-		account[_account] &= bytes32(~maskAccountPeriod); 
-
-		return true;
-	}
-
 	// Inflates the given amount according to the current demurrage modifier
 	function toBaseAmount(uint256 _value) public view returns (uint256) {
 		return (_value * ppmDivider * 1000000) / demurrageAmount;
@@ -517,7 +440,6 @@ contract DemurrageTokenSingleCap {
 		return result;
 	}
 
-
 	// Implements ERC20, triggers tax and/or redistribution
 	function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
 		uint256 baseValue;
@@ -541,9 +463,6 @@ contract DemurrageTokenSingleCap {
 		increaseBaseBalance(_to, _value);
 
 		period = actualPeriod();
-		if (_value >= minimumParticipantSpend && accountPeriod(_from) != period && _from != _to) {
-			registerAccountPeriod(_from, period);
-		}
 		return true;
 	}
 
