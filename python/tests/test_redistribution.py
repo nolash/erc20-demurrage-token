@@ -28,6 +28,47 @@ testdir = os.path.dirname(__file__)
 
 class TestRedistribution(TestDemurrageDefault):
 
+    def test_whole_is_parts(self):
+        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+
+        (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[1], 100000000)
+        self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+        
+        (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[2], 100000000)
+        self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+        
+        nonce_oracle = RPCNonceOracle(self.accounts[1], self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+        (tx_hash, o) = c.transfer(self.address, self.accounts[1], self.accounts[3], 50000000)
+        r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+
+        self.backend.time_travel(self.start_time + self.period_seconds + 1)
+
+        (tx_hash, o) = c.change_period(self.address, self.accounts[1])
+        r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+
+        balance = 0
+        for i in range(3):
+            o = c.balance_of(self.accounts[i+1])
+            r = self.rpc.do(o)
+            balance += c.parse_balance_of(r)
+
+        self.assertEqual(balance, 200000000)
+    
+
     def test_debug_periods(self):
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
