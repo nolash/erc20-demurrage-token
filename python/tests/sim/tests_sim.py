@@ -60,7 +60,7 @@ class TestSim(unittest.TestCase):
         self.sim.next()
 
         balance = self.sim.balance(self.sim.actors[0])
-        self.assertEqual(balance, 89995500)
+        self.assertEqual(balance, 90005520)
         
         balance = self.sim.balance(self.sim.actors[1])
         self.assertEqual(balance, 99995000)

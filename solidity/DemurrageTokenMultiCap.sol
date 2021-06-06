@@ -246,7 +246,7 @@ contract DemurrageTokenMultiCap {
 		return (uint256(redistribution) & maskRedistributionParticipants) >> shiftRedistributionParticipants;
 	}
 
-	// Serializes the number of participants part of the redistribution word
+	// Serializes the demurrage modifier part of the redistribution word
 	function toRedistributionDemurrageModifier(bytes32 redistribution) public pure returns (uint256) {
 		return (uint256(redistribution) & maskRedistributionDemurrage) >> shiftRedistributionDemurrage;
 	}
@@ -417,6 +417,8 @@ contract DemurrageTokenMultiCap {
 		uint256 periodTimestamp;
 		uint256 nextPeriod;
 
+		applyDemurrage();
+
 		currentRedistribution = checkPeriod();
 		if (currentRedistribution == bytes32(0x00)) {
 			return false;
@@ -426,7 +428,7 @@ contract DemurrageTokenMultiCap {
 		nextPeriod = currentPeriod + 1;
 		periodTimestamp = getPeriodTimeDelta(currentPeriod);
 
-		applyDemurrage();
+		//applyDemurrage();
 		currentDemurrageAmount = demurrageAmount; 
 
 		demurrageCounts = demurrageCycles(periodTimestamp);

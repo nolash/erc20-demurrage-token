@@ -223,6 +223,51 @@ class DemurrageToken(ERC20):
         return o
 
 
+    def to_redistribution_participants(self, contract_address, redistribution, sender_address=ZERO_ADDRESS):
+        o = jsonrpc_template()
+        o['method'] = 'eth_call'
+        enc = ABIContractEncoder()
+        enc.method('toRedistributionParticipants')
+        enc.typ(ABIContractType.BYTES32)
+        enc.bytes32(redistribution)
+        data = add_0x(enc.get())
+        tx = self.template(sender_address, contract_address)
+        tx = self.set_code(tx, data)
+        o['params'].append(self.normalize(tx))
+        o['params'].append('latest')
+        return o
+
+
+    def to_redistribution_supply(self, contract_address, redistribution, sender_address=ZERO_ADDRESS):
+        o = jsonrpc_template()
+        o['method'] = 'eth_call'
+        enc = ABIContractEncoder()
+        enc.method('toRedistributionSupply')
+        enc.typ(ABIContractType.BYTES32)
+        enc.bytes32(redistribution)
+        data = add_0x(enc.get())
+        tx = self.template(sender_address, contract_address)
+        tx = self.set_code(tx, data)
+        o['params'].append(self.normalize(tx))
+        o['params'].append('latest')
+        return o
+
+
+    def to_redistribution_demurrage_modifier(self, contract_address, redistribution, sender_address=ZERO_ADDRESS):
+        o = jsonrpc_template()
+        o['method'] = 'eth_call'
+        enc = ABIContractEncoder()
+        enc.method('toRedistributionDemurrageModifier')
+        enc.typ(ABIContractType.BYTES32)
+        enc.bytes32(redistribution)
+        data = add_0x(enc.get())
+        tx = self.template(sender_address, contract_address)
+        tx = self.set_code(tx, data)
+        o['params'].append(self.normalize(tx))
+        o['params'].append('latest')
+        return o
+
+
     def base_balance_of(self, contract_address, address, sender_address=ZERO_ADDRESS):
         o = jsonrpc_template()
         o['method'] = 'eth_call'
@@ -320,6 +365,11 @@ class DemurrageToken(ERC20):
 
     @classmethod
     def parse_to_redistribution_period(self, v):
+        return abi_decode_single(ABIContractType.UINT256, v)
+
+
+    @classmethod
+    def parse_to_redistribution_item(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)
 
 

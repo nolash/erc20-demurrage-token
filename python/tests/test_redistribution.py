@@ -26,7 +26,6 @@ logg = logging.getLogger()
 
 testdir = os.path.dirname(__file__)
 
-
 class TestRedistribution(TestDemurrageDefault):
 
     def test_debug_periods(self):
@@ -261,3 +260,5 @@ class TestRedistribution(TestDemurrageDefault):
         self.assertEqual(spender_actual_balance, spender_new_decayed_balance)
 
 
+if __name__ == '__main__':
+    unittest.main()
