@@ -8,7 +8,10 @@ import logging
 from chainlib.eth.constant import ZERO_ADDRESS
 from chainlib.eth.nonce import RPCNonceOracle
 from chainlib.eth.tx import receipt
-from chainlib.eth.block import block_latest
+from chainlib.eth.block import (
+        block_latest,
+        block_by_number,
+        )
 from chainlib.eth.address import to_checksum_address
 from hexathon import (
         strip_0x,
@@ -54,6 +57,12 @@ class TestRedistribution(TestDemurrageDefault):
         self.assertEqual(r['status'], 1)
 
         self.backend.time_travel(self.start_time + self.period_seconds + 1)
+        
+        o = block_latest()
+        r = self.rpc.do(o)
+        o = block_by_number(r)
+        r = self.rpc.do(o)
+        self.assertEqual(r['timestamp'], self.start_time + self.period_seconds)
 
         (tx_hash, o) = c.change_period(self.address, self.accounts[1])
         r = self.rpc.do(o)

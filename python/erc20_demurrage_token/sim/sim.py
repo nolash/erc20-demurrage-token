@@ -39,6 +39,7 @@ class DemurrageTokenSimulation:
     def __init__(self, chain_str, settings, redistribute=True, cap=0, actors=1):
         self.chain_spec = ChainSpec.from_chain_str(chain_str)
         self.accounts = []
+        self.redistribute = redistribute
         self.keystore = DictKeystore()
         self.signer = EIP155Signer(self.keystore)
         self.eth_helper = create_tester_signer(self.keystore)
@@ -220,22 +221,23 @@ class DemurrageTokenSimulation:
         self.last_block = r['number']
         block_base = self.last_block
         
-
         nonce_oracle = RPCNonceOracle(self.accounts[2], conn=self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle, gas_oracle=self.gas_oracle)
         (tx_hash, o) = c.change_period(self.address, self.accounts[2])
         self.rpc.do(o)
 
-        for actor in self.actors:
-            nonce_oracle = RPCNonceOracle(actor, conn=self.rpc)
+        if self.redistribute:
+            for actor in self.actors:
+                nonce_oracle = RPCNonceOracle(actor, conn=self.rpc)
+                c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle, gas_oracle=self.gas_oracle)
+                (tx_hash, o) = c.apply_redistribution_on_account(self.address, actor, actor)
+                self.rpc.do(o)
+
+            nonce_oracle = RPCNonceOracle(self.sink_address, conn=self.rpc)
             c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle, gas_oracle=self.gas_oracle)
-            (tx_hash, o) = c.apply_redistribution_on_account(self.address, actor, actor)
+            (tx_hash, o) = c.apply_redistribution_on_account(self.address, self.sink_address, self.sink_address)
             self.rpc.do(o)
 
-        nonce_oracle = RPCNonceOracle(self.sink_address, conn=self.rpc)
-        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle, gas_oracle=self.gas_oracle)
-        (tx_hash, o) = c.apply_redistribution_on_account(self.address, self.sink_address, self.sink_address)
-        self.rpc.do(o)
         self.__next_block()
 
         o = block_latest()

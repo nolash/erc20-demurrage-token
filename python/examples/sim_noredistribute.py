@@ -21,7 +21,7 @@ chain = 'evm:foochain:42'
 cap = (10 ** 6) * (10 ** 12)
 
 # instantiate simulation
-sim = DemurrageTokenSimulation(chain, settings, redistribute=True, cap=cap, actors=10)
+sim = DemurrageTokenSimulation(chain, settings, redistribute=False, cap=cap, actors=10)
 
 # name the usual suspects
 alice = sim.actors[0]
