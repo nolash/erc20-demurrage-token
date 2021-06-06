@@ -17,14 +17,13 @@ class TestSim(unittest.TestCase):
 
     def setUp(self):
         self.chain_spec = ChainSpec('evm', 'foochain', 42)
-        #self.cap = 1000000000
         self.cap = 0
         settings = DemurrageTokenSettings()
         settings.name = 'Simulated Demurrage Token'
         settings.symbol = 'SIM'
         settings.decimals = 6
-        settings.demurrage_level = 50
-        settings.period_minutes = 10800
+        settings.demurrage_level = 5010590837337300000000000000000000 # equals approx 2% per month
+        settings.period_minutes = 10800 # 1 week in minutes
         self.sim = DemurrageTokenSimulation(self.chain_spec, settings, redistribute=True, cap=self.cap, actors=10)
 
 
@@ -32,7 +31,7 @@ class TestSim(unittest.TestCase):
         self.sim.mint(self.sim.actors[0], 1024)
         self.sim.next()
         balance = self.sim.balance(self.sim.actors[0])
-        self.assertEqual(balance, 1024)
+        self.assertEqual(balance, 1023)
 
 
     def test_transfer(self):
@@ -40,21 +39,38 @@ class TestSim(unittest.TestCase):
         self.sim.transfer(self.sim.actors[0], self.sim.actors[1], 500)
         self.sim.next()
         balance = self.sim.balance(self.sim.actors[0])
-        self.assertEqual(balance, 524)
+        self.assertEqual(balance, 523)
 
         balance = self.sim.balance(self.sim.actors[1])
-        self.assertEqual(balance, 500)
+        self.assertEqual(balance, 499)
 
 
     def test_more_periods(self):
         self.sim.mint(self.sim.actors[0], 1024)
+        self.sim.mint(self.sim.actors[1], 1024)
         self.sim.next()
 
         self.sim.mint(self.sim.actors[0], 1024)
         self.sim.next()
 
         balance = self.sim.balance(self.sim.actors[0])
-        self.assertEqual(balance, 2048)
+        self.assertEqual(balance, 2047)
+
+
+    def test_demurrage(self):
+        self.sim.mint(self.sim.actors[0], self.sim.from_units(100))
+        self.sim.mint(self.sim.actors[1], self.sim.from_units(100))
+        self.sim.transfer(self.sim.actors[0], self.sim.actors[2], self.sim.from_units(10))
+        self.sim.next()
+
+        balance = self.sim.balance(self.sim.actors[0])
+        self.assertEqual(balance, 89995500)
+        
+        balance = self.sim.balance(self.sim.actors[1])
+        self.assertEqual(balance, 99995000)
+
+        balance = self.sim.balance(self.sim.actors[1], base=True)
+        self.assertEqual(balance, 100000000)
 
 
 if __name__ == '__main__':

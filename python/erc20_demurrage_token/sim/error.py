@@ -1,0 +1,2 @@
+class TxLimitException(RuntimeError):
+    pass

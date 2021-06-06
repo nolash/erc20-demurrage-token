@@ -223,6 +223,21 @@ class DemurrageToken(ERC20):
         return o
 
 
+    def base_balance_of(self, contract_address, address, sender_address=ZERO_ADDRESS):
+        o = jsonrpc_template()
+        o['method'] = 'eth_call'
+        enc = ABIContractEncoder()
+        enc.method('baseBalanceOf')
+        enc.typ(ABIContractType.ADDRESS)
+        enc.address(address)
+        data = add_0x(enc.get())
+        tx = self.template(sender_address, contract_address)
+        tx = self.set_code(tx, data)
+        o['params'].append(self.normalize(tx))
+        o['params'].append('latest')
+        return o
+
+
     def apply_demurrage(self, contract_address, sender_address):
         return self.transact_noarg('applyDemurrage', contract_address, sender_address)
 
