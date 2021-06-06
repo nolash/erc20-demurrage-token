@@ -2,6 +2,7 @@
 import logging
 
 # external imports
+from chainlib.chain import ChainSpec
 from chainlib.eth.unittest.ethtester import create_tester_signer
 from chainlib.eth.unittest.base import TestRPCConnection
 from chainlib.eth.tx import (
@@ -35,8 +36,8 @@ logg = logging.getLogger(__name__)
 
 class DemurrageTokenSimulation:
 
-    def __init__(self, chain_spec, settings, redistribute=True, cap=0, actors=1):
-        self.chain_spec = chain_spec
+    def __init__(self, chain_str, settings, redistribute=True, cap=0, actors=1):
+        self.chain_spec = ChainSpec.from_chain_str(chain_str)
         self.accounts = []
         self.keystore = DictKeystore()
         self.signer = EIP155Signer(self.keystore)
@@ -76,7 +77,7 @@ class DemurrageTokenSimulation:
         self.start_timestamp = self.last_timestamp
         nonce_oracle = RPCNonceOracle(self.accounts[0], conn=self.rpc)
 
-        c = DemurrageToken(chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
         (tx_hash, o) = c.constructor(self.accounts[0], settings, redistribute=redistribute, cap=cap)
         self.rpc.do(o)
         o = receipt(tx_hash)

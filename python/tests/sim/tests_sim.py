@@ -2,9 +2,6 @@
 import unittest
 import logging
 
-# external imports
-from chainlib.chain import ChainSpec
-
 # local imports
 from erc20_demurrage_token import DemurrageTokenSettings
 from erc20_demurrage_token.sim import DemurrageTokenSimulation
@@ -16,7 +13,6 @@ logg = logging.getLogger()
 class TestSim(unittest.TestCase):
 
     def setUp(self):
-        self.chain_spec = ChainSpec('evm', 'foochain', 42)
         self.cap = 0
         settings = DemurrageTokenSettings()
         settings.name = 'Simulated Demurrage Token'
@@ -24,7 +20,7 @@ class TestSim(unittest.TestCase):
         settings.decimals = 6
         settings.demurrage_level = 5010590837337300000000000000000000 # equals approx 2% per month
         settings.period_minutes = 10800 # 1 week in minutes
-        self.sim = DemurrageTokenSimulation(self.chain_spec, settings, redistribute=True, cap=self.cap, actors=10)
+        self.sim = DemurrageTokenSimulation('evm:foochain:42', settings, redistribute=True, cap=self.cap, actors=10)
 
 
     def test_mint(self):
