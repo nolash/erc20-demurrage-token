@@ -39,6 +39,21 @@ class TestBasic(TestDemurrageDefault):
         r = self.rpc.do(o)
 
 
+    def test_balance(self):
+        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+        (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[1], 1024)
+        r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+
+        o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        balance = c.parse_balance_of(r)
+        self.assertEqual(balance, 1024)
+
+
     def test_apply_demurrage(self):
         modifier = 10 * (10 ** 37)
 

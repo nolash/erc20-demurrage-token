@@ -50,7 +50,7 @@ contract DemurrageTokenSingleCap {
 
 	// 128 bit resolution of the demurrage divisor
 	// (this constant x 1000000 is contained within 128 bits)
-	uint256 constant ppmDivider = 100000000000000000000000000000000;
+	uint256 constant ppmDivider = 100000000000000000000000000; // now nanodivider, 6 zeros less
 
 	// Timestamp of start of periods (time which contract constructor was called)
 	uint256 public immutable periodStart;
@@ -108,7 +108,7 @@ contract DemurrageTokenSingleCap {
 		demurrageTimestamp = block.timestamp;
 		periodStart = demurrageTimestamp;
 		periodDuration = _periodMinutes * 60;
-		demurrageAmount = uint128(ppmDivider * 1000000); // Represents 38 decimal places
+		demurrageAmount = uint128(ppmDivider * 1000000000000); // Represents 38 decimal places
 		//demurragePeriod = 1;
 		taxLevel = _taxLevelMinute; // Represents 38 decimal places
 		bytes32 initialRedistribution = toRedistribution(0, 1000000, 0, 1);
@@ -147,7 +147,7 @@ contract DemurrageTokenSingleCap {
 
 		currentDemurragedAmount = uint128(decayBy(demurrageAmount, periodCount));
 
-		return (baseBalance * currentDemurragedAmount) / (ppmDivider * 1000000);
+		return (baseBalance * currentDemurragedAmount) / (ppmDivider * 1000000000000);
 	}
 
 	/// Balance unmodified by demurrage
@@ -271,7 +271,7 @@ contract DemurrageTokenSingleCap {
 	}
 
 	function getDistribution(uint256 _supply, uint256 _demurrageAmount) public view returns (uint256) {
-		return _supply * (ppmDivider - (_demurrageAmount / 1000000));
+		return _supply * (ppmDivider - (_demurrageAmount / 1000000000000));
 	}
 
 	// Returns the amount sent to the sink address
@@ -365,7 +365,7 @@ contract DemurrageTokenSingleCap {
 		uint256 truncatedTaxLevel;
 	      
 		valueFactor = 1000000;
-		truncatedTaxLevel = taxLevel / ppmDivider;
+		truncatedTaxLevel = taxLevel / (ppmDivider * 1000000);
 
 		for (uint256 i = 0; i < _period; i++) {
 			valueFactor = valueFactor + ((valueFactor * truncatedTaxLevel) / 1000000);
@@ -380,7 +380,7 @@ contract DemurrageTokenSingleCap {
 		uint256 truncatedTaxLevel;
 	      
 		valueFactor = 1000000;
-		truncatedTaxLevel = taxLevel / ppmDivider;
+		truncatedTaxLevel = taxLevel / (ppmDivider * 1000000);
 
 		for (uint256 i = 0; i < _period; i++) {
 			valueFactor = valueFactor - ((valueFactor * truncatedTaxLevel) / 1000000);
@@ -390,7 +390,7 @@ contract DemurrageTokenSingleCap {
 
 	// Inflates the given amount according to the current demurrage modifier
 	function toBaseAmount(uint256 _value) public view returns (uint256) {
-		return (_value * ppmDivider * 1000000) / demurrageAmount;
+		return (_value * ppmDivider * 1000000000000) / demurrageAmount;
 	}
 
 	// Implements ERC20, triggers tax and/or redistribution
