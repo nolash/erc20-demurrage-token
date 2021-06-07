@@ -163,3 +163,56 @@ class TestDemurrageCap(TestDemurrage):
         self.deploy(c, self.mode)
 
         logg.info('deployed with mode {}'.format(self.mode))
+
+
+
+class TestDemurrageUnit(TestDemurrage):
+
+    def setUp(self):
+        super(TestDemurrage, self).setUp()
+
+        self.tax_level = 50
+        self.period_seconds = 60
+
+        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+        self.settings = DemurrageTokenSettings()
+        self.settings.name = 'Foo Token'
+        self.settings.symbol = 'FOO'
+        self.settings.decimals = 6
+        self.settings.demurrage_level = self.tax_level * (10 ** 32)
+        self.settings.period_minutes = int(self.period_seconds/60)
+        self.settings.sink_address = self.accounts[9]
+        self.sink_address = self.settings.sink_address
+
+        o = block_latest()
+        self.start_block = self.rpc.do(o)
+        
+        o = block_by_number(self.start_block, include_tx=False)
+        r = self.rpc.do(o)
+
+        try:
+            self.start_time = int(r['timestamp'], 16)
+        except TypeError:
+            self.start_time = int(r['timestamp'])
+
+        self.default_supply = 1000000000000
+        self.default_supply_cap = int(self.default_supply * 10)
+
+        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+
+        self.mode = os.environ.get('ERC20_DEMURRAGE_TOKEN_TEST_MODE')
+        unit_valid_modes = [
+                    'SingleNocap',
+                    'SingleCap',
+                    ]
+        if self.mode != None:
+            if self.mode not in unit_valid_modes:
+                raise ValueError('Invalid mode "{}" for "unit" contract tests, valid are {}'.format(self.mode, unit_valid_modes))
+        else:
+            self.mode = 'SingleNocap'
+        logg.debug('executing test setup unit mode {}'.format(self.mode))
+
+        self.deploy(c, self.mode)
+
+        logg.info('deployed with mode {}'.format(self.mode))

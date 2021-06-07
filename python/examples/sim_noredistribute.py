@@ -16,7 +16,7 @@ settings.name = 'Simulated Demurrage Token'
 settings.symbol = 'SIM'
 settings.decimals = 6
 settings.demurrage_level = int(decay_per_minute*(10**40))
-settings.period_minutes = 10800 # 1 week in minutes
+settings.period_minutes = 1 # 1 week in minutes
 chain = 'evm:foochain:42'
 cap = (10 ** 6) * (10 ** 12)
 
@@ -55,15 +55,15 @@ period = sim.get_period()
 print('start {} now {} period {} minutes passed {}'.format(start, timestamp, period, minutes))
 
 
-contract_demurrage = 1 - sim.get_demurrage_modifier()    # demurrage in percent (float)
-frontend_demurrage = ((1 - decay_per_minute) ** minutes / 100)   # corresponding demurrage modifier (float)
+contract_demurrage = 1 - sim.get_demurrage()    # demurrage in percent (float)
+frontend_demurrage = 1.0 - ((1 - decay_per_minute) ** minutes)   # corresponding demurrage modifier (float)
 demurrage_delta = contract_demurrage - frontend_demurrage      # difference between demurrage in contract and demurrage calculated in frontend
 
 alice_checksum = 50000000 - (50000000 * frontend_demurrage) + (200000000 * frontend_demurrage) # alice's balance calculated with frontend demurrage
 print("""alice frontend balance {}
 alice contract balance {}
-frontend demurrage {}
-contract demurrage {}
+frontend demurrage {:f}
+contract demurrage {:f}
 demurrage delta {}""".format(
     alice_checksum,
     sim.balance(alice),
