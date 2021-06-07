@@ -65,7 +65,17 @@ class DemurrageTokenSimulation:
             r = self.rpc.do(o)
             if r['status'] != 1:
                 raise RuntimeError('failed gas transfer to account #{}: {} from {}'.format(i, address, self.accounts[idx]))
-            logg.debug('added actor account #{}: {}'.format(i, address))
+            logg.info('added actor account #{}: {} block {}'.format(i, address, r['block_number']))
+
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+        (tx_hash, o) = c.constructor(self.accounts[0], settings, redistribute=redistribute, cap=cap)
+        self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        if (r['status'] != 1):
+            raise RuntimeError('contract deployment failed')
+        self.address = r['contract_address']
+        logg.info('deployed contract to {} block {}'.format(self.address, r['block_number']))
 
         o = block_latest()
         r = self.rpc.do(o)
@@ -76,25 +86,14 @@ class DemurrageTokenSimulation:
         r = self.rpc.do(o)
         self.last_timestamp = r['timestamp']
         self.start_timestamp = self.last_timestamp
+
         nonce_oracle = RPCNonceOracle(self.accounts[0], conn=self.rpc)
-
-        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
-        (tx_hash, o) = c.constructor(self.accounts[0], settings, redistribute=redistribute, cap=cap)
-        self.rpc.do(o)
-        o = receipt(tx_hash)
-        r = self.rpc.do(o)
-        if (r['status'] != 1):
-            raise RuntimeError('contract deployment failed')
-        self.address = r['contract_address']
-
         o = c.decimals(self.address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         self.decimals = c.parse_decimals(r)
 
         self.period_seconds = settings.period_minutes * 60
 
-        self.last_block += 1
-        self.last_timestamp += 1
         self.period = 1
         self.period_txs = []
         self.period_tx_limit = self.period_seconds - 1
@@ -146,12 +145,15 @@ class DemurrageTokenSimulation:
 
 
     def get_period(self):
-        return self.period
+        o = self.caller_contract.actual_period(self.address, sender_address=self.caller_address)
+        r = self.rpc.do(o)
+        return self.caller_contract.parse_actual_period(r)
 
 
     def get_demurrage(self):
         o = self.caller_contract.demurrage_amount(self.address, sender_address=self.caller_address)
         r = self.rpc.do(o)
+        logg.info('demrrage amount {}'.format(r))
         return float(self.caller_contract.parse_demurrage_amount(r) / (10 ** 38))
 
 
@@ -218,21 +220,54 @@ class DemurrageTokenSimulation:
 
     def next(self):
         target_timestamp = self.start_timestamp + (self.period * self.period_seconds)
-        logg.debug('warping to {}, {} from start'.format(target_timestamp, target_timestamp - self.start_timestamp))
+        logg.info('warping to {}, {} from start {}'.format(target_timestamp, target_timestamp - self.start_timestamp, self.start_timestamp))
         self.last_timestamp = target_timestamp 
 
-        self.eth_helper.time_travel(self.last_timestamp)
-        self.__next_block()
+        o = block_latest()
+        r = self.rpc.do(o)
+        self.last_block = r
+        o = block_by_number(r)
+        r = self.rpc.do(o)
+        cursor_timestamp = r['timestamp'] + 1
 
+        nonce_oracle = RPCNonceOracle(self.accounts[2], conn=self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle, gas_oracle=self.gas_oracle)
+
+        i = 0
+        while cursor_timestamp < target_timestamp:
+            logg.info('mining block on {}'.format(cursor_timestamp))
+            (tx_hash, o) = c.apply_demurrage(self.address, self.accounts[2])
+            self.rpc.do(o)
+            self.eth_helper.time_travel(cursor_timestamp + 60)
+            self.__next_block()
+            o = receipt(tx_hash)
+            r = self.rpc.do(o)
+            if r['status'] == 0:
+                raise RuntimeError('demurrage fast-forward failed on step {} timestamp {} block timestamp {} target {}'.format(i, cursor_timestamp, target_timestamp))
+            cursor_timestamp += 60*60 # 1 hour
+            o = block_by_number(r['block_number'])
+            b = self.rpc.do(o)
+            logg.info('block mined on timestamp {} (delta {}) block number {}'.format(b['timestamp'], b['timestamp'] - self.start_timestamp, b['number']))
+            i += 1
+
+        
+        (tx_hash, o) = c.apply_demurrage(self.address, self.accounts[2])
+        self.rpc.do(o)
+
+        nonce_oracle = RPCNonceOracle(self.accounts[3], conn=self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle, gas_oracle=self.gas_oracle)
+        (tx_hash, o) = c.change_period(self.address, self.accounts[3])
+        self.rpc.do(o)
+        self.eth_helper.time_travel(target_timestamp + 1)
+        self.__next_block()
+    
+        o = block_latest()
+        r = self.rpc.do(o)
         o = block_by_number(self.last_block)
         r = self.rpc.do(o)
         self.last_block = r['number']
         block_base = self.last_block
-        
-        nonce_oracle = RPCNonceOracle(self.accounts[2], conn=self.rpc)
-        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle, gas_oracle=self.gas_oracle)
-        (tx_hash, o) = c.change_period(self.address, self.accounts[2])
-        self.rpc.do(o)
+        logg.info('block before demurrage execution {} {}'.format(r['timestamp'], r['number']))
 
         if self.redistribute:
             for actor in self.actors:

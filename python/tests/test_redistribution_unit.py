@@ -138,7 +138,7 @@ class TestRedistribution(TestDemurrageUnit):
         o = c.demurrage_amount(self.address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         demurrage = c.parse_demurrage_amount(r)
-        logg.debug('\ndemurrage {}\nsupply {}'.format(demurrage, supply))
+        logg.debug('\nrediistribution {}\ndemurrage {}\nsupply {}'.format(redistribution, demurrage, supply))
 
         expected_balance = int(supply * (self.tax_level / 1000000))
         expected_balance_tolerance = 1

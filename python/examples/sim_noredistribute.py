@@ -5,10 +5,10 @@ import logging
 from erc20_demurrage_token import DemurrageTokenSettings
 from erc20_demurrage_token.sim import DemurrageTokenSimulation
 
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.INFO)
 logg = logging.getLogger()
 
-decay_per_minute = 0.000050105908373373 # equals approx 2% per month
+decay_per_minute = 0.00000050105908373373 # equals approx 2% per month
 
 # parameters for simulation object
 settings = DemurrageTokenSettings()
@@ -16,7 +16,8 @@ settings.name = 'Simulated Demurrage Token'
 settings.symbol = 'SIM'
 settings.decimals = 6
 settings.demurrage_level = int(decay_per_minute*(10**38))
-settings.period_minutes = 1 # 1 week in minutes
+#settings.period_minutes = 1 # 1 week in minutes
+settings.period_minutes = 60*24*7*4
 chain = 'evm:foochain:42'
 cap = (10 ** 6) * (10 ** 12)
 
@@ -49,8 +50,8 @@ print('sink balance:  demurraged {:>9d} base {:>9d}'.format(sim.balance(sim.sink
 
 # get times
 minutes = sim.get_minutes()
-start = sim.get_now()
-timestamp = sim.get_start()
+timestamp = sim.get_now()
+start = sim.get_start()
 period = sim.get_period()
 print('start {} now {} period {} minutes passed {}'.format(start, timestamp, period, minutes))
 

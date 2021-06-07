@@ -270,15 +270,18 @@ contract DemurrageTokenSingleCap {
 		return lastRedistribution;
 	}
 
+	function getDistribution(uint256 _supply, uint256 _demurrageAmount) public view returns (uint256) {
+		return _supply * (ppmDivider - (_demurrageAmount / 1000000));
+	}
+
 	// Returns the amount sent to the sink address
 	function applyDefaultRedistribution(bytes32 _redistribution) private returns (uint256) {
 		uint256 redistributionSupply;
 		uint256 unit;
 
 		redistributionSupply = toRedistributionSupply(_redistribution);
-		unit = redistributionSupply * (ppmDivider - (demurrageAmount / 1000000));
-
-		increaseBaseBalance(sinkAddress, unit / ppmDivider);
+		unit = getDistribution(redistributionSupply, demurrageAmount);
+		increaseBaseBalance(sinkAddress, toBaseAmount(unit / ppmDivider));
 		return unit;
 	}
 
@@ -292,7 +295,6 @@ contract DemurrageTokenSingleCap {
 		uint128 epochPeriodCount;
 		uint256 periodCount;
 		uint256 lastDemurrageAmount;
-		uint256 newDemurrageAmount;
 
 		//epochPeriodCount = actualPeriod();
 		//periodCount = epochPeriodCount - demurragePeriod;
@@ -304,8 +306,8 @@ contract DemurrageTokenSingleCap {
 		lastDemurrageAmount = demurrageAmount;
 		demurrageAmount = uint128(decayBy(lastDemurrageAmount, periodCount));
 		//demurragePeriod = epochPeriodCount; 
-		demurrageTimestamp = periodStart + (periodCount * 60);
-		emit Decayed(block.timestamp, periodCount, lastDemurrageAmount, demurrageAmount);
+		demurrageTimestamp = demurrageTimestamp + (periodCount * 60);
+		emit Decayed(demurrageTimestamp, periodCount, lastDemurrageAmount, demurrageAmount);
 		return true;
 	}
 
