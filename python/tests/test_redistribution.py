@@ -285,7 +285,6 @@ class TestRedistribution(TestDemurrageDefault):
         r = self.rpc.do(o)
         self.assertEqual(r['status'], 1)
 
-#        logg.debug('log {}'.format(r.logs))
         (tx_hash, o) = c.apply_redistribution_on_account(self.address, self.accounts[4], self.accounts[2])
         self.rpc.do(o)
         o = receipt(tx_hash)

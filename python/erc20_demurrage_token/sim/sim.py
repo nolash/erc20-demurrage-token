@@ -151,7 +151,7 @@ class DemurrageTokenSimulation:
     def get_demurrage(self):
         o = self.caller_contract.demurrage_amount(self.address, sender_address=self.caller_address)
         r = self.rpc.do(o)
-        return float(self.caller_contract.parse_demurrage_amount(r) / (10 ** 40))
+        return float(self.caller_contract.parse_demurrage_amount(r) / (10 ** 38))
 
 
     def from_units(self, v):
