@@ -19,6 +19,7 @@ settings.demurrage_level = int(decay_per_minute*(10**38))
 settings.period_minutes = 1 # 1 week in minutes
 chain = 'evm:foochain:42'
 cap = (10 ** 6) * (10 ** 12)
+#cap = 0
 
 # instantiate simulation
 sim = DemurrageTokenSimulation(chain, settings, redistribute=False, cap=cap, actors=10)
@@ -62,9 +63,9 @@ demurrage_delta = contract_demurrage - frontend_demurrage      # difference betw
 alice_checksum = 50000000 - (50000000 * frontend_demurrage) + (200000000 * frontend_demurrage) # alice's balance calculated with frontend demurrage
 print("""alice frontend balance {}
 alice contract balance {}
-frontend demurrage {:f}
-contract demurrage {:f}
-demurrage delta {}""".format(
+frontend demurrage {:.38f}
+contract demurrage {:.38f}
+demurrage delta {:.38f}""".format(
     alice_checksum,
     sim.balance(alice),
     frontend_demurrage,
@@ -72,5 +73,7 @@ demurrage delta {}""".format(
     demurrage_delta),
 )
 
-balance_sum = sim.balance(alice) + sim.balance(bob) + sim.balance(carol)
+balance_sum = sim.balance(alice) + sim.balance(bob) + sim.balance(carol) + sim.balance(sim.sink_address)
+supply = sim.get_supply()
 print('sum of contract demurraged balances {}'.format(balance_sum))
+print('total token supply {}'.format(supply))

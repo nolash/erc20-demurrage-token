@@ -148,15 +148,25 @@ class DemurrageTokenSimulation:
     def get_period(self):
         return self.period
 
+
     def get_demurrage(self):
         o = self.caller_contract.demurrage_amount(self.address, sender_address=self.caller_address)
         r = self.rpc.do(o)
         return float(self.caller_contract.parse_demurrage_amount(r) / (10 ** 38))
 
 
+    def get_supply(self):
+        o = self.caller_contract.total_supply(self.address, sender_address=self.caller_address)
+        r = self.rpc.do(o)
+        supply = self.caller_contract.parse_total_supply(r)
+        return supply
+
+
     def from_units(self, v):
         return v * (10 ** self.decimals)
 
+
+    
 
     def mint(self, recipient, value):
         self.__check_limit()
