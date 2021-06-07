@@ -28,8 +28,7 @@ TAX_LEVEL = int(10000 * 2) # 2%
 # calc "1-(0.98)^(1/518400)" <- 518400 = 30 days of blocks
 # 0.00000003897127107225
 #PERIOD = int(60/BLOCKTIME) * 60 * 24 * 30 # month
-PERIOD = 1
-
+PERIOD = 10
 
 
 class TestDemurrage(EthTesterCase):

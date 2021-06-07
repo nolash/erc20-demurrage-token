@@ -100,6 +100,9 @@ class TestRedistribution(TestDemurrageUnit):
 
         (tx_hash, o) = c.change_period(self.address, self.accounts[1])
         self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
 
         demurrage_amount = int((self.tax_level / 1000000) * mint_amount)
 
@@ -125,6 +128,17 @@ class TestRedistribution(TestDemurrageUnit):
         o = c.total_supply(self.address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         supply = c.parse_total_supply(r)
+
+
+        o = c.redistributions(self.address, 0, sender_address=self.accounts[0])
+        redistribution = self.rpc.do(o)
+        o = c.to_redistribution_supply(self.address, redistribution, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        supply = c.parse_to_redistribution_item(r)
+        o = c.demurrage_amount(self.address, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        demurrage = c.parse_demurrage_amount(r)
+        logg.debug('\ndemurrage {}\nsupply {}'.format(demurrage, supply))
 
         expected_balance = int(supply * (self.tax_level / 1000000))
         expected_balance_tolerance = 1

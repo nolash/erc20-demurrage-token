@@ -23,7 +23,7 @@ done
 
 modes=(MultiCap MultiNocap)
 for m in ${modes[@]}; do
-	ERC20_DEMURRAGE_TOKEN_TEST_MODE=$m python tests/test_pure.py
+	ERC20_DEMURRAGE_TOKEN_TEST_MODE=$m python tests/test_remainder.py
 	ERC20_DEMURRAGE_TOKEN_TEST_MODE=$m python tests/test_redistribution.py
 done
 

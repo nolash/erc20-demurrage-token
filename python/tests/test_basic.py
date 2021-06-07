@@ -9,6 +9,10 @@ import datetime
 from chainlib.eth.constant import ZERO_ADDRESS
 from chainlib.eth.nonce import RPCNonceOracle
 from chainlib.eth.tx import receipt
+from chainlib.eth.block import (
+        block_latest,
+        block_by_number,
+    )
 
 # local imports
 from erc20_demurrage_token import DemurrageToken
@@ -46,20 +50,54 @@ class TestBasic(TestDemurrageDefault):
         demurrage_amount = c.parse_demurrage_amount(r)
         self.assertEqual(modifier, demurrage_amount)
 
-        self.backend.time_travel(self.start_time + self.period_seconds - 1)
+        o = block_latest()
+        r = self.rpc.do(o)
+        o = block_by_number(r)
+        b = self.rpc.do(o)
+        logg.debug('block {} start {}'.format(b['timestamp'], self.start_time))
+
+        self.backend.time_travel(self.start_time + 2)
+        (tx_hash, o) = c.apply_demurrage(self.address, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+
         o = c.demurrage_amount(self.address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         demurrage_amount = c.parse_demurrage_amount(r)
         self.assertEqual(modifier, demurrage_amount)
 
-        self.backend.time_travel(self.start_time + self.period_seconds + 1)
+        self.backend.time_travel(self.start_time + 61)
         (tx_hash, o) = c.apply_demurrage(self.address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
         o = c.demurrage_amount(self.address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         demurrage_amount = c.parse_demurrage_amount(r)
-        modifier = int(98 * (10 ** 36))
+        modifier_base = 1000000 - self.tax_level
+        logg.debug('modifier base {}'.format(modifier_base))
+        modifier = int(modifier_base * (10 ** 32)) # 38 decimal places minus 6 (1000000)
         self.assertEqual(modifier, demurrage_amount)
+
+        self.backend.time_travel(self.start_time + 601)
+        (tx_hash, o) = c.apply_demurrage(self.address, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+        o = c.demurrage_amount(self.address, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        demurrage_amount = c.parse_demurrage_amount(r)
+        modifier_base = ((1000000 - self.tax_level) / 1000000) ** 10
+        modifier = int(modifier_base * (10 ** 12))
+
+        rounding_tolerance_nano = 4000000 # 0.000004% precision
+        demurrage_amount_truncate = int(demurrage_amount / (10 ** 26)) # equals 12 decimal places
+        self.assertGreaterEqual(modifier, demurrage_amount_truncate - rounding_tolerance_nano)
+        self.assertLessEqual(modifier, demurrage_amount_truncate)
 
 
     def test_mint(self):

@@ -19,7 +19,6 @@ settings.demurrage_level = int(decay_per_minute*(10**38))
 settings.period_minutes = 1 # 1 week in minutes
 chain = 'evm:foochain:42'
 cap = (10 ** 6) * (10 ** 12)
-#cap = 0
 
 # instantiate simulation
 sim = DemurrageTokenSimulation(chain, settings, redistribute=False, cap=cap, actors=10)

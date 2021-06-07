@@ -28,6 +28,7 @@ testdir = os.path.dirname(__file__)
 
 class TestRedistributionSingle(TestDemurrageSingle):
 
+
     def test_single_even_if_multiple(self):
 
         mint_amount = 100000000

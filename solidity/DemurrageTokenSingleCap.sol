@@ -21,7 +21,9 @@ contract DemurrageTokenSingleCap {
 	uint128 public demurrageAmount;
 
 	// Cached demurrage period; the period for which demurrageAmount was calculated
-	uint128 public demurragePeriod;
+	//uint128 public demurragePeriod;
+	// Cached demurrage timestamp; the timestamp for which demurrageAmount was last calculated
+	uint256 public demurrageTimestamp;
 
 	// Implements EIP172
 	address public owner;
@@ -103,10 +105,11 @@ contract DemurrageTokenSingleCap {
 		decimals = _decimals;
 
 		// Demurrage setup
-		periodStart = block.timestamp;
+		demurrageTimestamp = block.timestamp;
+		periodStart = demurrageTimestamp;
 		periodDuration = _periodMinutes * 60;
 		demurrageAmount = uint128(ppmDivider * 1000000); // Represents 38 decimal places
-		demurragePeriod = 1;
+		//demurragePeriod = 1;
 		taxLevel = _taxLevelMinute; // Represents 38 decimal places
 		bytes32 initialRedistribution = toRedistribution(0, 1000000, 0, 1);
 		redistributions.push(initialRedistribution);
@@ -139,7 +142,8 @@ contract DemurrageTokenSingleCap {
 
 		baseBalance = baseBalanceOf(_account);
 
-		periodCount = actualPeriod() - demurragePeriod; 
+		//periodCount = actualPeriod() - demurragePeriod; 
+		periodCount = getMinutesDelta(demurrageTimestamp);
 
 		currentDemurragedAmount = uint128(decayBy(demurrageAmount, periodCount));
 
@@ -237,10 +241,12 @@ contract DemurrageTokenSingleCap {
 	// Save the current total supply amount to the current redistribution period
 	function saveRedistributionSupply() private returns (bool) {
 		uint256 currentRedistribution;
+		uint256 grownSupply;
 
+		grownSupply = growBy(totalSupply, 1);
 		currentRedistribution = uint256(redistributions[redistributions.length-1]);
 		currentRedistribution &= (~maskRedistributionValue);
-		currentRedistribution |= (totalSupply << shiftRedistributionValue);
+		currentRedistribution |= (grownSupply << shiftRedistributionValue);
 
 		redistributions[redistributions.length-1] = bytes32(currentRedistribution);
 		return true;
@@ -270,29 +276,36 @@ contract DemurrageTokenSingleCap {
 		uint256 unit;
 
 		redistributionSupply = toRedistributionSupply(_redistribution);
-
-		unit = (redistributionSupply * taxLevel) / 1000000;
+		unit = redistributionSupply * (ppmDivider - (demurrageAmount / 1000000));
 
 		increaseBaseBalance(sinkAddress, unit / ppmDivider);
 		return unit;
 	}
 
+	// Calculate the time delta in whole minutes passed between given timestamp and current timestamp
+	function getMinutesDelta(uint256 _lastTimestamp) public view returns (uint256) {
+		return (block.timestamp - _lastTimestamp) / 60;
+	}
+
 	// Calculate and cache the demurrage value corresponding to the (period of the) time of the method call
 	function applyDemurrage() public returns (bool) {
 		uint128 epochPeriodCount;
-		uint128 periodCount;
+		uint256 periodCount;
 		uint256 lastDemurrageAmount;
 		uint256 newDemurrageAmount;
 
-		epochPeriodCount = actualPeriod();
-		periodCount = epochPeriodCount - demurragePeriod;
+		//epochPeriodCount = actualPeriod();
+		//periodCount = epochPeriodCount - demurragePeriod;
+
+		periodCount = getMinutesDelta(demurrageTimestamp);
 		if (periodCount == 0) {
 			return false;
 		}
 		lastDemurrageAmount = demurrageAmount;
 		demurrageAmount = uint128(decayBy(lastDemurrageAmount, periodCount));
-		demurragePeriod = epochPeriodCount; 
-		emit Decayed(epochPeriodCount, periodCount, lastDemurrageAmount, demurrageAmount);
+		//demurragePeriod = epochPeriodCount; 
+		demurrageTimestamp = periodStart + (periodCount * 60);
+		emit Decayed(block.timestamp, periodCount, lastDemurrageAmount, demurrageAmount);
 		return true;
 	}
 
