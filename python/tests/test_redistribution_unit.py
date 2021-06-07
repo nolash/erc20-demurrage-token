@@ -127,11 +127,13 @@ class TestRedistribution(TestDemurrageUnit):
         supply = c.parse_total_supply(r)
 
         expected_balance = int(supply * (self.tax_level / 1000000))
+        expected_balance_tolerance = 1
 
         o = c.balance_of(self.address, self.sink_address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         balance = c.parse_balance_of(r)
-        self.assertEqual(balance, expected_balance)
+        self.assertGreaterEqual(balance, expected_balance - expected_balance_tolerance)
+        self.assertLessEqual(balance, expected_balance)
 
 
 if __name__ == '__main__':

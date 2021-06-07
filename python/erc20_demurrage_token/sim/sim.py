@@ -166,8 +166,6 @@ class DemurrageTokenSimulation:
         return v * (10 ** self.decimals)
 
 
-    
-
     def mint(self, recipient, value):
         self.__check_limit()
         nonce_oracle = RPCNonceOracle(self.accounts[0], conn=self.rpc)

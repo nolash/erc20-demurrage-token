@@ -262,18 +262,11 @@ contract DemurrageTokenSingleNocap {
 	// Returns the amount sent to the sink address
 	function applyDefaultRedistribution(bytes32 _redistribution) private returns (uint256) {
 		uint256 redistributionSupply;
-		uint256 redistributionPeriod;
 		uint256 unit;
-		uint256 truncatedResult;
 
 		redistributionSupply = toRedistributionSupply(_redistribution);
 
 		unit = (redistributionSupply * taxLevel) / 1000000;
-		truncatedResult = (unit * 1000000) / taxLevel;
-
-		if (truncatedResult < redistributionSupply) {
-			redistributionPeriod = toRedistributionPeriod(_redistribution); // since we reuse period here, can possibly be optimized by passing period instead
-		}
 
 		increaseBaseBalance(sinkAddress, unit / ppmDivider);
 		return unit;
