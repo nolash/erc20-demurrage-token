@@ -76,6 +76,31 @@ class TestPeriod(TestDemurrageDefault):
         period = int(period) * (10 ** (38 - 9))
         self.assertEqual(modifier, period)
 
+        self.backend.time_travel(self.start_time + self.period_seconds * 2)
+
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+        (tx_hash, o) = c.change_period(self.address, self.accounts[0])
+        r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+
+        o = c.redistributions(self.address, 2, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        redistribution = c.parse_redistributions(r)
+
+        o = c.to_redistribution_demurrage_modifier(self.address, redistribution, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        period = c.parse_to_redistribution_item(r)
+
+        # allow test code float rounding error to billionth
+        modifier = (1 - (self.tax_level / 1000000)) ** ((self.period_seconds * 2) / 60)
+        modifier *= 10 ** 9 
+        modifier = int(modifier) * (10 ** (38 - 9))
+
+        period /= (10 ** (38 - 9))
+        period = int(period) * (10 ** (38 - 9))
+        self.assertEqual(modifier, period)
 
 if __name__ == '__main__':
     unittest.main()
