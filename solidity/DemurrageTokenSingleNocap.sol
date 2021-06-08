@@ -2,17 +2,21 @@ pragma solidity > 0.6.11;
 
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-contract DemurrageTokenSingleNocap {
+contract DemurrageTokenSingleCap {
 
 	// Redistribution bit field, with associated shifts and masks
 	// (Uses sub-byte boundaries)
-	bytes32[] public redistributions; // uint95(unused) | uint20(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
+	bytes32[] public redistributions; // uint51(unused) | uint64(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
 	uint8 constant shiftRedistributionPeriod 	= 0;
 	uint256 constant maskRedistributionPeriod 	= 0x00000000000000000000000000000000000000000000000000000000ffffffff; // (1 << 32) - 1
 	uint8 constant shiftRedistributionValue 	= 32;
 	uint256 constant maskRedistributionValue	= 0x00000000000000000000000000000000000000ffffffffffffffffff00000000; // ((1 << 72) - 1) << 32
-	uint8 constant shiftRedistributionDemurrage	= 140;
-	uint256 constant maskRedistributionDemurrage	= 0x000000000000000000000000fffff00000000000000000000000000000000000; // ((1 << 20) - 1) << 140
+	uint8 constant shiftRedistributionDemurrage	= 104;
+	uint256 constant maskRedistributionDemurrage	= 0x000000ffffffffffffffffffffffffffffffff00000000000000000000000000; // ((1 << 20) - 1) << 140
+
+	uint8 constant shiftRedistributionIsUsed	= 255;
+	uint256 constant maskRedistributionIsUsed	= 0x4000000000000000000000000000000000000000000000000000000000000000; // 1 << 255
+
 
 	// Account balances
 	mapping (address => uint256) account;
@@ -21,7 +25,9 @@ contract DemurrageTokenSingleNocap {
 	uint128 public demurrageAmount;
 
 	// Cached demurrage period; the period for which demurrageAmount was calculated
-	uint128 public demurragePeriod;
+	//uint128 public demurragePeriod;
+	// Cached demurrage timestamp; the timestamp for which demurrageAmount was last calculated
+	uint256 public demurrageTimestamp;
 
 	// Implements EIP172
 	address public owner;
@@ -45,7 +51,13 @@ contract DemurrageTokenSingleNocap {
 
 	// 128 bit resolution of the demurrage divisor
 	// (this constant x 1000000 is contained within 128 bits)
-	uint256 constant ppmDivider = 100000000000000000000000000000000;
+	uint256 constant nanoDivider = 100000000000000000000000000; // now nanodivider, 6 zeros less
+
+	// remaining decimal positions of nanoDivider to reach 38, equals precision in growth and decay
+	uint256 constant growthResolutionFactor = 1000000000000;
+
+	// demurrage decimal width; 38 places
+	uint256 immutable resolutionFactor = nanoDivider * growthResolutionFactor; 
 
 	// Timestamp of start of periods (time which contract constructor was called)
 	uint256 public immutable periodStart;
@@ -55,7 +67,7 @@ contract DemurrageTokenSingleNocap {
 
 	// Demurrage in ppm per minute
 	uint256 public immutable taxLevel;
-
+		
 	// Addresses allowed to mint new tokens
 	mapping (address => bool) minter;
 
@@ -89,7 +101,7 @@ contract DemurrageTokenSingleNocap {
 	// EIP173
 	event OwnershipTransferred(address indexed previousOwner, address indexed newOwner); // EIP173
 
-	constructor(string memory _name, string memory _symbol, uint8 _decimals, uint256 _taxLevelMinute, uint256 _periodMinutes, address _defaultSinkAddress) public {
+	constructor(string memory _name, string memory _symbol, uint8 _decimals, uint128 _taxLevelMinute, uint256 _periodMinutes, address _defaultSinkAddress) public {
 		// ACL setup
 		owner = msg.sender;
 		minter[owner] = true;
@@ -100,12 +112,14 @@ contract DemurrageTokenSingleNocap {
 		decimals = _decimals;
 
 		// Demurrage setup
-		periodStart = block.timestamp;
+		demurrageTimestamp = block.timestamp;
+		periodStart = demurrageTimestamp;
 		periodDuration = _periodMinutes * 60;
-		demurrageAmount = uint128(ppmDivider * 1000000); // Represents 38 decimal places
-		demurragePeriod = 1;
+		//demurrageAmount = 100000000000000000000000000000000000000 - _taxLevelMinute; // Represents 38 decimal places, same as resolutionFactor
+		demurrageAmount = 100000000000000000000000000000000000000;
+		//demurragePeriod = 1;
 		taxLevel = _taxLevelMinute; // Represents 38 decimal places
-		bytes32 initialRedistribution = toRedistribution(0, 1000000, 0, 1);
+		bytes32 initialRedistribution = toRedistribution(0, demurrageAmount, 0, 1);
 		redistributions.push(initialRedistribution);
 
 		// Misc settings
@@ -135,11 +149,12 @@ contract DemurrageTokenSingleNocap {
 
 		baseBalance = baseBalanceOf(_account);
 
-		periodCount = actualPeriod() - demurragePeriod; 
+		//periodCount = actualPeriod() - demurragePeriod; 
+		periodCount = getMinutesDelta(demurrageTimestamp);
 
 		currentDemurragedAmount = uint128(decayBy(demurrageAmount, periodCount));
 
-		return (baseBalance * currentDemurragedAmount) / (ppmDivider * 1000000);
+		return (baseBalance * currentDemurragedAmount) / (nanoDivider * 1000000000000);
 	}
 
 	/// Balance unmodified by demurrage
@@ -187,10 +202,10 @@ contract DemurrageTokenSingleNocap {
 	function mintTo(address _beneficiary, uint256 _amount) external returns (bool) {
 		uint256 baseAmount;
 
-		require(minter[msg.sender]);
+		require(minter[msg.sender], 'ERR_ACCESS');
 
 		changePeriod();
-		baseAmount = _amount;
+		baseAmount = toBaseAmount(_amount);
 		totalSupply += _amount;
 		increaseBaseBalance(_beneficiary, baseAmount);
 		emit Mint(msg.sender, _beneficiary, _amount);
@@ -200,7 +215,7 @@ contract DemurrageTokenSingleNocap {
 
 	// Deserializes the redistribution word
 	// uint95(unused) | uint20(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
-	function toRedistribution(uint256 _participants, uint256 _demurrageModifierPpm, uint256 _value, uint256 _period) private pure returns(bytes32) {
+	function toRedistribution(uint256 _participants, uint256 _demurrageModifierPpm, uint256 _value, uint256 _period) public pure returns(bytes32) {
 		bytes32 redistribution;
 
 		redistribution |= bytes32((_demurrageModifierPpm << shiftRedistributionDemurrage) & maskRedistributionDemurrage);
@@ -232,10 +247,13 @@ contract DemurrageTokenSingleNocap {
 	// Save the current total supply amount to the current redistribution period
 	function saveRedistributionSupply() private returns (bool) {
 		uint256 currentRedistribution;
+		uint256 grownSupply;
 
+		//grownSupply = growBy(totalSupply, 1);
+		grownSupply = totalSupply;
 		currentRedistribution = uint256(redistributions[redistributions.length-1]);
 		currentRedistribution &= (~maskRedistributionValue);
-		currentRedistribution |= (totalSupply << shiftRedistributionValue);
+		currentRedistribution |= (grownSupply << shiftRedistributionValue);
 
 		redistributions[redistributions.length-1] = bytes32(currentRedistribution);
 		return true;
@@ -259,35 +277,54 @@ contract DemurrageTokenSingleNocap {
 		return lastRedistribution;
 	}
 
-	// Returns the amount sent to the sink address
-	function applyDefaultRedistribution(bytes32 _redistribution) private returns (uint256) {
+	function getDistribution(uint256 _supply, uint256 _demurrageAmount) public view returns (uint256) {
+		uint256 difference;
+
+		difference = _supply * (resolutionFactor - _demurrageAmount); //(nanoDivider - ((resolutionFactor - _demurrageAmount) / nanoDivider));
+		return difference / resolutionFactor;
+	}
+
+	function getDistributionFromRedistribution(bytes32 _redistribution) public returns (uint256) {
 		uint256 redistributionSupply;
-		uint256 unit;
+		uint256 redistributionDemurrage;
 
 		redistributionSupply = toRedistributionSupply(_redistribution);
+		redistributionDemurrage = toRedistributionDemurrageModifier(_redistribution);
+		return getDistribution(redistributionSupply, redistributionDemurrage);
+	}
 
-		unit = (redistributionSupply * taxLevel) / 1000000;
-
-		increaseBaseBalance(sinkAddress, unit / ppmDivider);
+	// Returns the amount sent to the sink address
+	function applyDefaultRedistribution(bytes32 _redistribution) private returns (uint256) {
+		uint256 unit;
+	
+		unit = getDistributionFromRedistribution(_redistribution);	
+		increaseBaseBalance(sinkAddress, toBaseAmount(unit));
 		return unit;
+	}
+
+	// Calculate the time delta in whole minutes passed between given timestamp and current timestamp
+	function getMinutesDelta(uint256 _lastTimestamp) public view returns (uint256) {
+		return (block.timestamp - _lastTimestamp) / 60;
 	}
 
 	// Calculate and cache the demurrage value corresponding to the (period of the) time of the method call
 	function applyDemurrage() public returns (bool) {
-		uint128 epochPeriodCount;
-		uint128 periodCount;
+		//uint128 epochPeriodCount;
+		uint256 periodCount;
 		uint256 lastDemurrageAmount;
-		uint256 newDemurrageAmount;
 
-		epochPeriodCount = actualPeriod();
-		periodCount = epochPeriodCount - demurragePeriod;
+		//epochPeriodCount = actualPeriod();
+		//periodCount = epochPeriodCount - demurragePeriod;
+
+		periodCount = getMinutesDelta(demurrageTimestamp);
 		if (periodCount == 0) {
 			return false;
 		}
 		lastDemurrageAmount = demurrageAmount;
 		demurrageAmount = uint128(decayBy(lastDemurrageAmount, periodCount));
-		demurragePeriod = epochPeriodCount; 
-		emit Decayed(epochPeriodCount, periodCount, lastDemurrageAmount, demurrageAmount);
+		//demurragePeriod = epochPeriodCount; 
+		demurrageTimestamp = demurrageTimestamp + (periodCount * 60);
+		emit Decayed(demurrageTimestamp, periodCount, lastDemurrageAmount, demurrageAmount);
 		return true;
 	}
 
@@ -312,6 +349,7 @@ contract DemurrageTokenSingleNocap {
 		uint256 periodTimestamp;
 		uint256 nextPeriod;
 
+		applyDemurrage();
 		currentRedistribution = checkPeriod();
 		if (currentRedistribution == bytes32(0x00)) {
 			return false;
@@ -321,20 +359,19 @@ contract DemurrageTokenSingleNocap {
 		nextPeriod = currentPeriod + 1;
 		periodTimestamp = getPeriodTimeDelta(currentPeriod);
 
-		applyDemurrage();
 		currentDemurrageAmount = demurrageAmount; 
 
 		demurrageCounts = demurrageCycles(periodTimestamp);
 		if (demurrageCounts > 0) {
-			nextRedistributionDemurrage = growBy(currentDemurrageAmount, demurrageCounts) / ppmDivider;
+			nextRedistributionDemurrage = growBy(currentDemurrageAmount, demurrageCounts);
 		} else {
-			nextRedistributionDemurrage = currentDemurrageAmount / ppmDivider;
+			nextRedistributionDemurrage = currentDemurrageAmount;
 		}
 		
 		nextRedistribution = toRedistribution(0, nextRedistributionDemurrage, totalSupply, nextPeriod);
 		redistributions.push(nextRedistribution);
 
-		applyDefaultRedistribution(currentRedistribution);
+		applyDefaultRedistribution(nextRedistribution);
 		emit Period(nextPeriod);
 		return true;
 	}
@@ -344,33 +381,32 @@ contract DemurrageTokenSingleNocap {
 		uint256 valueFactor;
 		uint256 truncatedTaxLevel;
 	      
-		valueFactor = 1000000;
-		truncatedTaxLevel = taxLevel / ppmDivider;
+		valueFactor = growthResolutionFactor;
+		truncatedTaxLevel = taxLevel / nanoDivider;
 
 		for (uint256 i = 0; i < _period; i++) {
-			valueFactor = valueFactor + ((valueFactor * truncatedTaxLevel) / 1000000);
+			valueFactor = valueFactor + ((valueFactor * truncatedTaxLevel) / growthResolutionFactor);
 		}
-		return (valueFactor * _value) / 1000000;
+		return (valueFactor * _value) / growthResolutionFactor;
 	}
 
 	// Calculate a value reduced by demurrage by the given period
-	// TODO: higher precision if possible
 	function decayBy(uint256 _value, uint256 _period) public view returns (uint256) {
 		uint256 valueFactor;
 		uint256 truncatedTaxLevel;
 	      
-		valueFactor = 1000000;
-		truncatedTaxLevel = taxLevel / ppmDivider;
+		valueFactor = growthResolutionFactor;
+		truncatedTaxLevel = taxLevel / nanoDivider;
 
 		for (uint256 i = 0; i < _period; i++) {
-			valueFactor = valueFactor - ((valueFactor * truncatedTaxLevel) / 1000000);
+			valueFactor = valueFactor - ((valueFactor * truncatedTaxLevel) / growthResolutionFactor);
 		}
-		return (valueFactor * _value) / 1000000;
+		return (valueFactor * _value) / growthResolutionFactor;
 	}
 
 	// Inflates the given amount according to the current demurrage modifier
 	function toBaseAmount(uint256 _value) public view returns (uint256) {
-		return (_value * ppmDivider * 1000000) / demurrageAmount;
+		return (_value * resolutionFactor) / demurrageAmount;
 	}
 
 	// Implements ERC20, triggers tax and/or redistribution
@@ -398,7 +434,6 @@ contract DemurrageTokenSingleNocap {
 		return result;
 	}
 
-
 	// Implements ERC20, triggers tax and/or redistribution
 	function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
 		uint256 baseValue;
@@ -421,7 +456,7 @@ contract DemurrageTokenSingleNocap {
 		decreaseBaseBalance(_from, _value);
 		increaseBaseBalance(_to, _value);
 
-		period = actualPeriod();
+		//period = actualPeriod();
 		return true;
 	}
 

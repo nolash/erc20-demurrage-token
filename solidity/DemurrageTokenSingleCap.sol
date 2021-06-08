@@ -14,10 +14,6 @@ contract DemurrageTokenSingleCap {
 	uint8 constant shiftRedistributionDemurrage	= 104;
 	uint256 constant maskRedistributionDemurrage	= 0x000000ffffffffffffffffffffffffffffffff00000000000000000000000000; // ((1 << 20) - 1) << 140
 
-	uint8 constant shiftRedistributionIsUsed	= 255;
-	uint256 constant maskRedistributionIsUsed	= 0x4000000000000000000000000000000000000000000000000000000000000000; // 1 << 255
-
-
 	// Account balances
 	mapping (address => uint256) account;
 	
