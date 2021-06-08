@@ -17,7 +17,7 @@ settings.symbol = 'SIM'
 settings.decimals = 6
 settings.demurrage_level = int(decay_per_minute*(10**38))
 #settings.period_minutes = 1 # 1 week in minutes
-settings.period_minutes = 60*24*7
+settings.period_minutes = 10
 chain = 'evm:foochain:42'
 cap = (10 ** 6) * (10 ** 12)
 
@@ -61,8 +61,8 @@ frontend_demurrage = 1.0 - ((1 - decay_per_minute) ** minutes)   # corresponding
 demurrage_delta = contract_demurrage - frontend_demurrage      # difference between demurrage in contract and demurrage calculated in frontend
 
 alice_checksum = 50000000 - (50000000 * frontend_demurrage) + (200000000 * frontend_demurrage) # alice's balance calculated with frontend demurrage
-print("""alice frontend balance {}
-alice contract balance {}
+#print("""alice frontend balance {}
+print("""alice contract balance {}
 frontend demurrage {:.38f}
 contract demurrage {:.38f}
 demurrage delta {:.38f}""".format(

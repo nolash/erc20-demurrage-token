@@ -60,5 +60,24 @@ class TestAmounts(TestDemurrageDefault):
         self.assert_within_lower(balance, expected_balance, 500)
 
 
+    def test_transfers(self):
+        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+        (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[1], 2000)
+        r = self.rpc.do(o)
+
+        self.backend.time_travel(self.start_time + self.period_seconds)
+
+        nonce_oracle = RPCNonceOracle(self.accounts[1], self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+        (tx_hash, o) = c.transfer(self.address, self.accounts[1], self.accounts[2], 500)
+        r = self.rpc.do(o)
+     
+        o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        balance = c.parse_balance_of(r)
+        self.assertEqual(balance, 817)
+
+
 if __name__ == '__main__':
     unittest.main()
