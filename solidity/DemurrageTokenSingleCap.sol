@@ -206,7 +206,7 @@ contract DemurrageTokenSingleCap {
 		require(_amount + totalSupply <= supplyCap, 'ERR_CAP');
 
 		changePeriod();
-		baseAmount = _amount;
+		baseAmount = toBaseAmount(_amount);
 		totalSupply += _amount;
 		increaseBaseBalance(_beneficiary, baseAmount);
 		emit Mint(msg.sender, _beneficiary, _amount);
@@ -350,6 +350,7 @@ contract DemurrageTokenSingleCap {
 		uint256 periodTimestamp;
 		uint256 nextPeriod;
 
+		applyDemurrage();
 		currentRedistribution = checkPeriod();
 		if (currentRedistribution == bytes32(0x00)) {
 			return false;
@@ -359,7 +360,6 @@ contract DemurrageTokenSingleCap {
 		nextPeriod = currentPeriod + 1;
 		periodTimestamp = getPeriodTimeDelta(currentPeriod);
 
-		applyDemurrage();
 		currentDemurrageAmount = demurrageAmount; 
 
 		demurrageCounts = demurrageCycles(periodTimestamp);

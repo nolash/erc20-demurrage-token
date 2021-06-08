@@ -102,5 +102,6 @@ class TestPeriod(TestDemurrageDefault):
         period = int(period) * (10 ** (38 - 9))
         self.assertEqual(modifier, period)
 
+
 if __name__ == '__main__':
     unittest.main()
