@@ -310,7 +310,7 @@ contract DemurrageTokenSingleCap {
 
 	// Calculate and cache the demurrage value corresponding to the (period of the) time of the method call
 	function applyDemurrage() public returns (bool) {
-		uint128 epochPeriodCount;
+		//uint128 epochPeriodCount;
 		uint256 periodCount;
 		uint256 lastDemurrageAmount;
 
