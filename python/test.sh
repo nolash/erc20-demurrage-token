@@ -8,6 +8,7 @@ modes=(MultiNocap MultiCap SingleCap SingleNocap)
 for m in ${modes[@]}; do
 	ERC20_DEMURRAGE_TOKEN_TEST_MODE=$m python tests/test_period.py
 	ERC20_DEMURRAGE_TOKEN_TEST_MODE=$m python tests/test_basic.py
+	ERC20_DEMURRAGE_TOKEN_TEST_MODE=$m python tests/test_growth.py
 done
 
 modes=(MultiCap SingleCap)

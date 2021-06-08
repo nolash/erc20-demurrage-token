@@ -52,6 +52,9 @@ contract DemurrageTokenSingleCap {
 	// (this constant x 1000000 is contained within 128 bits)
 	uint256 constant nanoDivider = 100000000000000000000000000; // now nanodivider, 6 zeros less
 
+	// remaining decimal positions of nanoDivider to reach 38, equals precision in growth and decay
+	uint256 constant growthResolutionFactor = 1000000000000;
+
 	// Timestamp of start of periods (time which contract constructor was called)
 	uint256 public immutable periodStart;
 
@@ -60,7 +63,7 @@ contract DemurrageTokenSingleCap {
 
 	// Demurrage in ppm per minute
 	uint256 public immutable taxLevel;
-
+		
 	// Addresses allowed to mint new tokens
 	mapping (address => bool) minter;
 
@@ -271,7 +274,7 @@ contract DemurrageTokenSingleCap {
 	}
 
 	function getDistribution(uint256 _supply, uint256 _demurrageAmount) public view returns (uint256) {
-		return _supply * (nanoDivider - (_demurrageAmount / 1000000000000));
+		return _supply * (nanoDivider - (_demurrageAmount / nanoDivider));
 	}
 
 	// Returns the amount sent to the sink address
@@ -364,33 +367,32 @@ contract DemurrageTokenSingleCap {
 		uint256 valueFactor;
 		uint256 truncatedTaxLevel;
 	      
-		valueFactor = 1000000;
-		truncatedTaxLevel = taxLevel / (nanoDivider * 1000000);
+		valueFactor = growthResolutionFactor;
+		truncatedTaxLevel = taxLevel / nanoDivider;
 
 		for (uint256 i = 0; i < _period; i++) {
-			valueFactor = valueFactor + ((valueFactor * truncatedTaxLevel) / 1000000);
+			valueFactor = valueFactor + ((valueFactor * truncatedTaxLevel) / growthResolutionFactor);
 		}
-		return (valueFactor * _value) / 1000000;
+		return (valueFactor * _value) / growthResolutionFactor;
 	}
 
 	// Calculate a value reduced by demurrage by the given period
-	// TODO: higher precision if possible
 	function decayBy(uint256 _value, uint256 _period) public view returns (uint256) {
 		uint256 valueFactor;
 		uint256 truncatedTaxLevel;
 	      
-		valueFactor = 1000000;
-		truncatedTaxLevel = taxLevel / (nanoDivider * 1000000);
+		valueFactor = growthResolutionFactor;
+		truncatedTaxLevel = taxLevel / nanoDivider;
 
 		for (uint256 i = 0; i < _period; i++) {
-			valueFactor = valueFactor - ((valueFactor * truncatedTaxLevel) / 1000000);
+			valueFactor = valueFactor - ((valueFactor * truncatedTaxLevel) / growthResolutionFactor);
 		}
-		return (valueFactor * _value) / 1000000;
+		return (valueFactor * _value) / growthResolutionFactor;
 	}
 
 	// Inflates the given amount according to the current demurrage modifier
 	function toBaseAmount(uint256 _value) public view returns (uint256) {
-		return (_value * nanoDivider * 1000000000000) / demurrageAmount;
+		return (_value * nanoDivider * growthResolutionFactor) / demurrageAmount;
 	}
 
 	// Implements ERC20, triggers tax and/or redistribution
