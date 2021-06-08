@@ -17,9 +17,10 @@ settings.symbol = 'SIM'
 settings.decimals = 6
 settings.demurrage_level = int(decay_per_minute*(10**38))
 #settings.period_minutes = 1 # 1 week in minutes
-settings.period_minutes = 10
+settings.period_minutes = 60*24*7
 chain = 'evm:foochain:42'
 cap = (10 ** 6) * (10 ** 12)
+#cap = 0
 
 # instantiate simulation
 sim = DemurrageTokenSimulation(chain, settings, redistribute=False, cap=cap, actors=10)

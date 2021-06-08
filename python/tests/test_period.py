@@ -70,10 +70,10 @@ class TestPeriod(TestDemurrageDefault):
         # allow test code float rounding error to billionth
         modifier = (1 - (self.tax_level / 1000000)) ** (self.period_seconds / 60)
         modifier *= 10 ** 9 
-        modifier = int(modifier) * (10 ** (38 - 9))
+        modifier = int(modifier) * (10 ** (28 - 9))
 
-        period /= (10 ** (38 - 9))
-        period = int(period) * (10 ** (38 - 9))
+        period /= (10 ** (28 - 9))
+        period = int(period) * (10 ** (28 - 9))
         self.assertEqual(modifier, period)
 
         self.backend.time_travel(self.start_time + self.period_seconds * 2)
@@ -96,10 +96,10 @@ class TestPeriod(TestDemurrageDefault):
         # allow test code float rounding error to billionth
         modifier = (1 - (self.tax_level / 1000000)) ** ((self.period_seconds * 2) / 60)
         modifier *= 10 ** 9 
-        modifier = int(modifier) * (10 ** (38 - 9))
+        modifier = int(modifier) * (10 ** (28 - 9))
 
-        period /= (10 ** (38 - 9))
-        period = int(period) * (10 ** (38 - 9))
+        period /= (10 ** (28 - 9))
+        period = int(period) * (10 ** (28 - 9))
         self.assertEqual(modifier, period)
 
 

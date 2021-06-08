@@ -12,11 +12,7 @@ contract DemurrageTokenSingleCap {
 	uint8 constant shiftRedistributionValue 	= 32;
 	uint256 constant maskRedistributionValue	= 0x00000000000000000000000000000000000000ffffffffffffffffff00000000; // ((1 << 72) - 1) << 32
 	uint8 constant shiftRedistributionDemurrage	= 104;
-	uint256 constant maskRedistributionDemurrage	= 0x000000ffffffffffffffffffffffffffffffff00000000000000000000000000; // ((1 << 20) - 1) << 140
-
-	uint8 constant shiftRedistributionIsUsed	= 255;
-	uint256 constant maskRedistributionIsUsed	= 0x4000000000000000000000000000000000000000000000000000000000000000; // 1 << 255
-
+	uint256 constant maskRedistributionDemurrage	= 0x0000000000ffffffffffffffffffffffffffff00000000000000000000000000; // ((1 << 20) - 1) << 140
 
 	// Account balances
 	mapping (address => uint256) account;
@@ -116,7 +112,8 @@ contract DemurrageTokenSingleCap {
 		periodStart = demurrageTimestamp;
 		periodDuration = _periodMinutes * 60;
 		//demurrageAmount = 100000000000000000000000000000000000000 - _taxLevelMinute; // Represents 38 decimal places, same as resolutionFactor
-		demurrageAmount = 100000000000000000000000000000000000000;
+		//demurrageAmount = 100000000000000000000000000000000000000;
+		demurrageAmount = 10000000000000000000000000000;
 		//demurragePeriod = 1;
 		taxLevel = _taxLevelMinute; // Represents 38 decimal places
 		bytes32 initialRedistribution = toRedistribution(0, demurrageAmount, 0, 1);
@@ -152,7 +149,8 @@ contract DemurrageTokenSingleCap {
 		//periodCount = actualPeriod() - demurragePeriod; 
 		periodCount = getMinutesDelta(demurrageTimestamp);
 
-		currentDemurragedAmount = uint128(decayBy(demurrageAmount, periodCount));
+		//currentDemurragedAmount = uint128(decayBy(demurrageAmount, periodCount));
+		currentDemurragedAmount = uint128(decayBy(demurrageAmount * 10000000000, periodCount));
 
 		return (baseBalance * currentDemurragedAmount) / (nanoDivider * 1000000000000);
 	}
@@ -406,7 +404,8 @@ contract DemurrageTokenSingleCap {
 
 	// Inflates the given amount according to the current demurrage modifier
 	function toBaseAmount(uint256 _value) public view returns (uint256) {
-		return (_value * resolutionFactor) / demurrageAmount;
+		//return (_value * resolutionFactor) / demurrageAmount;
+		return (_value * resolutionFactor) / (demurrageAmount * 10000000000);
 	}
 
 	// Implements ERC20, triggers tax and/or redistribution

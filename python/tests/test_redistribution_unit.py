@@ -36,21 +36,23 @@ class TestRedistribution(TestDemurrageUnit):
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
-        demurrage = (1 - (self.tax_level / 1000000)) * (10**38)
+        #demurrage = (1 - (self.tax_level / 1000000)) * (10**38)
+        demurrage = (1 - (self.tax_level / 1000000)) * (10**28)
         supply = self.default_supply
 
         o = c.get_distribution(self.address, supply, demurrage, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         distribution = c.parse_get_distribution(r)
         expected_distribution = self.default_supply * (self.tax_level / 1000000)
-        self.assertEqual(distribution, expected_distribution)
+        self.assert_within_lower(distribution, expected_distribution, 1000)
 
 
     def test_distribution_from_redistribution(self):
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
-        demurrage = (1 - (self.tax_level / 1000000)) * (10**38)
+        #demurrage = (1 - (self.tax_level / 1000000)) * (10**38)
+        demurrage = (1 - (self.tax_level / 1000000)) * (10**28)
         supply = self.default_supply
 
         o = c.to_redistribution(self.address, 0, demurrage, supply, 1, sender_address=self.accounts[0])
@@ -60,8 +62,7 @@ class TestRedistribution(TestDemurrageUnit):
         r = self.rpc.do(o)
         distribution = c.parse_get_distribution(r)
         expected_distribution = self.default_supply * (self.tax_level / 1000000)
-        self.assertEqual(distribution, expected_distribution)
-
+        self.assert_within_lower(distribution, expected_distribution, 1000)
 
 
     def test_single_step(self):
