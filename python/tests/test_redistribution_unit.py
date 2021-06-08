@@ -31,39 +31,39 @@ testdir = os.path.dirname(__file__)
 
 class TestRedistribution(TestDemurrageUnit):
 
-    # TODO: move to "pure" test file when getdistribution is implemented in all contracts
-    def test_distribution(self):
-        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
-        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
-
-        demurrage = (1 - (self.tax_level / 1000000)) * (10**38)
-        supply = self.default_supply
-
-        o = c.get_distribution(self.address, supply, demurrage, sender_address=self.accounts[0])
-        r = self.rpc.do(o)
-        distribution = c.parse_get_distribution(r)
-        expected_distribution = self.default_supply * (self.tax_level / 1000000)
-        self.assertEqual(distribution, expected_distribution)
-
-
-    def test_distribution_from_redistribution(self):
-        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
-        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
-
-        demurrage = (1 - (self.tax_level / 1000000)) * (10**38)
-        supply = self.default_supply
-
-        o = c.to_redistribution(self.address, 0, demurrage, supply, 1, sender_address=self.accounts[0])
-        redistribution = self.rpc.do(o)
-
-        o = c.get_distribution_from_redistribution(self.address, redistribution, self.accounts[0])
-        r = self.rpc.do(o)
-        distribution = c.parse_get_distribution(r)
-        expected_distribution = self.default_supply * (self.tax_level / 1000000)
-        self.assertEqual(distribution, expected_distribution)
-
-
-
+#    # TODO: move to "pure" test file when getdistribution is implemented in all contracts
+#    def test_distribution(self):
+#        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+#        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+#
+#        demurrage = (1 - (self.tax_level / 1000000)) * (10**38)
+#        supply = self.default_supply
+#
+#        o = c.get_distribution(self.address, supply, demurrage, sender_address=self.accounts[0])
+#        r = self.rpc.do(o)
+#        distribution = c.parse_get_distribution(r)
+#        expected_distribution = self.default_supply * (self.tax_level / 1000000)
+#        self.assertEqual(distribution, expected_distribution)
+#
+#
+#    def test_distribution_from_redistribution(self):
+#        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+#        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+#
+#        demurrage = (1 - (self.tax_level / 1000000)) * (10**38)
+#        supply = self.default_supply
+#
+#        o = c.to_redistribution(self.address, 0, demurrage, supply, 1, sender_address=self.accounts[0])
+#        redistribution = self.rpc.do(o)
+#
+#        o = c.get_distribution_from_redistribution(self.address, redistribution, self.accounts[0])
+#        r = self.rpc.do(o)
+#        distribution = c.parse_get_distribution(r)
+#        expected_distribution = self.default_supply * (self.tax_level / 1000000)
+#        self.assertEqual(distribution, expected_distribution)
+#
+#
+#
 #    def test_single_step(self):
 #        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
 #        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
@@ -137,6 +137,10 @@ class TestRedistribution(TestDemurrageUnit):
         r = self.rpc.do(o)
         self.assertEqual(r['status'], 1)
 
+        # check that we have crossed into new period, this will throw if not
+        o = c.redistributions(self.address, 1, sender_address=self.accounts[0])
+        self.rpc.do(o)
+
         demurrage_amount = int((self.tax_level / 1000000) * mint_amount)
 
         expected_balance = mint_amount - demurrage_amount
@@ -181,8 +185,7 @@ class TestRedistribution(TestDemurrageUnit):
         o = c.balance_of(self.address, self.sink_address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         balance = c.parse_balance_of(r)
-        self.assertGreaterEqual(balance, expected_balance - expected_balance_tolerance)
-        self.assertLessEqual(balance, expected_balance)
+        self.assert_within_lower(balance, expected_balance, 1000)
 
 
 if __name__ == '__main__':

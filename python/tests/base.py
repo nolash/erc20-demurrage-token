@@ -19,9 +19,7 @@ from erc20_demurrage_token import (
         DemurrageToken,
         )
 
-
 logg = logging.getLogger()
-
 
 #BLOCKTIME = 5 # seconds
 TAX_LEVEL = int(10000 * 2) # 2%
