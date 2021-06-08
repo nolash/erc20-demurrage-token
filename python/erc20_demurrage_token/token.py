@@ -357,6 +357,23 @@ class DemurrageToken(ERC20):
         return o
 
 
+    def get_distribution(self, contract_address, supply, demurrage_amount, sender_address=ZERO_ADDRESS):
+        o = jsonrpc_template()
+        o['method'] = 'eth_call'
+        enc = ABIContractEncoder()
+        enc.method('getDistribution')
+        enc.typ(ABIContractType.UINT256)
+        enc.typ(ABIContractType.UINT256)
+        enc.uint256(supply)
+        enc.uint256(demurrage_amount)
+        data = add_0x(enc.get())
+        tx = self.template(sender_address, contract_address)
+        tx = self.set_code(tx, data)
+        o['params'].append(self.normalize(tx))
+        o['params'].append('latest')
+        return o
+
+
     @classmethod
     def parse_actual_period(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)
@@ -418,4 +435,9 @@ class DemurrageToken(ERC20):
 
     @classmethod
     def parse_decay_by(self, v):
+        return abi_decode_single(ABIContractType.UINT256, v)
+
+
+    @classmethod
+    def parse_get_distribution(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)

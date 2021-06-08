@@ -60,7 +60,7 @@ class TestDemurrage(EthTesterCase):
         except TypeError:
             self.start_time = int(r['timestamp'])
 
-        self.default_supply = 1000000000000
+        self.default_supply = 10 ** 12
         self.default_supply_cap = int(self.default_supply * 10)
 
 

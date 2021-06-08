@@ -8,7 +8,7 @@ from erc20_demurrage_token.sim import DemurrageTokenSimulation
 logging.basicConfig(level=logging.INFO)
 logg = logging.getLogger()
 
-decay_per_minute = 0.00050105908373373 # equals approx 2% per month
+decay_per_minute = 0.00000050105908373373 # equals approx 2% per month
 
 # parameters for simulation object
 settings = DemurrageTokenSettings()

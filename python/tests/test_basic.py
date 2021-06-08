@@ -55,7 +55,7 @@ class TestBasic(TestDemurrageDefault):
 
 
     def test_apply_demurrage(self):
-        modifier = 10 * (10 ** 37)
+        modifier = (10 ** 38)
 
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)

@@ -6,13 +6,13 @@ contract DemurrageTokenSingleCap {
 
 	// Redistribution bit field, with associated shifts and masks
 	// (Uses sub-byte boundaries)
-	bytes32[] public redistributions; // uint95(unused) | uint20(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
+	bytes32[] public redistributions; // uint51(unused) | uint64(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
 	uint8 constant shiftRedistributionPeriod 	= 0;
 	uint256 constant maskRedistributionPeriod 	= 0x00000000000000000000000000000000000000000000000000000000ffffffff; // (1 << 32) - 1
 	uint8 constant shiftRedistributionValue 	= 32;
 	uint256 constant maskRedistributionValue	= 0x00000000000000000000000000000000000000ffffffffffffffffff00000000; // ((1 << 72) - 1) << 32
-	uint8 constant shiftRedistributionDemurrage	= 140;
-	uint256 constant maskRedistributionDemurrage	= 0x000000000000000000000ffffffff00000000000000000000000000000000000; // ((1 << 20) - 1) << 140
+	uint8 constant shiftRedistributionDemurrage	= 104;
+	uint256 constant maskRedistributionDemurrage	= 0x000000ffffffffffffffffffffffffffffffff00000000000000000000000000; // ((1 << 20) - 1) << 140
 
 	// Account balances
 	mapping (address => uint256) account;
@@ -54,6 +54,9 @@ contract DemurrageTokenSingleCap {
 
 	// remaining decimal positions of nanoDivider to reach 38, equals precision in growth and decay
 	uint256 constant growthResolutionFactor = 1000000000000;
+
+	// demurrage decimal width; 38 places
+	uint256 immutable resolutionFactor = nanoDivider * growthResolutionFactor; 
 
 	// Timestamp of start of periods (time which contract constructor was called)
 	uint256 public immutable periodStart;
@@ -111,10 +114,10 @@ contract DemurrageTokenSingleCap {
 		demurrageTimestamp = block.timestamp;
 		periodStart = demurrageTimestamp;
 		periodDuration = _periodMinutes * 60;
-		demurrageAmount = uint128(nanoDivider * 1000000000000); // Represents 38 decimal places
+		demurrageAmount = 100000000000000000000000000000000000000; // Represents 38 decimal places, same as resolutionFactor
 		//demurragePeriod = 1;
 		taxLevel = _taxLevelMinute; // Represents 38 decimal places
-		bytes32 initialRedistribution = toRedistribution(0, 10000000000000000000, 0, 1);
+		bytes32 initialRedistribution = toRedistribution(0, nanoDivider, 0, 1);
 		redistributions.push(initialRedistribution);
 
 		// Misc settings
@@ -246,7 +249,8 @@ contract DemurrageTokenSingleCap {
 		uint256 currentRedistribution;
 		uint256 grownSupply;
 
-		grownSupply = growBy(totalSupply, 1);
+		//grownSupply = growBy(totalSupply, 1);
+		grownSupply = totalSupply;
 		currentRedistribution = uint256(redistributions[redistributions.length-1]);
 		currentRedistribution &= (~maskRedistributionValue);
 		currentRedistribution |= (grownSupply << shiftRedistributionValue);
@@ -280,10 +284,15 @@ contract DemurrageTokenSingleCap {
 	// Returns the amount sent to the sink address
 	function applyDefaultRedistribution(bytes32 _redistribution) private returns (uint256) {
 		uint256 redistributionSupply;
+		uint256 redistributionDemurrage;
 		uint256 unit;
 
 		redistributionSupply = toRedistributionSupply(_redistribution);
-		unit = getDistribution(redistributionSupply, demurrageAmount);
+		redistributionDemurrage = resolutionFactor - toRedistributionDemurrageModifier(_redistribution);
+		if (redistributionDemurrage == 0) {
+			return 0;
+		}
+		unit = getDistribution(redistributionSupply, redistributionDemurrage);
 		increaseBaseBalance(sinkAddress, toBaseAmount(unit / nanoDivider));
 		return unit;
 	}
@@ -349,9 +358,9 @@ contract DemurrageTokenSingleCap {
 
 		demurrageCounts = demurrageCycles(periodTimestamp);
 		if (demurrageCounts > 0) {
-			nextRedistributionDemurrage = growBy(currentDemurrageAmount, demurrageCounts) / nanoDivider;
+			nextRedistributionDemurrage = growBy(currentDemurrageAmount, demurrageCounts);
 		} else {
-			nextRedistributionDemurrage = currentDemurrageAmount / nanoDivider;
+			nextRedistributionDemurrage = currentDemurrageAmount;
 		}
 		
 		nextRedistribution = toRedistribution(0, nextRedistributionDemurrage, totalSupply, nextPeriod);
