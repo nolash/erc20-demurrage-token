@@ -208,6 +208,28 @@ class DemurrageToken(ERC20):
         return o
 
 
+    def to_redistribution(self, contract_address, participants, demurrage_modifier_ppm, value, period, sender_address=ZERO_ADDRESS):
+        o = jsonrpc_template()
+        o['method'] = 'eth_call'
+        enc = ABIContractEncoder()
+        enc.method('toRedistribution')
+        enc.typ(ABIContractType.UINT256)
+        enc.typ(ABIContractType.UINT256)
+        enc.typ(ABIContractType.UINT256)
+        enc.typ(ABIContractType.UINT256)
+        enc.uint256(participants)
+        enc.uint256(demurrage_modifier_ppm)
+        enc.uint256(value)
+        enc.uint256(period)
+        data = add_0x(enc.get())
+        tx = self.template(sender_address, contract_address)
+        tx = self.set_code(tx, data)
+        o['params'].append(self.normalize(tx))
+        o['params'].append('latest')
+        return o
+
+
+
     def to_redistribution_period(self, contract_address, redistribution, sender_address=ZERO_ADDRESS):
         o = jsonrpc_template()
         o['method'] = 'eth_call'
@@ -301,7 +323,7 @@ class DemurrageToken(ERC20):
         tx = self.set_code(tx, data)
         tx = self.finalize(tx, tx_format)
         return tx
-       
+    
 
     def actual_period(self, contract_address, sender_address=ZERO_ADDRESS):
         return self.call_noarg('actualPeriod', contract_address, sender_address=sender_address)
@@ -372,6 +394,22 @@ class DemurrageToken(ERC20):
         o['params'].append(self.normalize(tx))
         o['params'].append('latest')
         return o
+
+
+    def get_distribution_from_redistribution(self, contract_address, redistribution, sender_address=ZERO_ADDRESS):
+        o = jsonrpc_template()
+        o['method'] = 'eth_call'
+        enc = ABIContractEncoder()
+        enc.method('getDistributionFromRedistribution')
+        enc.typ(ABIContractType.BYTES32)
+        enc.bytes32(redistribution)
+        data = add_0x(enc.get())
+        tx = self.template(sender_address, contract_address)
+        tx = self.set_code(tx, data)
+        o['params'].append(self.normalize(tx))
+        o['params'].append('latest')
+        return o
+
 
 
     @classmethod

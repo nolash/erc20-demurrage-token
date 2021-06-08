@@ -52,69 +52,69 @@ class TestBasic(TestDemurrageDefault):
 #        r = self.rpc.do(o)
 #        balance = c.parse_balance_of(r)
 #        self.assertEqual(balance, 1024)
-
-
-    def test_apply_demurrage(self):
-        modifier = (10 ** 38)
-
-        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
-        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
-
-        o = c.demurrage_amount(self.address, sender_address=self.accounts[0])
-        r = self.rpc.do(o)
-        demurrage_amount = c.parse_demurrage_amount(r)
-        self.assertEqual(modifier, demurrage_amount)
-
-        o = block_latest()
-        r = self.rpc.do(o)
-        o = block_by_number(r)
-        b = self.rpc.do(o)
-        logg.debug('block {} start {}'.format(b['timestamp'], self.start_time))
-
-        self.backend.time_travel(self.start_time + 2)
-        (tx_hash, o) = c.apply_demurrage(self.address, sender_address=self.accounts[0])
-        r = self.rpc.do(o)
-        o = receipt(tx_hash)
-        r = self.rpc.do(o)
-        self.assertEqual(r['status'], 1)
-
-        o = c.demurrage_amount(self.address, sender_address=self.accounts[0])
-        r = self.rpc.do(o)
-        demurrage_amount = c.parse_demurrage_amount(r)
-        self.assertEqual(modifier, demurrage_amount)
-
-        self.backend.time_travel(self.start_time + 61)
-        (tx_hash, o) = c.apply_demurrage(self.address, sender_address=self.accounts[0])
-        r = self.rpc.do(o)
-        o = receipt(tx_hash)
-        r = self.rpc.do(o)
-        self.assertEqual(r['status'], 1)
-        o = c.demurrage_amount(self.address, sender_address=self.accounts[0])
-        r = self.rpc.do(o)
-        demurrage_amount = c.parse_demurrage_amount(r)
-        modifier_base = 1000000 - self.tax_level
-        logg.debug('modifier base {}'.format(modifier_base))
-        modifier = int(modifier_base * (10 ** 32)) # 38 decimal places minus 6 (1000000)
-        self.assertEqual(modifier, demurrage_amount)
-
-        self.backend.time_travel(self.start_time + 601)
-        (tx_hash, o) = c.apply_demurrage(self.address, sender_address=self.accounts[0])
-        r = self.rpc.do(o)
-        o = receipt(tx_hash)
-        r = self.rpc.do(o)
-        self.assertEqual(r['status'], 1)
-        o = c.demurrage_amount(self.address, sender_address=self.accounts[0])
-        r = self.rpc.do(o)
-        demurrage_amount = c.parse_demurrage_amount(r)
-        modifier_base = ((1000000 - self.tax_level) / 1000000) ** 10
-        modifier = int(modifier_base * (10 ** 12))
-
-        rounding_tolerance_nano = 4000000 # 0.000004% precision
-        demurrage_amount_truncate = int(demurrage_amount / (10 ** 26)) # equals 12 decimal places
-        self.assertGreaterEqual(modifier, demurrage_amount_truncate - rounding_tolerance_nano)
-        self.assertLessEqual(modifier, demurrage_amount_truncate)
-
-
+#
+#
+#    def test_apply_demurrage(self):
+#        modifier = (10 ** 38)
+#
+#        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+#        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+#
+#        o = c.demurrage_amount(self.address, sender_address=self.accounts[0])
+#        r = self.rpc.do(o)
+#        demurrage_amount = c.parse_demurrage_amount(r)
+#        self.assertEqual(modifier, demurrage_amount)
+#
+#        o = block_latest()
+#        r = self.rpc.do(o)
+#        o = block_by_number(r)
+#        b = self.rpc.do(o)
+#        logg.debug('block {} start {}'.format(b['timestamp'], self.start_time))
+#
+#        self.backend.time_travel(self.start_time + 2)
+#        (tx_hash, o) = c.apply_demurrage(self.address, sender_address=self.accounts[0])
+#        r = self.rpc.do(o)
+#        o = receipt(tx_hash)
+#        r = self.rpc.do(o)
+#        self.assertEqual(r['status'], 1)
+#
+#        o = c.demurrage_amount(self.address, sender_address=self.accounts[0])
+#        r = self.rpc.do(o)
+#        demurrage_amount = c.parse_demurrage_amount(r)
+#        self.assertEqual(modifier, demurrage_amount)
+#
+#        self.backend.time_travel(self.start_time + 61)
+#        (tx_hash, o) = c.apply_demurrage(self.address, sender_address=self.accounts[0])
+#        r = self.rpc.do(o)
+#        o = receipt(tx_hash)
+#        r = self.rpc.do(o)
+#        self.assertEqual(r['status'], 1)
+#        o = c.demurrage_amount(self.address, sender_address=self.accounts[0])
+#        r = self.rpc.do(o)
+#        demurrage_amount = c.parse_demurrage_amount(r)
+#        modifier_base = 1000000 - self.tax_level
+#        logg.debug('modifier base {}'.format(modifier_base))
+#        modifier = int(modifier_base * (10 ** 32)) # 38 decimal places minus 6 (1000000)
+#        self.assertEqual(modifier, demurrage_amount)
+#
+#        self.backend.time_travel(self.start_time + 601)
+#        (tx_hash, o) = c.apply_demurrage(self.address, sender_address=self.accounts[0])
+#        r = self.rpc.do(o)
+#        o = receipt(tx_hash)
+#        r = self.rpc.do(o)
+#        self.assertEqual(r['status'], 1)
+#        o = c.demurrage_amount(self.address, sender_address=self.accounts[0])
+#        r = self.rpc.do(o)
+#        demurrage_amount = c.parse_demurrage_amount(r)
+#        modifier_base = ((1000000 - self.tax_level) / 1000000) ** 10
+#        modifier = int(modifier_base * (10 ** 12))
+#
+#        rounding_tolerance_nano = 4000000 # 0.000004% precision
+#        demurrage_amount_truncate = int(demurrage_amount / (10 ** 26)) # equals 12 decimal places
+#        self.assertGreaterEqual(modifier, demurrage_amount_truncate - rounding_tolerance_nano)
+#        self.assertLessEqual(modifier, demurrage_amount_truncate)
+#
+#
 #    def test_mint(self):
 #        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
 #        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
@@ -201,21 +201,21 @@ class TestBasic(TestDemurrageDefault):
 #        self.assertEqual(r['status'], 0)
 #            
 #
-#    def test_base_amount(self):
-#        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
-#        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
-#
-#        (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[1], 1024)
-#        self.rpc.do(o)
-#
-#        self.backend.time_travel(self.start_time + 61)
-#        (tx_hash, o) = c.apply_demurrage(self.address, sender_address=self.accounts[0])
-#        r = self.rpc.do(o)
-#        o = c.to_base_amount(self.address, 1000, sender_address=self.accounts[0])
-#        r = self.rpc.do(o)
-#        amount = c.parse_to_base_amount(r)
-#        self.assertEqual(amount, 1020)
-#
+    def test_base_amount(self):
+        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+
+        (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[1], 1024)
+        self.rpc.do(o)
+
+        self.backend.time_travel(self.start_time + 61)
+        (tx_hash, o) = c.apply_demurrage(self.address, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        o = c.to_base_amount(self.address, 1000, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        amount = c.parse_to_base_amount(r)
+        self.assertEqual(amount, 1020)
+
 #
 #    def test_transfer(self):
 #        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)

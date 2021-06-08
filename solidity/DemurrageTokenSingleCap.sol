@@ -100,7 +100,7 @@ contract DemurrageTokenSingleCap {
 	// EIP173
 	event OwnershipTransferred(address indexed previousOwner, address indexed newOwner); // EIP173
 
-	constructor(string memory _name, string memory _symbol, uint8 _decimals, uint256 _taxLevelMinute, uint256 _periodMinutes, address _defaultSinkAddress, uint256 _supplyCap) public {
+	constructor(string memory _name, string memory _symbol, uint8 _decimals, uint128 _taxLevelMinute, uint256 _periodMinutes, address _defaultSinkAddress, uint256 _supplyCap) public {
 		// ACL setup
 		owner = msg.sender;
 		minter[owner] = true;
@@ -114,10 +114,11 @@ contract DemurrageTokenSingleCap {
 		demurrageTimestamp = block.timestamp;
 		periodStart = demurrageTimestamp;
 		periodDuration = _periodMinutes * 60;
-		demurrageAmount = 100000000000000000000000000000000000000; // Represents 38 decimal places, same as resolutionFactor
+		//demurrageAmount = 100000000000000000000000000000000000000 - _taxLevelMinute; // Represents 38 decimal places, same as resolutionFactor
+		demurrageAmount = 100000000000000000000000000000000000000;
 		//demurragePeriod = 1;
 		taxLevel = _taxLevelMinute; // Represents 38 decimal places
-		bytes32 initialRedistribution = toRedistribution(0, nanoDivider, 0, 1);
+		bytes32 initialRedistribution = toRedistribution(0, demurrageAmount, 0, 1);
 		redistributions.push(initialRedistribution);
 
 		// Misc settings
@@ -215,7 +216,7 @@ contract DemurrageTokenSingleCap {
 
 	// Deserializes the redistribution word
 	// uint95(unused) | uint20(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
-	function toRedistribution(uint256 _participants, uint256 _demurrageModifierPpm, uint256 _value, uint256 _period) private pure returns(bytes32) {
+	function toRedistribution(uint256 _participants, uint256 _demurrageModifierPpm, uint256 _value, uint256 _period) public pure returns(bytes32) {
 		bytes32 redistribution;
 
 		redistribution |= bytes32((_demurrageModifierPpm << shiftRedistributionDemurrage) & maskRedistributionDemurrage);
@@ -278,22 +279,27 @@ contract DemurrageTokenSingleCap {
 	}
 
 	function getDistribution(uint256 _supply, uint256 _demurrageAmount) public view returns (uint256) {
-		return _supply * (nanoDivider - (_demurrageAmount / nanoDivider));
+		uint256 difference;
+
+		difference = _supply * (resolutionFactor - _demurrageAmount); //(nanoDivider - ((resolutionFactor - _demurrageAmount) / nanoDivider));
+		return difference / resolutionFactor;
+	}
+
+	function getDistributionFromRedistribution(bytes32 _redistribution) public returns (uint256) {
+		uint256 redistributionSupply;
+		uint256 redistributionDemurrage;
+
+		redistributionSupply = toRedistributionSupply(_redistribution);
+		redistributionDemurrage = toRedistributionDemurrageModifier(_redistribution);
+		return getDistribution(redistributionSupply, redistributionDemurrage);
 	}
 
 	// Returns the amount sent to the sink address
 	function applyDefaultRedistribution(bytes32 _redistribution) private returns (uint256) {
-		uint256 redistributionSupply;
-		uint256 redistributionDemurrage;
 		uint256 unit;
-
-		redistributionSupply = toRedistributionSupply(_redistribution);
-		redistributionDemurrage = resolutionFactor - toRedistributionDemurrageModifier(_redistribution);
-		if (redistributionDemurrage == 0) {
-			return 0;
-		}
-		unit = getDistribution(redistributionSupply, redistributionDemurrage);
-		increaseBaseBalance(sinkAddress, toBaseAmount(unit / nanoDivider));
+	
+		unit = getDistributionFromRedistribution(_redistribution);	
+		increaseBaseBalance(sinkAddress, toBaseAmount(unit));
 		return unit;
 	}
 
@@ -401,7 +407,7 @@ contract DemurrageTokenSingleCap {
 
 	// Inflates the given amount according to the current demurrage modifier
 	function toBaseAmount(uint256 _value) public view returns (uint256) {
-		return (_value * nanoDivider * growthResolutionFactor) / demurrageAmount;
+		return (_value * resolutionFactor) / demurrageAmount;
 	}
 
 	// Implements ERC20, triggers tax and/or redistribution
@@ -451,7 +457,7 @@ contract DemurrageTokenSingleCap {
 		decreaseBaseBalance(_from, _value);
 		increaseBaseBalance(_to, _value);
 
-		period = actualPeriod();
+		//period = actualPeriod();
 		return true;
 	}
 
