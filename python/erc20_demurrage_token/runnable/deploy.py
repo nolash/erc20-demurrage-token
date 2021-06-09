@@ -70,8 +70,8 @@ if args.vv:
 elif args.v:
     logg.setLevel(logging.INFO)
 
-block_last = args.w
 block_all = args.ww
+block_last = args.w or block_all
 
 # process config
 config = confini.Config(args.c)
