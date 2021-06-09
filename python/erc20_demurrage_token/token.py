@@ -70,7 +70,7 @@ class DemurrageToken(ERC20):
 
     @staticmethod
     def gas(code=None):
-        return 3500000
+        return 4000000
 
 
     @staticmethod
