@@ -67,18 +67,18 @@ class TestRedistributionSingle(TestDemurrageSingle):
         tax_modifier = (1 - (self.tax_level / 1000000)) ** 10
         o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
         r = self.rpc.do(o)
-        balance = c.parse_balance_of(r)
+        balance = c.parse_balance(r)
         self.assertEqual(balance, int(mint_amount * tax_modifier))
 
         o = c.balance_of(self.address, self.accounts[2], sender_address=self.accounts[0])
         r = self.rpc.do(o)
-        balance = c.parse_balance_of(r)
+        balance = c.parse_balance(r)
         base_amount = mint_amount - int(mint_amount * 0.1)
         self.assertEqual(balance, int(base_amount * tax_modifier)) #(base_amount - (base_amount * (self.tax_level / 1000000))))
 
         o = c.balance_of(self.address, self.accounts[3], sender_address=self.accounts[0])
         r = self.rpc.do(o)
-        balance = c.parse_balance_of(r)
+        balance = c.parse_balance(r)
         base_amount = mint_amount - int(mint_amount * 0.2)
         self.assertEqual(balance, int(base_amount * tax_modifier)) #(base_amount - (base_amount * (self.tax_level / 1000000))))
 
@@ -88,7 +88,7 @@ class TestRedistributionSingle(TestDemurrageSingle):
 
         o = c.balance_of(self.address, self.sink_address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
-        balance = c.parse_balance_of(r)
+        balance = c.parse_balance(r)
         expected_balance = new_supply - (new_supply * tax_modifier)
         self.assert_within_lower(balance, expected_balance, 1)
 

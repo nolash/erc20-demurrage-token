@@ -35,7 +35,7 @@ class TestAmounts(TestDemurrageDefault):
         
         o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
         r = self.rpc.do(o)
-        balance = c.parse_balance_of(r)
+        balance = c.parse_balance(r)
         self.assertEqual(balance, 817)
 
         (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[1], 1000)
@@ -43,7 +43,7 @@ class TestAmounts(TestDemurrageDefault):
 
         o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
         r = self.rpc.do(o)
-        balance = c.parse_balance_of(r)
+        balance = c.parse_balance(r)
         self.assert_within_lower(balance, 1817, 750)
 
         self.backend.time_travel(self.start_time + self.period_seconds * 2)
@@ -53,7 +53,7 @@ class TestAmounts(TestDemurrageDefault):
         
         o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
         r = self.rpc.do(o)
-        balance = c.parse_balance_of(r)
+        balance = c.parse_balance(r)
 
         expected_balance = ((1 - self.tax_level / 1000000) ** 10) * 1000
         expected_balance += ((1 - self.tax_level / 1000000) ** 20) * 1000
@@ -73,7 +73,7 @@ class TestAmounts(TestDemurrageDefault):
  
         o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
         r = self.rpc.do(o)
-        balance = c.parse_balance_of(r)
+        balance = c.parse_balance(r)
         self.assertEqual(balance, 1634)
 
         nonce_oracle = RPCNonceOracle(self.accounts[1], self.rpc)
@@ -83,12 +83,12 @@ class TestAmounts(TestDemurrageDefault):
      
         o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
         r = self.rpc.do(o)
-        balance = c.parse_balance_of(r)
+        balance = c.parse_balance(r)
         self.assertEqual(balance, 1134)
 
         o = c.balance_of(self.address, self.accounts[2], sender_address=self.accounts[0])
         r = self.rpc.do(o)
-        balance = c.parse_balance_of(r)
+        balance = c.parse_balance(r)
         self.assert_within_lower(balance, 500, 2000)
 
 
@@ -115,7 +115,7 @@ class TestAmounts(TestDemurrageDefault):
 
             o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
             r = self.rpc.do(o)
-            balance = c.parse_balance_of(r)
+            balance = c.parse_balance(r)
             self.assertEqual(balance, case[1])
 
 

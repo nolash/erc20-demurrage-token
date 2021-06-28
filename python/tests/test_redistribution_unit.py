@@ -83,7 +83,7 @@ class TestRedistribution(TestDemurrageUnit):
 
         o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
         r = self.rpc.do(o)
-        balance = c.parse_balance_of(r)
+        balance = c.parse_balance(r)
 
         self.assertEqual(balance, expected_balance)
 
@@ -108,7 +108,7 @@ class TestRedistribution(TestDemurrageUnit):
         for i in range(3):
             o = c.balance_of(self.address, self.accounts[i+1], sender_address=self.accounts[0])
             r = self.rpc.do(o)
-            balance = c.parse_balance_of(r)
+            balance = c.parse_balance(r)
             self.assertEqual(balance, expected_balance)
 
 
@@ -147,7 +147,7 @@ class TestRedistribution(TestDemurrageUnit):
         expected_balance = mint_amount - demurrage_amount
         o = c.balance_of(self.address, self.accounts[2], sender_address=self.accounts[0])
         r = self.rpc.do(o)
-        balance = c.parse_balance_of(r)
+        balance = c.parse_balance(r)
         self.assertEqual(balance, expected_balance)
 
         half_demurrage_amount = int((self.tax_level / 1000000) * half_mint_amount)
@@ -155,12 +155,12 @@ class TestRedistribution(TestDemurrageUnit):
         expected_balance = half_mint_amount - half_demurrage_amount
         o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
         r = self.rpc.do(o)
-        balance = c.parse_balance_of(r)
+        balance = c.parse_balance(r)
         self.assertEqual(balance, expected_balance)
 
         o = c.balance_of(self.address, self.accounts[3], sender_address=self.accounts[0])
         r = self.rpc.do(o)
-        balance = c.parse_balance_of(r)
+        balance = c.parse_balance(r)
         self.assertEqual(balance, expected_balance)
 
         o = c.total_supply(self.address, sender_address=self.accounts[0])
@@ -185,7 +185,7 @@ class TestRedistribution(TestDemurrageUnit):
 
         o = c.balance_of(self.address, self.sink_address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
-        balance = c.parse_balance_of(r)
+        balance = c.parse_balance(r)
         self.assert_within_lower(balance, expected_balance, 1000)
 
 

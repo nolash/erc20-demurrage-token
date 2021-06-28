@@ -1,0 +1,4 @@
+- 0.0.2-pending
+	* Move to chainlib-eth
+- 0.0.1-unreleased
+	* Interface for redistributed and non-redistributed, with or without cap

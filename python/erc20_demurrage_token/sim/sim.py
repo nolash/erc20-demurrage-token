@@ -200,7 +200,7 @@ class DemurrageTokenSimulation:
         else:
             o = self.caller_contract.balance_of(self.address, holder, sender_address=self.caller_address)
         r = self.rpc.do(o)
-        return self.caller_contract.parse_balance_of(r)
+        return self.caller_contract.parse_balance(r)
 
 
     def __next_block(self):

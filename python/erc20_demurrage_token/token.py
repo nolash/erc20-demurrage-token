@@ -14,7 +14,7 @@ from chainlib.eth.contract import (
         abi_decode_single,
         )
 from chainlib.eth.constant import ZERO_ADDRESS
-from chainlib.jsonrpc import jsonrpc_template
+from chainlib.jsonrpc import JSONRPCRequest
 from eth_erc20 import ERC20
 from hexathon import (
         add_0x,
@@ -146,8 +146,9 @@ class DemurrageToken(ERC20):
         return tx
 
 
-    def to_base_amount(self, contract_address, value, sender_address=ZERO_ADDRESS):
-        o = jsonrpc_template()
+    def to_base_amount(self, contract_address, value, sender_address=ZERO_ADDRESS, id_generator=None):
+        j = JSONRPCRequest(id_generator)
+        o = j.template()
         o['method'] = 'eth_call'
         enc = ABIContractEncoder()
         enc.method('toBaseAmount')
@@ -158,11 +159,13 @@ class DemurrageToken(ERC20):
         tx = self.set_code(tx, data)
         o['params'].append(self.normalize(tx))
         o['params'].append('latest')
+        o = j.finalize(o)
         return o
 
 
-    def remainder(self, contract_address, parts, whole, sender_address=ZERO_ADDRESS):
-        o = jsonrpc_template()
+    def remainder(self, contract_address, parts, whole, sender_address=ZERO_ADDRESS, id_generator=None):
+        j = JSONRPCRequest(id_generator)
+        o = j.template()
         o['method'] = 'eth_call'
         enc = ABIContractEncoder()
         enc.method('remainder')
@@ -175,11 +178,13 @@ class DemurrageToken(ERC20):
         tx = self.set_code(tx, data)
         o['params'].append(self.normalize(tx))
         o['params'].append('latest')
+        o = j.finalize(o)
         return o
 
 
-    def redistributions(self, contract_address, idx, sender_address=ZERO_ADDRESS):
-        o = jsonrpc_template()
+    def redistributions(self, contract_address, idx, sender_address=ZERO_ADDRESS, id_generator=None):
+        j = JSONRPCRequest(id_generator)
+        o = j.template()
         o['method'] = 'eth_call'
         enc = ABIContractEncoder()
         enc.method('redistributions')
@@ -190,11 +195,13 @@ class DemurrageToken(ERC20):
         tx = self.set_code(tx, data)
         o['params'].append(self.normalize(tx))
         o['params'].append('latest')
+        o = j.finalize(o)
         return o
 
 
-    def account_period(self, contract_address, address, sender_address=ZERO_ADDRESS):
-        o = jsonrpc_template()
+    def account_period(self, contract_address, address, sender_address=ZERO_ADDRESS, id_generator=None):
+        j = JSONRPCRequest(id_generator)
+        o = j.template()
         o['method'] = 'eth_call'
         enc = ABIContractEncoder()
         enc.method('accountPeriod')
@@ -205,11 +212,13 @@ class DemurrageToken(ERC20):
         tx = self.set_code(tx, data)
         o['params'].append(self.normalize(tx))
         o['params'].append('latest')
+        o = j.finalize(o)
         return o
 
 
-    def to_redistribution(self, contract_address, participants, demurrage_modifier_ppm, value, period, sender_address=ZERO_ADDRESS):
-        o = jsonrpc_template()
+    def to_redistribution(self, contract_address, participants, demurrage_modifier_ppm, value, period, sender_address=ZERO_ADDRESS, id_generator=None):
+        j = JSONRPCRequest(id_generator)
+        o = j.template()
         o['method'] = 'eth_call'
         enc = ABIContractEncoder()
         enc.method('toRedistribution')
@@ -226,12 +235,14 @@ class DemurrageToken(ERC20):
         tx = self.set_code(tx, data)
         o['params'].append(self.normalize(tx))
         o['params'].append('latest')
+        o = j.finalize(o)
         return o
 
 
 
-    def to_redistribution_period(self, contract_address, redistribution, sender_address=ZERO_ADDRESS):
-        o = jsonrpc_template()
+    def to_redistribution_period(self, contract_address, redistribution, sender_address=ZERO_ADDRESS, id_generator=None):
+        j = JSONRPCRequest(id_generator)
+        o = j.template()
         o['method'] = 'eth_call'
         enc = ABIContractEncoder()
         enc.method('toRedistributionPeriod')
@@ -242,11 +253,13 @@ class DemurrageToken(ERC20):
         tx = self.set_code(tx, data)
         o['params'].append(self.normalize(tx))
         o['params'].append('latest')
+        o = j.finalize(o)
         return o
 
 
-    def to_redistribution_participants(self, contract_address, redistribution, sender_address=ZERO_ADDRESS):
-        o = jsonrpc_template()
+    def to_redistribution_participants(self, contract_address, redistribution, sender_address=ZERO_ADDRESS, id_generator=None):
+        j = JSONRPCRequest(id_generator)
+        o = j.template()
         o['method'] = 'eth_call'
         enc = ABIContractEncoder()
         enc.method('toRedistributionParticipants')
@@ -257,11 +270,13 @@ class DemurrageToken(ERC20):
         tx = self.set_code(tx, data)
         o['params'].append(self.normalize(tx))
         o['params'].append('latest')
+        o = j.finalize(o)
         return o
 
 
-    def to_redistribution_supply(self, contract_address, redistribution, sender_address=ZERO_ADDRESS):
-        o = jsonrpc_template()
+    def to_redistribution_supply(self, contract_address, redistribution, sender_address=ZERO_ADDRESS, id_generator=None):
+        j = JSONRPCRequest(id_generator)
+        o = j.template()
         o['method'] = 'eth_call'
         enc = ABIContractEncoder()
         enc.method('toRedistributionSupply')
@@ -272,11 +287,13 @@ class DemurrageToken(ERC20):
         tx = self.set_code(tx, data)
         o['params'].append(self.normalize(tx))
         o['params'].append('latest')
+        o = j.finalize(o)
         return o
 
 
-    def to_redistribution_demurrage_modifier(self, contract_address, redistribution, sender_address=ZERO_ADDRESS):
-        o = jsonrpc_template()
+    def to_redistribution_demurrage_modifier(self, contract_address, redistribution, sender_address=ZERO_ADDRESS, id_generator=None):
+        j = JSONRPCRequest(id_generator)
+        o = j.template()
         o['method'] = 'eth_call'
         enc = ABIContractEncoder()
         enc.method('toRedistributionDemurrageModifier')
@@ -287,11 +304,13 @@ class DemurrageToken(ERC20):
         tx = self.set_code(tx, data)
         o['params'].append(self.normalize(tx))
         o['params'].append('latest')
+        o = j.finalize(o)
         return o
 
 
-    def base_balance_of(self, contract_address, address, sender_address=ZERO_ADDRESS):
-        o = jsonrpc_template()
+    def base_balance_of(self, contract_address, address, sender_address=ZERO_ADDRESS, id_generator=None):
+        j = JSONRPCRequest(id_generator)
+        o = j.template()
         o['method'] = 'eth_call'
         enc = ABIContractEncoder()
         enc.method('baseBalanceOf')
@@ -302,6 +321,7 @@ class DemurrageToken(ERC20):
         tx = self.set_code(tx, data)
         o['params'].append(self.normalize(tx))
         o['params'].append('latest')
+        o = j.finalize(o)
         return o
 
 
@@ -345,8 +365,9 @@ class DemurrageToken(ERC20):
         return self.call_noarg('supplyCap', contract_address, sender_address=sender_address)
 
 
-    def grow_by(self, contract_address, value, period, sender_address=ZERO_ADDRESS):
-        o = jsonrpc_template()
+    def grow_by(self, contract_address, value, period, sender_address=ZERO_ADDRESS, id_generator=None):
+        j = JSONRPCRequest(id_generator)
+        o = j.template()
         o['method'] = 'eth_call'
         enc = ABIContractEncoder()
         enc.method('growBy')
@@ -359,11 +380,13 @@ class DemurrageToken(ERC20):
         tx = self.set_code(tx, data)
         o['params'].append(self.normalize(tx))
         o['params'].append('latest')
+        o = j.finalize(o)
         return o
 
 
-    def decay_by(self, contract_address, value, period, sender_address=ZERO_ADDRESS):
-        o = jsonrpc_template()
+    def decay_by(self, contract_address, value, period, sender_address=ZERO_ADDRESS, id_generator=None):
+        j = JSONRPCRequest(id_generator)
+        o = j.template()
         o['method'] = 'eth_call'
         enc = ABIContractEncoder()
         enc.method('decayBy')
@@ -376,11 +399,13 @@ class DemurrageToken(ERC20):
         tx = self.set_code(tx, data)
         o['params'].append(self.normalize(tx))
         o['params'].append('latest')
+        o = j.finalize(o)
         return o
 
 
-    def get_distribution(self, contract_address, supply, demurrage_amount, sender_address=ZERO_ADDRESS):
-        o = jsonrpc_template()
+    def get_distribution(self, contract_address, supply, demurrage_amount, sender_address=ZERO_ADDRESS, id_generator=None):
+        j = JSONRPCRequest(id_generator)
+        o = j.template()
         o['method'] = 'eth_call'
         enc = ABIContractEncoder()
         enc.method('getDistribution')
@@ -393,11 +418,13 @@ class DemurrageToken(ERC20):
         tx = self.set_code(tx, data)
         o['params'].append(self.normalize(tx))
         o['params'].append('latest')
+        o = j.finalize(o)
         return o
 
 
-    def get_distribution_from_redistribution(self, contract_address, redistribution, sender_address=ZERO_ADDRESS):
-        o = jsonrpc_template()
+    def get_distribution_from_redistribution(self, contract_address, redistribution, sender_address=ZERO_ADDRESS, id_generator=None):
+        j = JSONRPCRequest(id_generator)
+        o = j.template()
         o['method'] = 'eth_call'
         enc = ABIContractEncoder()
         enc.method('getDistributionFromRedistribution')
@@ -408,6 +435,7 @@ class DemurrageToken(ERC20):
         tx = self.set_code(tx, data)
         o['params'].append(self.normalize(tx))
         o['params'].append('latest')
+        o = j.finalize(o)
         return o
 
 
