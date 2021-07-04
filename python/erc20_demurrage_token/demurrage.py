@@ -39,7 +39,7 @@ class DemurrageCalculator:
         remainder_minutes = math.floor(remainder / 60)
         adjusted_delta = adjusted_amount * ((1 - self.r_min) ** remainder_minutes)
         adjusted_amount -= (adjusted_amount - adjusted_delta)
-        logg.debug('adjusted for {} hours {} -> {} delta {}'.format(remainder_minutes, amount, adjusted_amount, adjusted_delta))
+        logg.debug('adjusted for {} minutes {} -> {} delta {}'.format(remainder_minutes, amount, adjusted_amount, adjusted_delta))
 
         return adjusted_amount
 

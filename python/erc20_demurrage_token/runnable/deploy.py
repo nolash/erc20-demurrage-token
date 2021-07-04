@@ -60,6 +60,7 @@ argparser.add_argument('--nonce', type=int, help='Override transaction nonce')
 argparser.add_argument('--sink-address', dest='sink_address', default=ZERO_ADDRESS, type=str, help='demurrage level,ppm per minute') 
 argparser.add_argument('--supply-limit', dest='supply_limit', type=int, help='token supply limit (0 = no limit)')
 argparser.add_argument('--redistribution-period', type=int, help='redistribution period, minutes (0 = deactivate)') # default 10080 = week
+argparser.add_argument('--multi', action='store_true', help='automatic redistribution')
 argparser.add_argument('--env-prefix', default=os.environ.get('CONFINI_ENV_PREFIX'), dest='env_prefix', type=str, help='environment prefix for variables to overwrite configuration')
 argparser.add_argument('--symbol', type=str, help='Token symbol')
 argparser.add_argument('--demurrage-level', dest='demurrage_level', type=int, help='demurrage level, ppm per minute') 
@@ -136,6 +137,8 @@ token_name = args.name
 if token_name == None:
     token_name = args.symbol
 
+multi = bool(args.multi)
+
 def main():
     c = DemurrageToken(chain_spec, signer=signer, gas_oracle=gas_oracle, nonce_oracle=nonce_oracle)
     settings = DemurrageTokenSettings()
@@ -149,7 +152,8 @@ def main():
     (tx_hash_hex, o) = c.constructor(
             signer_address,
             settings,
-            redistribute=settings.period_minutes > 0,
+            #redistribute=settings.period_minutes > 0,
+            redistribute=multi,
             cap=int(config.get('TOKEN_SUPPLY_LIMIT')),
             )
     if dummy:
