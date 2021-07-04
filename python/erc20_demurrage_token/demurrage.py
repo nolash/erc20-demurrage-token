@@ -1,7 +1,13 @@
-#
+# standard imports
 import logging
 import datetime
 import math
+
+# eternal imports
+from chainlib.eth.constant import ZERO_ADDRESS
+
+# local imports
+from .token import DemurrageToken
 
 logging.basicConfig(level=logging.DEBUG)
 logg = logging.getLogger()
@@ -36,3 +42,18 @@ class DemurrageCalculator:
         logg.debug('adjusted for {} hours {} -> {} delta {}'.format(remainder_minutes, amount, adjusted_amount, adjusted_delta))
 
         return adjusted_amount
+
+
+    @staticmethod
+    def from_contract(rpc, chain_spec, contract_address, sender_address=ZERO_ADDRESS):
+        c = DemurrageToken(chain_spec)
+        o = c.tax_level(contract_address, sender_address=sender_address)
+        r = rpc.do(o)
+        taxlevel_i = c.parse_tax_level(r)
+
+        o = c.resolution_factor(contract_address, sender_address=sender_address)
+        r = rpc.do(o)
+        divider = c.parse_resolution_factor(r)
+        logg.debug('taxlevel {} f {}'.format(taxlevel_i, divider))
+        taxlevel_f = taxlevel_i / divider
+        return DemurrageCalculator(taxlevel_f)

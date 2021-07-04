@@ -56,6 +56,9 @@ contract DemurrageTokenMultiNocap {
 	// (this constant x 1000000 is contained within 128 bits)
 	uint256 constant ppmDivider = 100000000000000000000000000000000;
 
+	// demurrage decimal width; 38 places
+	uint256 public immutable resolutionFactor = ppmDivider * 1000000;
+
 	// Timestamp of start of periods (time which contract constructor was called)
 	uint256 public immutable periodStart;
 

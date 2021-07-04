@@ -343,7 +343,15 @@ class DemurrageToken(ERC20):
         tx = self.set_code(tx, data)
         tx = self.finalize(tx, tx_format)
         return tx
-    
+
+
+    def tax_level(self, contract_address, sender_address=ZERO_ADDRESS):
+        return self.call_noarg('taxLevel', contract_address, sender_address=sender_address)
+
+
+    def resolution_factor(self, contract_address, sender_address=ZERO_ADDRESS):
+        return self.call_noarg('resolutionFactor', contract_address, sender_address=sender_address)
+
 
     def actual_period(self, contract_address, sender_address=ZERO_ADDRESS):
         return self.call_noarg('actualPeriod', contract_address, sender_address=sender_address)
@@ -506,4 +514,14 @@ class DemurrageToken(ERC20):
 
     @classmethod
     def parse_get_distribution(self, v):
+        return abi_decode_single(ABIContractType.UINT256, v)
+
+
+    @classmethod
+    def parse_tax_level(self, v):
+        return abi_decode_single(ABIContractType.UINT256, v)
+
+
+    @classmethod
+    def parse_resolution_factor(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)

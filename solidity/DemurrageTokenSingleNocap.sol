@@ -53,7 +53,7 @@ contract DemurrageTokenSingleCap {
 	uint256 constant growthResolutionFactor = 1000000000000;
 
 	// demurrage decimal width; 38 places
-	uint256 immutable resolutionFactor = nanoDivider * growthResolutionFactor; 
+	uint256 public immutable resolutionFactor = nanoDivider * growthResolutionFactor; 
 
 	// Timestamp of start of periods (time which contract constructor was called)
 	uint256 public immutable periodStart;
