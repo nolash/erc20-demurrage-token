@@ -43,6 +43,15 @@ class DemurrageCalculator:
 
         return adjusted_amount
 
+    
+    def amount_since_slow(self, amount, timestamp):
+        delta = datetime.datetime.utcnow() - datetime.datetime.fromtimestamp(timestamp)
+        remainder_minutes = math.floor(delta.total_seconds() / 60)
+        adjusted_amount = amount * ((1 - self.r_min) ** remainder_minutes)
+        logg.debug('adjusted for {} minutes {} -> {} delta {}'.format(remainder_minutes, amount, adjusted_amount, amount - adjusted_amount))
+
+        return adjusted_amount
+
 
     @staticmethod
     def from_contract(rpc, chain_spec, contract_address, sender_address=ZERO_ADDRESS):
