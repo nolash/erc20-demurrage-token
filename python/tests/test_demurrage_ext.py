@@ -10,7 +10,7 @@ from erc20_demurrage_token import DemurrageToken
 from erc20_demurrage_token.demurrage import DemurrageCalculator
 
 # test imports
-from tests.base import TestDemurrage
+from erc20_demurrage_token.unittest.base import TestDemurrage
 
 
 class TestEmulate(TestDemurrage):

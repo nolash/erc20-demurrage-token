@@ -22,7 +22,7 @@ from hexathon import (
 from erc20_demurrage_token import DemurrageToken
 
 # test imports
-from tests.base import TestDemurrageDefault
+from erc20_demurrage_token.unittest.base import TestDemurrageDefault
 
 logging.basicConfig(level=logging.DEBUG)
 logg = logging.getLogger()

@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -x
 set -e
 
 export PYTHONPATH=.
@@ -31,3 +32,4 @@ done
 #done
 
 set +e
+set +x

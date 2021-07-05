@@ -12,6 +12,7 @@ from chainlib.eth.block import (
         block_by_number,
         )
 from chainlib.eth.nonce import RPCNonceOracle
+from chainlib.eth.constant import ZERO_ADDRESS
 
 # local imports
 from erc20_demurrage_token import (
@@ -29,63 +30,92 @@ TAX_LEVEL = int(10000 * 2) # 2%
 PERIOD = 10
 
 
-class TestDemurrage(EthTesterCase):
+class TestTokenDeploy:
 
-    def setUp(self):
-        super(TestDemurrage, self).setUp()
-
+    def __init__(self, rpc, token_symbol='FOO', token_name='Foo Token', sink_address=ZERO_ADDRESS, supply=10**12):
         self.tax_level = TAX_LEVEL
         self.period_seconds = PERIOD * 60
 
-        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         self.settings = DemurrageTokenSettings()
-        self.settings.name = 'Foo Token'
-        self.settings.symbol = 'FOO'
+        self.settings.name = token_name
+        self.settings.symbol = token_symbol
         self.settings.decimals = 6
         self.settings.demurrage_level = TAX_LEVEL * (10 ** 32)
         self.settings.period_minutes = PERIOD
-        self.settings.sink_address = self.accounts[9]
+        self.settings.sink_address = sink_address
         self.sink_address = self.settings.sink_address
 
         o = block_latest()
-        self.start_block = self.rpc.do(o)
+        self.start_block = rpc.do(o)
         
         o = block_by_number(self.start_block, include_tx=False)
-        r = self.rpc.do(o)
+        r = rpc.do(o)
 
         try:
             self.start_time = int(r['timestamp'], 16)
         except TypeError:
             self.start_time = int(r['timestamp'])
 
-        self.default_supply = 10 ** 12
+        self.default_supply = supply
         self.default_supply_cap = int(self.default_supply * 10)
 
 
-    def deploy(self, interface, mode):
+    def deploy(self, rpc, deployer_address, interface, mode, supply_cap=10**12):
         tx_hash = None
         o = None
+        logg.debug('mode {} {}'.format(mode, self.settings))
+        self.mode = mode
         if mode == 'MultiNocap':
-            (tx_hash, o) = interface.constructor(self.accounts[0], self.settings, redistribute=True, cap=0)
+            (tx_hash, o) = interface.constructor(deployer_address, self.settings, redistribute=True, cap=0)
         elif mode == 'SingleNocap':
-            (tx_hash, o) = interface.constructor(self.accounts[0], self.settings, redistribute=False, cap=0)
+            (tx_hash, o) = interface.constructor(deployer_address, self.settings, redistribute=False, cap=0)
         elif mode == 'MultiCap':
-            (tx_hash, o) = interface.constructor(self.accounts[0], self.settings, redistribute=True, cap=self.default_supply_cap)
+            (tx_hash, o) = interface.constructor(deployer_address, self.settings, redistribute=True, cap=supply_cap)
         elif mode == 'SingleCap':
-            (tx_hash, o) = interface.constructor(self.accounts[0], self.settings, redistribute=False, cap=self.default_supply_cap)
+            (tx_hash, o) = interface.constructor(deployer_address, self.settings, redistribute=False, cap=supply_cap)
         else:
-            raise ValueError('Invalid mode "{}", valid are {}'.format(self.mode, DemurrageToken.valid_modes))
+            raise ValueError('Invalid mode "{}", valid are {}'.format(mode, DemurrageToken.valid_modes))
 
-        r = self.rpc.do(o)
+        r = rpc.do(o)
         o = receipt(tx_hash)
-        r = self.rpc.do(o)
-        self.assertEqual(r['status'], 1)
+        r = rpc.do(o)
+        assert r['status'] == 1
         self.start_block = r['block_number']
         self.address = r['contract_address']
 
         o = block_by_number(r['block_number'])
-        r = self.rpc.do(o)
+        r = rpc.do(o)
         self.start_time = r['timestamp']
+
+        return self.address
+
+
+class TestDemurrage(EthTesterCase):
+
+    def setUp(self):
+        super(TestDemurrage, self).setUp()
+#        token_deploy = TestTokenDeploy()
+#        self.settings = token_deploy.settings
+#        self.sink_address = token_deploy.sink_address
+#        self.start_block = token_deploy.start_block
+#        self.start_time = token_deploy.start_time
+#        self.default_supply = self.default_supply
+#        self.default_supply_cap = self.default_supply_cap
+        self.deployer = TestTokenDeploy(self.rpc)
+        self.default_supply = self.deployer.default_supply
+        self.default_supply_cap = self.deployer.default_supply_cap
+        self.start_block = None
+        self.address = None
+        self.start_time = None
+
+
+    def deploy(self, interface, mode):
+        self.address = self.deployer.deploy(self.rpc, self.accounts[0], interface, mode, supply_cap=self.default_supply_cap)
+        self.start_block = self.deployer.start_block
+        self.start_time = self.deployer.start_time
+        self.tax_level = self.deployer.tax_level
+        self.period_seconds = self.deployer.period_seconds
+        self.sink_address = self.deployer.sink_address
 
         logg.debug('contract address {} start block {} start time {}'.format(self.address, self.start_block, self.start_time))
 
