@@ -1,1 +1,1 @@
-include erc20_demurrage_token/data/*
+include erc20_demurrage_token/data/* erc20_demurrage_token/data/config/*.ini

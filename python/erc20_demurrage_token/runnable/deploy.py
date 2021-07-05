@@ -41,7 +41,7 @@ logg = logging.getLogger()
 script_dir = os.path.dirname(__file__)
 data_dir = os.path.join(script_dir, '..', 'data')
 
-default_config_dir = os.environ.get('CONFINI_DIR', '/usr/local/share/sarafu-token')
+default_config_dir = os.environ.get('CONFINI_DIR', os.path.join(data_dir, 'config'))
 
 argparser = argparse.ArgumentParser()
 argparser.add_argument('-c', '--config', dest='c', type=str, default=default_config_dir, help='configuration directory')
