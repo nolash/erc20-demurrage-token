@@ -14,8 +14,8 @@ import logging
 
 # external imports
 import confini
-from crypto_dev_signer.eth.signer import ReferenceSigner as EIP155Signer
-from crypto_dev_signer.keystore.dict import DictKeystore
+from funga.eth.signer import EIP155Signer
+from funga.eth.keystore.dict import DictKeystore
 from chainlib.chain import ChainSpec
 from chainlib.eth.nonce import (
         RPCNonceOracle,

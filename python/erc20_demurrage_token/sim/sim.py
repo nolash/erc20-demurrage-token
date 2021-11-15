@@ -20,8 +20,8 @@ from chainlib.eth.block import (
         block_by_number,
         block_by_hash,
         )
-from crypto_dev_signer.keystore.dict import DictKeystore
-from crypto_dev_signer.eth.signer import ReferenceSigner as EIP155Signer
+from funga.eth.keystore.dict import DictKeystore
+from funga.eth.signer import EIP155Signer
 from hexathon import (
         strip_0x,
         add_0x,
