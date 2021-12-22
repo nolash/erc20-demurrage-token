@@ -1,3 +1,3 @@
-chainlib-eth~=0.0.14
-eth-erc20~=0.1.4
+chainlib-eth~=0.0.15
+eth-erc20~=0.1.5
 funga-eth~=0.5.1
