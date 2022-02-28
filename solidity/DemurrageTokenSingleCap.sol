@@ -311,6 +311,10 @@ contract DemurrageTokenSingleCap {
 
 	// Calculate and cache the demurrage value corresponding to the (period of the) time of the method call
 	function applyDemurrage() public returns (bool) {
+		return applyDemurrageLimited(0);
+	}
+
+	function applyDemurrageLimited(uint256 _rounds) public returns (bool) {
 		//uint128 epochPeriodCount;
 		uint256 periodCount;
 		uint256 lastDemurrageAmount;
@@ -323,6 +327,12 @@ contract DemurrageTokenSingleCap {
 			return false;
 		}
 		lastDemurrageAmount = demurrageAmount;
+		// safety limit for exponential calculation to ensure that we can always
+		// execute this code no matter how much time passes.			
+		if (_rounds > 0 && _rounds < periodCount) {
+			periodCount = _rounds;
+		}
+
 		demurrageAmount = uint128(decayBy(lastDemurrageAmount, periodCount));
 		//demurragePeriod = epochPeriodCount; 
 		demurrageTimestamp = demurrageTimestamp + (periodCount * 60);

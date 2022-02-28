@@ -107,10 +107,11 @@ class TestBasic(TestDemurrageDefault):
         r = self.rpc.do(o)
         demurrage_amount = c.parse_demurrage_amount(r)
         modifier_base = ((1000000 - self.tax_level) / 1000000) ** 10
+        logg.warning('mod base {}'.format(modifier_base))
         modifier = int(modifier_base * (10 ** 12))
 
         rounding_tolerance_nano = 4000000 # 0.000004% precision
-        demurrage_amount_truncate = int(demurrage_amount / (10 ** 26)) # equals 12 decimal places
+        demurrage_amount_truncate = int(demurrage_amount / (10 ** 16)) # equals 38 decimal places - 14 for the modifier magniture - 2 for percent int calc + 6 for token decimals (originally equalled 12 decimal places)
         self.assertGreaterEqual(modifier, demurrage_amount_truncate - rounding_tolerance_nano)
         self.assertLessEqual(modifier, demurrage_amount_truncate)
 
