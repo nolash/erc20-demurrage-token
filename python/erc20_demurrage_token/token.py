@@ -325,8 +325,19 @@ class DemurrageToken(ERC20):
         return o
 
 
-    def apply_demurrage(self, contract_address, sender_address):
-        return self.transact_noarg('applyDemurrage', contract_address, sender_address)
+    def apply_demurrage(self, contract_address, sender_address, limit=0, tx_format=TxFormat.JSONRPC):
+        if limit == 0:
+            return self.transact_noarg('applyDemurrage', contract_address, sender_address)
+
+        enc = ABIContractEncoder()
+        enc.method('applyDemurrageLimited')
+        enc.typ(ABIContractType.UINT256)
+        enc.uint256(limit)
+        data = enc.get()
+        tx = self.template(sender_address, contract_address, use_nonce=True)
+        tx = self.set_code(tx, data)
+        tx = self.finalize(tx, tx_format)
+        return tx
 
 
     def change_period(self, contract_address, sender_address):
