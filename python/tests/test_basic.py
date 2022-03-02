@@ -54,6 +54,32 @@ class TestBasic(TestDemurrageDefault):
         self.assertEqual(balance, 1024)
 
 
+    def test_apply_demurrage_limited(self):
+        modifier = (10 ** 28)
+
+        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+
+        o = c.demurrage_amount(self.address, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        demurrage_amount = c.parse_demurrage_amount(r)
+        self.assertEqual(modifier, demurrage_amount)
+
+        self.backend.time_travel(self.start_time + 120)
+        (tx_hash, o) = c.apply_demurrage(self.address, sender_address=self.accounts[0], limit=1)
+        r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+
+        o = c.demurrage_amount(self.address, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        demurrage_amount = c.parse_demurrage_amount(r)
+        modifier_base = 1000000 - self.tax_level
+        modifier = int(modifier_base * (10 ** 22)) # 38 decimal places minus 6 (1000000)
+        self.assertEqual(modifier, demurrage_amount)
+
+
     def test_apply_demurrage(self):
         modifier = (10 ** 28)
 
@@ -93,7 +119,6 @@ class TestBasic(TestDemurrageDefault):
         r = self.rpc.do(o)
         demurrage_amount = c.parse_demurrage_amount(r)
         modifier_base = 1000000 - self.tax_level
-        logg.debug('modifier base {}'.format(modifier_base))
         modifier = int(modifier_base * (10 ** 22)) # 38 decimal places minus 6 (1000000)
         self.assertEqual(modifier, demurrage_amount)
 
@@ -107,10 +132,11 @@ class TestBasic(TestDemurrageDefault):
         r = self.rpc.do(o)
         demurrage_amount = c.parse_demurrage_amount(r)
         modifier_base = ((1000000 - self.tax_level) / 1000000) ** 10
+        logg.warning('mod base {}'.format(modifier_base))
         modifier = int(modifier_base * (10 ** 12))
 
         rounding_tolerance_nano = 4000000 # 0.000004% precision
-        demurrage_amount_truncate = int(demurrage_amount / (10 ** 26)) # equals 12 decimal places
+        demurrage_amount_truncate = int(demurrage_amount / (10 ** 16)) # equals 38 decimal places - 14 for the modifier magniture - 2 for percent int calc + 6 for token decimals <- TODO verify this calc
         self.assertGreaterEqual(modifier, demurrage_amount_truncate - rounding_tolerance_nano)
         self.assertLessEqual(modifier, demurrage_amount_truncate)
 
