@@ -6,3 +6,5 @@ __pycache__
 gmon.out
 solidity/*.json
 solidity/*.bin
+.venv
+venv
