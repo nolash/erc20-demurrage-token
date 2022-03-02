@@ -128,6 +128,12 @@ contract DemurrageTokenSingleCap {
 		minimumParticipantSpend = 10 ** uint256(_decimals);
 	}
 
+	// Change sink address for redistribution
+	function setSinkAddress(address _sinkAddress) public {
+		require(msg.sender == owner);
+		sinkAddress = _sinkAddress;
+	}
+
 	// Given address will be allowed to call the mintTo() function
 	function addMinter(address _minter) public returns (bool) {
 		require(msg.sender == owner);

@@ -80,7 +80,6 @@ class TestBasic(TestDemurrageDefault):
         self.assertEqual(modifier, demurrage_amount)
 
 
-
     def test_apply_demurrage(self):
         modifier = (10 ** 28)
 
