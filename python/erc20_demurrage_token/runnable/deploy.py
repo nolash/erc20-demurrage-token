@@ -49,8 +49,8 @@ arg_flags = chainlib.eth.cli.argflag_std_write
 argparser = chainlib.eth.cli.ArgumentParser(arg_flags)
 argparser.add_argument('--name', dest='token_name', type=str, help='Token name')
 argparser.add_argument('--symbol', dest='token_symbol', required=True, type=str, help='Token symbol')
-argparser.add_argument('--decimals', dest='token_decimals', default=18, type=int, help='Token decimals')
-argparser.add_argument('--sink-address', dest='sink_address', default=ZERO_ADDRESS, type=str, help='demurrage level,ppm per minute') 
+argparser.add_argument('--decimals', dest='token_decimals', type=int, help='Token decimals')
+argparser.add_argument('--sink-address', dest='sink_address', type=str, help='demurrage level,ppm per minute') 
 argparser.add_argument('--supply-limit', dest='supply_limit', type=int, help='token supply limit (0 = no limit)')
 argparser.add_argument('--redistribution-period', type=int, help='redistribution period, minutes (0 = deactivate)') # default 10080 = week
 argparser.add_argument('--multi', action='store_true', help='automatic redistribution')
@@ -89,7 +89,6 @@ rpc = chainlib.eth.cli.Rpc(wallet=wallet)
 conn = rpc.connect_by_config(config)
 
 chain_spec = ChainSpec.from_chain_str(config.get('CHAIN_SPEC'))
-
 
 def main():
     signer = rpc.get_signer()
