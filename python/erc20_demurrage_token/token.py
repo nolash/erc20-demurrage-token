@@ -380,6 +380,10 @@ class DemurrageToken(ERC20):
         return self.call_noarg('demurrageAmount', contract_address, sender_address=sender_address)
 
 
+    def demurrage_timestamp(self, contract_address, sender_address=ZERO_ADDRESS):
+        return self.call_noarg('demurrageTimestamp', contract_address, sender_address=sender_address)
+
+
     def supply_cap(self, contract_address, sender_address=ZERO_ADDRESS):
         return self.call_noarg('supplyCap', contract_address, sender_address=sender_address)
 

@@ -1,3 +1,7 @@
+- 0.1.1
+	* Settable demurrage steps for apply demurrage cli tool
+- 0.1.0
+	* Dependency upgrades
 - 0.0.11
 	* Apply demurrage cli tool
 - 0.0.10
