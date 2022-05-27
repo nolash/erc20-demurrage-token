@@ -33,7 +33,7 @@ PERIOD = 10
 class TestTokenDeploy:
 
     def __init__(self, rpc, token_symbol='FOO', token_name='Foo Token', sink_address=ZERO_ADDRESS, supply=10**12):
-        self.tax_level = TAX_LEVEL
+        self.tax_level= TAX_LEVEL
         self.period_seconds = PERIOD * 60
 
         self.settings = DemurrageTokenSettings()
@@ -44,6 +44,7 @@ class TestTokenDeploy:
         self.settings.period_minutes = PERIOD
         self.settings.sink_address = sink_address
         self.sink_address = self.settings.sink_address
+        logg.debug('using demurrage token settings: {}'.format(self.settings))
 
         o = block_latest()
         self.start_block = rpc.do(o)
@@ -203,7 +204,7 @@ class TestDemurrageCap(TestDemurrage):
 class TestDemurrageUnit(TestDemurrage):
 
     def setUp(self):
-        super(TestDemurrage, self).setUp()
+        super(TestDemurrageUnit, self).setUp()
 
         self.tax_level = 50
         self.period_seconds = 60
