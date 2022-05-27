@@ -32,16 +32,16 @@ PERIOD = 10
 
 class TestTokenDeploy:
 
-    def __init__(self, rpc, token_symbol='FOO', token_name='Foo Token', sink_address=ZERO_ADDRESS, supply=10**12):
-        self.tax_level= TAX_LEVEL
-        self.period_seconds = PERIOD * 60
+    def __init__(self, rpc, token_symbol='FOO', token_name='Foo Token', sink_address=ZERO_ADDRESS, supply=10**12, tax_level=TAX_LEVEL, period=PERIOD):
+        self.tax_level = tax_level
+        self.period_seconds = period * 60
 
         self.settings = DemurrageTokenSettings()
         self.settings.name = token_name
         self.settings.symbol = token_symbol
         self.settings.decimals = 6
-        self.settings.demurrage_level = TAX_LEVEL * (10 ** 32)
-        self.settings.period_minutes = PERIOD
+        self.settings.demurrage_level = tax_level * (10 ** 32)
+        self.settings.period_minutes = period
         self.settings.sink_address = sink_address
         self.sink_address = self.settings.sink_address
         logg.debug('using demurrage token settings: {}'.format(self.settings))
@@ -102,7 +102,12 @@ class TestDemurrage(EthTesterCase):
 #        self.start_time = token_deploy.start_time
 #        self.default_supply = self.default_supply
 #        self.default_supply_cap = self.default_supply_cap
-        self.deployer = TestTokenDeploy(self.rpc)
+        period = PERIOD
+        try:
+            period = getattr(self, 'period')
+        except AttributeError as e:
+            pass
+        self.deployer = TestTokenDeploy(self.rpc, period=period)
         self.default_supply = self.deployer.default_supply
         self.default_supply_cap = self.deployer.default_supply_cap
         self.start_block = None
@@ -204,10 +209,11 @@ class TestDemurrageCap(TestDemurrage):
 class TestDemurrageUnit(TestDemurrage):
 
     def setUp(self):
-        super(TestDemurrageUnit, self).setUp()
+        self.period = 1
+        self.period_seconds = self.period * 60
+        self.tax_level = TAX_LEVEL
 
-        self.tax_level = 50
-        self.period_seconds = 60
+        super(TestDemurrageUnit, self).setUp()
 
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         self.settings = DemurrageTokenSettings()
