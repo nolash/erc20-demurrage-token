@@ -77,6 +77,56 @@ class TestRedistribution(TestDemurrageDefault):
 
             self.assert_within_lower(balance_minter + balance_sink, supply, 0.001)
 
+
+    def test_redistribution_catchup_periods(self):
+        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+
+        demurrage = (1 - (self.tax_level / 1000000)) * (10**28)
+        supply = self.default_supply
+
+        (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[0], supply)
+        self.rpc.do(o)
+
+        self.backend.time_travel(self.start_time + (self.period_seconds * 10))
+
+        for i in range(1, 11):
+            logg.debug('checking period {}'.format(i))
+
+            (tx_hash, o) = c.change_period(self.address, self.accounts[0])
+            self.rpc.do(o)
+            o = receipt(tx_hash)
+            r = self.rpc.do(o)
+            self.assertEqual(r['status'], 1)
+
+        i = 10
+        o = c.redistributions(self.address, i, sender_address=self.accounts[0])
+        redistribution = self.rpc.do(o)
+
+        o = c.to_redistribution_demurrage_modifier(self.address, redistribution, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        demurrage = c.parse_to_redistribution_item(r)
+
+        o = c.redistributions(self.address, i-1, sender_address=self.accounts[0])
+        redistribution = self.rpc.do(o)
+
+        o = c.to_redistribution_demurrage_modifier(self.address, redistribution, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        demurrage_previous = c.parse_to_redistribution_item(r)
+
+        o = c.balance_of(self.address, self.sink_address, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        balance_sink = c.parse_balance(r)
+
+        o = c.balance_of(self.address, self.accounts[0], sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        balance_minter = c.parse_balance(r)
+
+        logg.debug('testing sink {} mint {} adds up to supply {} with demurrage between {} and {}'.format(balance_sink, balance_minter, supply, demurrage_previous, demurrage))
+
+        self.assert_within_lower(balance_minter + balance_sink, supply, 0.001)
+
+
 #    def test_redistribution_boundaries(self):
 #        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
 #        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)

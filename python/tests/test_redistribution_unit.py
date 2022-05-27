@@ -62,7 +62,6 @@ class TestRedistribution(TestDemurrageUnit):
         o = c.get_distribution_from_redistribution(self.address, redistribution, self.accounts[0])
         r = self.rpc.do(o)
         distribution = c.parse_get_distribution(r)
-        #expected_distribution = self.default_supply * (((self.tax_level * 1.33) - self.tax_level) / 100000)
         expected_distribution = (self.default_supply * self.tax_level) / 100000
         logg.debug('distribution {} supply {}'.format(distribution, self.default_supply))
         self.assert_within_lower(distribution, expected_distribution, 1000)
@@ -184,9 +183,6 @@ class TestRedistribution(TestDemurrageUnit):
         o = c.to_redistribution_demurrage_modifier(self.address, redistribution, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         demurrage = c.parse_to_redistribution_item(r)
-#        o = c.demurrage_amount(self.address, sender_address=self.accounts[0])
-#        r = self.rpc.do(o)
-#        demurrage = c.parse_demurrage_amount(r)
         logg.debug('\nrediistribution {}\ndemurrage {}\nsupply {}'.format(redistribution, demurrage, supply))
 
         expected_balance = int(supply * (self.tax_level / 1000000))
