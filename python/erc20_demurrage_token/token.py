@@ -454,16 +454,14 @@ class DemurrageToken(ERC20):
         return o
 
 
-    def get_distribution_from_redistribution(self, contract_address, redistribution, redistribution_previous, sender_address=ZERO_ADDRESS, id_generator=None):
+    def get_distribution_from_redistribution(self, contract_address, redistribution, sender_address=ZERO_ADDRESS, id_generator=None):
         j = JSONRPCRequest(id_generator)
         o = j.template()
         o['method'] = 'eth_call'
         enc = ABIContractEncoder()
         enc.method('getDistributionFromRedistribution')
         enc.typ(ABIContractType.BYTES32)
-        enc.typ(ABIContractType.BYTES32)
         enc.bytes32(redistribution)
-        enc.bytes32(redistribution_previous)
         data = add_0x(enc.get())
         tx = self.template(sender_address, contract_address)
         tx = self.set_code(tx, data)

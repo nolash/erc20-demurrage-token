@@ -22,8 +22,6 @@ contract DemurrageTokenSingleCap {
 
 	uint256 public demurrageStart;
 
-	// Cached demurrage period; the period for which demurrageAmount was calculated
-	//uint128 public demurragePeriod;
 	// Cached demurrage timestamp; the timestamp for which demurrageAmount was last calculated
 	uint256 public demurrageTimestamp;
 
@@ -47,8 +45,8 @@ contract DemurrageTokenSingleCap {
 	// Last executed period
 	uint256 public lastPeriod;
 
-	// Minimum amount of (demurraged) tokens an account must spend to participate in redistribution for a particular period
-	//uint256 public minimumParticipantSpend;
+	// Last sink redistribution amount
+	uint256 public totalSink;
 
 	// 128 bit resolution of the demurrage divisor
 	// (this constant x 1000000 is contained within 128 bits)
@@ -116,19 +114,14 @@ contract DemurrageTokenSingleCap {
 		demurrageTimestamp = block.timestamp;
 		periodStart = demurrageTimestamp;
 		periodDuration = _periodMinutes * 60;
-		//demurrageAmount = 100000000000000000000000000000000000000 - _taxLevelMinute; // Represents 38 decimal places, same as resolutionFactor
-		//demurrageAmount = 100000000000000000000000000000000000000;
-		//demurrageAmount = 10000000000000000000000000000;
 		demurrageAmount = uint128(nanoDivider) * 100;
 		demurrageStart = demurrageAmount;
-		//demurragePeriod = 1;
 		taxLevel = _taxLevelMinute; // Represents 38 decimal places
 		bytes32 initialRedistribution = toRedistribution(0, demurrageAmount, 0, 1);
 		redistributions.push(initialRedistribution);
 
 		// Misc settings
 		sinkAddress = _defaultSinkAddress;
-		//minimumParticipantSpend = 10 ** uint256(_decimals);
 	}
 
 
@@ -160,10 +153,8 @@ contract DemurrageTokenSingleCap {
 
 		baseBalance = baseBalanceOf(_account);
 
-		//periodCount = actualPeriod() - demurragePeriod; 
 		periodCount = getMinutesDelta(demurrageTimestamp);
 
-		//currentDemurragedAmount = uint128(decayBy(demurrageAmount, periodCount));
 		currentDemurragedAmount = uint128(decayBy(demurrageAmount * 10000000000, periodCount));
 
 		return (baseBalance * currentDemurragedAmount) / (nanoDivider * 1000000000000);
@@ -281,7 +272,6 @@ contract DemurrageTokenSingleCap {
 		bytes32 lastRedistribution;
 		uint256 currentPeriod;
 
-		//lastRedistribution =  redistributions[redistributions.length-1];
 		lastRedistribution =  redistributions[lastPeriod];
 		currentPeriod = this.actualPeriod();
 		if (currentPeriod <= toRedistributionPeriod(lastRedistribution)) {
@@ -293,30 +283,29 @@ contract DemurrageTokenSingleCap {
 	function getDistribution(uint256 _supply, uint256 _demurrageAmount) public view returns (uint256) {
 		uint256 difference;
 
-		//difference = _supply * (resolutionFactor - _demurrageAmount); //(nanoDivider - ((resolutionFactor - _demurrageAmount) / nanoDivider));
-		difference = _supply * (resolutionFactor - (_demurrageAmount * 10000000000)); //(nanoDivider - ((resolutionFactor - _demurrageAmount) / nanoDivider));
+		difference = _supply * (resolutionFactor - (_demurrageAmount * 10000000000));
 		return difference / resolutionFactor;
 	}
 
-	function getDistributionFromRedistribution(bytes32 _redistribution, bytes32 _redistributionPrevious) public returns (uint256) {
+	function getDistributionFromRedistribution(bytes32 _redistribution) public returns (uint256) {
 		uint256 redistributionSupply;
 		uint256 redistributionDemurrage;
-		uint256 redistributionDemurragePrevious;
 
 		redistributionSupply = toRedistributionSupply(_redistribution);
 		redistributionDemurrage = toRedistributionDemurrageModifier(_redistribution);
-		redistributionDemurragePrevious = toRedistributionDemurrageModifier(_redistributionPrevious);
-		redistributionDemurrage = demurrageStart - (redistributionDemurragePrevious - redistributionDemurrage);
 		return getDistribution(redistributionSupply, redistributionDemurrage);
 	}
 
 	// Returns the amount sent to the sink address
-	function applyDefaultRedistribution(bytes32 _redistribution, bytes32 _redistributionPrevious) private returns (uint256) {
+	function applyDefaultRedistribution(bytes32 _redistribution) private returns (uint256) {
 		uint256 unit;
+		uint256 baseUnit;
 	
-		unit = getDistributionFromRedistribution(_redistribution, _redistributionPrevious);
-		increaseBaseBalance(sinkAddress, toBaseAmount(unit));
+		unit = getDistributionFromRedistribution(_redistribution);	
+		baseUnit = toBaseAmount(unit) - totalSink;
+		increaseBaseBalance(sinkAddress, baseUnit);
 		lastPeriod += 1;
+		totalSink += baseUnit;
 		return unit;
 	}
 
@@ -331,12 +320,8 @@ contract DemurrageTokenSingleCap {
 	}
 
 	function applyDemurrageLimited(uint256 _rounds) public returns (bool) {
-		//uint128 epochPeriodCount;
 		uint256 periodCount;
 		uint256 lastDemurrageAmount;
-
-		//epochPeriodCount = actualPeriod();
-		//periodCount = epochPeriodCount - demurragePeriod;
 
 		periodCount = getMinutesDelta(demurrageTimestamp);
 		if (periodCount == 0) {
@@ -400,7 +385,7 @@ contract DemurrageTokenSingleCap {
 		nextRedistribution = toRedistribution(0, nextRedistributionDemurrage, totalSupply, nextPeriod);
 		redistributions.push(nextRedistribution);
 
-		applyDefaultRedistribution(nextRedistribution, currentRedistribution);
+		applyDefaultRedistribution(nextRedistribution);
 		emit Period(nextPeriod);
 		return true;
 	}
@@ -435,7 +420,6 @@ contract DemurrageTokenSingleCap {
 
 	// Inflates the given amount according to the current demurrage modifier
 	function toBaseAmount(uint256 _value) public view returns (uint256) {
-		//return (_value * resolutionFactor) / demurrageAmount;
 		return (_value * resolutionFactor) / (demurrageAmount * 10000000000);
 	}
 
@@ -486,7 +470,6 @@ contract DemurrageTokenSingleCap {
 		decreaseBaseBalance(_from, _value);
 		increaseBaseBalance(_to, _value);
 
-		//period = actualPeriod();
 		return true;
 	}
 

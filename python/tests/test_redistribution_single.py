@@ -32,7 +32,7 @@ testdir = os.path.dirname(__file__)
 class TestRedistribution(TestDemurrageDefault):
 
 
-    def test_redistribution_boundaries(self):
+    def test_redistribution_periods(self):
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
@@ -42,48 +42,93 @@ class TestRedistribution(TestDemurrageDefault):
         (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[0], supply)
         self.rpc.do(o)
 
-        o = c.balance_of(self.address, self.sink_address, sender_address=self.accounts[0])
-        r = self.rpc.do(o)
-        balance = c.parse_balance(r)
-        logg.debug('balance before {} supply {}'.format(balance, supply))
+        for i in range(1, 10):
+            logg.debug('execute time travel to period {}'.format(i))
+            self.backend.time_travel(self.start_time + (self.period_seconds * i))
+            (tx_hash, o) = c.change_period(self.address, self.accounts[0])
+            self.rpc.do(o)
+            o = receipt(tx_hash)
+            r = self.rpc.do(o)
+            self.assertEqual(r['status'], 1)
 
-        self.backend.time_travel(self.start_time + self.period_seconds)
-        (tx_hash, o) = c.change_period(self.address, self.accounts[0])
-        r = self.rpc.do(o)
+            o = c.redistributions(self.address, i, sender_address=self.accounts[0])
+            redistribution = self.rpc.do(o)
 
-        o = receipt(tx_hash)
-        r = self.rpc.do(o)
-        self.assertEqual(r['status'], 1)
+            o = c.to_redistribution_demurrage_modifier(self.address, redistribution, sender_address=self.accounts[0])
+            r = self.rpc.do(o)
+            demurrage = c.parse_to_redistribution_item(r)
 
-        o = c.redistributions(self.address, 1, sender_address=self.accounts[0])
-        r = self.rpc.do(o)
-        oo = c.to_redistribution_supply(self.address, r, sender_address=self.accounts[0])
-        rr = self.rpc.do(oo)
-        oo = c.to_redistribution_demurrage_modifier(self.address, r, sender_address=self.accounts[0])
-        rr = self.rpc.do(oo)
+            o = c.redistributions(self.address, i-1, sender_address=self.accounts[0])
+            redistribution = self.rpc.do(o)
 
-        o = c.balance_of(self.address, self.sink_address, sender_address=self.accounts[0])
-        r = self.rpc.do(o)
-        balance = c.parse_balance(r)
+            o = c.to_redistribution_demurrage_modifier(self.address, redistribution, sender_address=self.accounts[0])
+            r = self.rpc.do(o)
+            demurrage_previous = c.parse_to_redistribution_item(r)
 
-        self.backend.time_travel(self.start_time + self.period_seconds * 2 + 1)
-        (tx_hash, o) = c.change_period(self.address, self.accounts[0])
-        r = self.rpc.do(o)
+            o = c.balance_of(self.address, self.sink_address, sender_address=self.accounts[0])
+            r = self.rpc.do(o)
+            balance_sink = c.parse_balance(r)
 
-        o = receipt(tx_hash)
-        r = self.rpc.do(o)
-        self.assertEqual(r['status'], 1)
+            o = c.balance_of(self.address, self.accounts[0], sender_address=self.accounts[0])
+            r = self.rpc.do(o)
+            balance_minter = c.parse_balance(r)
 
-        o = c.redistributions(self.address, 2, sender_address=self.accounts[0])
-        r = self.rpc.do(o)
-        oo = c.to_redistribution_supply(self.address, r, sender_address=self.accounts[0])
-        rr = self.rpc.do(oo)
-        oo = c.to_redistribution_demurrage_modifier(self.address, r, sender_address=self.accounts[0])
-        rr = self.rpc.do(oo)
+            logg.debug('testing sink {} mint {} adds up to supply {} with demurrage between {} and {}'.format(balance_sink, balance_minter, supply, demurrage_previous, demurrage))
 
-        o = c.balance_of(self.address, self.sink_address, sender_address=self.accounts[0])
-        r = self.rpc.do(o)
-        balance = c.parse_balance(r)
+            self.assert_within_lower(balance_minter + balance_sink, supply, 0.001)
+
+#    def test_redistribution_boundaries(self):
+#        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+#        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+#
+#        demurrage = (1 - (self.tax_level / 1000000)) * (10**28)
+#        supply = self.default_supply
+#
+#        (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[0], supply)
+#        self.rpc.do(o)
+#
+#        o = c.balance_of(self.address, self.sink_address, sender_address=self.accounts[0])
+#        r = self.rpc.do(o)
+#        balance = c.parse_balance(r)
+#        logg.debug('balance before {} supply {}'.format(balance, supply))
+#
+#        self.backend.time_travel(self.start_time + self.period_seconds)
+#        (tx_hash, o) = c.change_period(self.address, self.accounts[0])
+#        r = self.rpc.do(o)
+#
+#        o = receipt(tx_hash)
+#        r = self.rpc.do(o)
+#        self.assertEqual(r['status'], 1)
+#
+#        o = c.redistributions(self.address, 1, sender_address=self.accounts[0])
+#        r = self.rpc.do(o)
+#        oo = c.to_redistribution_supply(self.address, r, sender_address=self.accounts[0])
+#        rr = self.rpc.do(oo)
+#        oo = c.to_redistribution_demurrage_modifier(self.address, r, sender_address=self.accounts[0])
+#        rr = self.rpc.do(oo)
+#
+#        o = c.balance_of(self.address, self.sink_address, sender_address=self.accounts[0])
+#        r = self.rpc.do(o)
+#        balance = c.parse_balance(r)
+#
+#        self.backend.time_travel(self.start_time + self.period_seconds * 2 + 1)
+#        (tx_hash, o) = c.change_period(self.address, self.accounts[0])
+#        r = self.rpc.do(o)
+#
+#        o = receipt(tx_hash)
+#        r = self.rpc.do(o)
+#        self.assertEqual(r['status'], 1)
+#
+#        o = c.redistributions(self.address, 2, sender_address=self.accounts[0])
+#        r = self.rpc.do(o)
+#        oo = c.to_redistribution_supply(self.address, r, sender_address=self.accounts[0])
+#        rr = self.rpc.do(oo)
+#        oo = c.to_redistribution_demurrage_modifier(self.address, r, sender_address=self.accounts[0])
+#        rr = self.rpc.do(oo)
+#
+#        o = c.balance_of(self.address, self.sink_address, sender_address=self.accounts[0])
+#        r = self.rpc.do(o)
+#        balance = c.parse_balance(r)
 
 
 if __name__ == '__main__':

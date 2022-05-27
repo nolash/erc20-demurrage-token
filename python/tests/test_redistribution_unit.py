@@ -51,22 +51,19 @@ class TestRedistribution(TestDemurrageUnit):
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
-        demurrage_previous = (1 - (self.tax_level / 100000)) * (10**28)
-        demurrage = (1 - ((self.tax_level * 1.33) / 100000)) * (10**28)
+        demurrage = (1 - (self.tax_level / 100000)) * (10**28)
 
-        logg.debug('demurrage then {} now {}'.format(demurrage_previous, demurrage))
+        logg.debug('demurrage {}'.format(demurrage))
         supply = self.default_supply
-
-        o = c.to_redistribution(self.address, 0, demurrage_previous, supply, 1, sender_address=self.accounts[0])
-        redistribution_previous = self.rpc.do(o)
 
         o = c.to_redistribution(self.address, 0, demurrage, supply, 2, sender_address=self.accounts[0])
         redistribution = self.rpc.do(o)
 
-        o = c.get_distribution_from_redistribution(self.address, redistribution, redistribution_previous, self.accounts[0])
+        o = c.get_distribution_from_redistribution(self.address, redistribution, self.accounts[0])
         r = self.rpc.do(o)
         distribution = c.parse_get_distribution(r)
-        expected_distribution = self.default_supply * (((self.tax_level * 1.33) - self.tax_level) / 100000)
+        #expected_distribution = self.default_supply * (((self.tax_level * 1.33) - self.tax_level) / 100000)
+        expected_distribution = (self.default_supply * self.tax_level) / 100000
         logg.debug('distribution {} supply {}'.format(distribution, self.default_supply))
         self.assert_within_lower(distribution, expected_distribution, 1000)
 
