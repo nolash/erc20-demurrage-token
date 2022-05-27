@@ -20,8 +20,6 @@ contract DemurrageTokenSingleCap {
 	// Cached demurrage amount, ppm with 38 digit resolution
 	uint128 public demurrageAmount;
 
-	uint256 public demurrageStart;
-
 	// Cached demurrage timestamp; the timestamp for which demurrageAmount was last calculated
 	uint256 public demurrageTimestamp;
 
@@ -115,7 +113,6 @@ contract DemurrageTokenSingleCap {
 		periodStart = demurrageTimestamp;
 		periodDuration = _periodMinutes * 60;
 		demurrageAmount = uint128(nanoDivider) * 100;
-		demurrageStart = demurrageAmount;
 		taxLevel = _taxLevelMinute; // Represents 38 decimal places
 		bytes32 initialRedistribution = toRedistribution(0, demurrageAmount, 0, 1);
 		redistributions.push(initialRedistribution);
@@ -252,7 +249,6 @@ contract DemurrageTokenSingleCap {
 		uint256 currentRedistribution;
 		uint256 grownSupply;
 
-		//grownSupply = growBy(totalSupply, 1);
 		grownSupply = totalSupply;
 		currentRedistribution = uint256(redistributions[redistributions.length-1]);
 		currentRedistribution &= (~maskRedistributionValue);
