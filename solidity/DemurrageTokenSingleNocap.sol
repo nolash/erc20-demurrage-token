@@ -72,7 +72,7 @@ contract DemurrageTokenSingleCap {
 	mapping (address => mapping (address => uint256 ) ) allowance; // holder -> spender -> amount (amount is subject to demurrage)
 
 	// Address to send unallocated redistribution tokens
-	address sinkAddress; 
+	address public sinkAddress; 
 
 	// Implements ERC20
 	event Transfer(address indexed _from, address indexed _to, uint256 _value);

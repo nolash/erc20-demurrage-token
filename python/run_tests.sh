@@ -22,7 +22,7 @@ done
 modes=(SingleNocap) # other contracts need to be updted
 for m in ${modes[@]}; do
 	ERC20_DEMURRAGE_TOKEN_TEST_MODE=$m python tests/test_redistribution_unit.py
-	#ERC20_DEMURRAGE_TOKEN_TEST_MODE=$m python tests/test_redistribution_single.py
+	ERC20_DEMURRAGE_TOKEN_TEST_MODE=$m python tests/test_redistribution_single.py
 done
 
 modes=(MultiCap SingleCap)
