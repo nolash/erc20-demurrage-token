@@ -31,6 +31,8 @@ testdir = os.path.dirname(__file__)
 
 class TestRedistribution(TestDemurrageDefault):
 
+
+
     def test_whole_is_parts(self):
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)

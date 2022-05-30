@@ -31,12 +31,12 @@ testdir = os.path.dirname(__file__)
 
 class TestRedistribution(TestDemurrageUnit):
 
+
     # TODO: move to "pure" test file when getdistribution is implemented in all contracts
-    def test_distribution(self):
+    def test_distribution_direct(self):
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
-        #demurrage = (1 - (self.tax_level / 1000000)) * (10**38)
         demurrage = (1 - (self.tax_level / 1000000)) * (10**28)
         supply = self.default_supply
 
@@ -51,21 +51,23 @@ class TestRedistribution(TestDemurrageUnit):
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
-        #demurrage = (1 - (self.tax_level / 1000000)) * (10**38)
-        demurrage = (1 - (self.tax_level / 1000000)) * (10**28)
+        demurrage = (1 - (self.tax_level / 100000)) * (10**28)
+
+        logg.debug('demurrage {}'.format(demurrage))
         supply = self.default_supply
 
-        o = c.to_redistribution(self.address, 0, demurrage, supply, 1, sender_address=self.accounts[0])
+        o = c.to_redistribution(self.address, 0, demurrage, supply, 2, sender_address=self.accounts[0])
         redistribution = self.rpc.do(o)
 
         o = c.get_distribution_from_redistribution(self.address, redistribution, self.accounts[0])
         r = self.rpc.do(o)
         distribution = c.parse_get_distribution(r)
-        expected_distribution = self.default_supply * (self.tax_level / 1000000)
+        expected_distribution = (self.default_supply * self.tax_level) / 100000
+        logg.debug('distribution {} supply {}'.format(distribution, self.default_supply))
         self.assert_within_lower(distribution, expected_distribution, 1000)
 
 
-    def test_single_step(self):
+    def test_single_step_basic(self):
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
@@ -80,6 +82,12 @@ class TestRedistribution(TestDemurrageUnit):
         self.rpc.do(o)
 
         expected_balance = int(mint_amount - ((self.tax_level / 1000000) * mint_amount))
+
+        o = c.balance_of(self.address, ZERO_ADDRESS, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        balance = c.parse_balance(r)
+
+        logg.debug('balance {}'.format(balance))
 
         o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
         r = self.rpc.do(o)
@@ -175,9 +183,6 @@ class TestRedistribution(TestDemurrageUnit):
         o = c.to_redistribution_demurrage_modifier(self.address, redistribution, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         demurrage = c.parse_to_redistribution_item(r)
-#        o = c.demurrage_amount(self.address, sender_address=self.accounts[0])
-#        r = self.rpc.do(o)
-#        demurrage = c.parse_demurrage_amount(r)
         logg.debug('\nrediistribution {}\ndemurrage {}\nsupply {}'.format(redistribution, demurrage, supply))
 
         expected_balance = int(supply * (self.tax_level / 1000000))

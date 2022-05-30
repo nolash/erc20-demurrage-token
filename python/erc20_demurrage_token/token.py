@@ -38,6 +38,15 @@ class DemurrageTokenSettings:
         self.sink_address = None
 
 
+    def __str__(self):
+        return 'name {} demurrage level {} period minutes {} sink address {}'.format(
+                self.name,
+                self.demurrage_level,
+                self.period_minutes,
+                self.sink_address,
+                )
+
+
 class DemurrageToken(ERC20):
 
     __abi = {}
@@ -378,6 +387,10 @@ class DemurrageToken(ERC20):
 
     def demurrage_amount(self, contract_address, sender_address=ZERO_ADDRESS):
         return self.call_noarg('demurrageAmount', contract_address, sender_address=sender_address)
+
+
+    def demurrage_timestamp(self, contract_address, sender_address=ZERO_ADDRESS):
+        return self.call_noarg('demurrageTimestamp', contract_address, sender_address=sender_address)
 
 
     def supply_cap(self, contract_address, sender_address=ZERO_ADDRESS):
