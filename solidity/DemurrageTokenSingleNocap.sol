@@ -509,6 +509,11 @@ contract DemurrageTokenSingleCap {
 		return supply - burned;
 	}
 
+	// Return total number of burned tokens
+	function totalBurned() public view returns (uint256) {
+		return burned;
+	}
+
 	// Implements EIP165
 	function supportsInterface(bytes4 _sum) public pure returns (bool) {
 		if (_sum == 0xc6bb4b70) { // ERC20

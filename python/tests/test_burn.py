@@ -37,7 +37,7 @@ class TestBurn(TestDemurrageDefault):
 
         nonce_oracle = RPCNonceOracle(self.accounts[1], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
-        (tx_hash, o) = c.burn(self.address, self.accounts[1], 500000)
+        (tx_hash, o) = c.burn(self.address, self.accounts[1], 600000)
         r = self.rpc.do(o)
         o = receipt(tx_hash)
         r = self.rpc.do(o)
@@ -50,7 +50,7 @@ class TestBurn(TestDemurrageDefault):
 
         nonce_oracle = RPCNonceOracle(self.accounts[1], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
-        (tx_hash, o) = c.burn(self.address, self.accounts[1], 500000)
+        (tx_hash, o) = c.burn(self.address, self.accounts[1], 600000)
         r = self.rpc.do(o)
         o = receipt(tx_hash)
         r = self.rpc.do(o)
@@ -59,7 +59,12 @@ class TestBurn(TestDemurrageDefault):
         o = c.total_supply(self.address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         new_supply = c.parse_total_supply(r)
-        self.assertEqual(new_supply, 500000)
+        self.assertEqual(new_supply, 400000)
+
+        o = c.total_burned(self.address, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        burned = c.parse_total_burned(r)
+        self.assertEqual(burned, 600000)
 
 
     def test_burned_redistribution(self):
