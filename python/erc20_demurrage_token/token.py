@@ -155,6 +155,18 @@ class DemurrageToken(ERC20):
         return tx
 
 
+    def burn(self, contract_address, sender_address, value, tx_format=TxFormat.JSONRPC):
+        enc = ABIContractEncoder()
+        enc.method('burn')
+        enc.typ(ABIContractType.UINT256)
+        enc.uint256(value)
+        data = enc.get()
+        tx = self.template(sender_address, contract_address, use_nonce=True)
+        tx = self.set_code(tx, data)
+        tx = self.finalize(tx, tx_format)
+        return tx
+
+
     def to_base_amount(self, contract_address, value, sender_address=ZERO_ADDRESS, id_generator=None):
         j = JSONRPCRequest(id_generator)
         o = j.template()

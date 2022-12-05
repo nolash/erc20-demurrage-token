@@ -1,7 +1,6 @@
 pragma solidity > 0.6.11;
 
 // SPDX-License-Identifier: GPL-3.0-or-later
-
 contract DemurrageTokenSingleCap {
 
 	// Redistribution bit field, with associated shifts and masks
@@ -38,13 +37,17 @@ contract DemurrageTokenSingleCap {
 	uint256 public decimals;
 
 	// Implements ERC20
-	uint256 public totalSupply;
+	//uint256 public totalSupply;
+	uint256 supply;
 
 	// Last executed period
 	uint256 public lastPeriod;
 
 	// Last sink redistribution amount
 	uint256 public totalSink;
+
+	// Value of burnt tokens (burnt tokens do not decay)
+	uint256 public burned;
 
 	// 128 bit resolution of the demurrage divisor
 	// (this constant x 1000000 is contained within 128 bits)
@@ -94,6 +97,9 @@ contract DemurrageTokenSingleCap {
 
 	// Temporary event used in development, will be removed on prod
 	event Debug(bytes32 _foo);
+
+	// Emitted when tokens are burned
+	event Burn(address indexed _burner, uint256 _value);
 
 	// EIP173
 	event OwnershipTransferred(address indexed previousOwner, address indexed newOwner); // EIP173
@@ -206,7 +212,7 @@ contract DemurrageTokenSingleCap {
 
 		changePeriod();
 		baseAmount = toBaseAmount(_amount);
-		totalSupply += _amount;
+		supply += _amount;
 		increaseBaseBalance(_beneficiary, baseAmount);
 		emit Mint(msg.sender, _beneficiary, _amount);
 		saveRedistributionSupply();
@@ -249,7 +255,7 @@ contract DemurrageTokenSingleCap {
 		uint256 currentRedistribution;
 		uint256 grownSupply;
 
-		grownSupply = totalSupply;
+		grownSupply = totalSupply();
 		currentRedistribution = uint256(redistributions[redistributions.length-1]);
 		currentRedistribution &= (~maskRedistributionValue);
 		currentRedistribution |= (grownSupply << shiftRedistributionValue);
@@ -378,7 +384,7 @@ contract DemurrageTokenSingleCap {
 			nextRedistributionDemurrage = currentDemurrageAmount;
 		}
 		
-		nextRedistribution = toRedistribution(0, nextRedistributionDemurrage, totalSupply, nextPeriod);
+		nextRedistribution = toRedistribution(0, nextRedistributionDemurrage, totalSupply(), nextPeriod);
 		redistributions.push(nextRedistribution);
 
 		applyDefaultRedistribution(nextRedistribution);
@@ -484,6 +490,23 @@ contract DemurrageTokenSingleCap {
 		owner = newOwner;
 		newOwner = address(0);
 		emit OwnershipTransferred(oldOwner, owner);
+	}
+
+	// Explicitly and irretrievably burn tokens
+	function burn(uint256 _value) public {
+		require(minter[msg.sender]);
+		require(_value <= account[msg.sender]);
+		uint256 _delta = toBaseAmount(_value);
+
+		applyDemurrage();
+		decreaseBaseBalance(msg.sender, _delta);
+		burned += _value;
+		emit Burn(msg.sender, _value);
+	}
+
+	// Implements ERC20
+	function totalSupply() public view returns (uint256) {
+		return supply - burned;
 	}
 
 	// Implements EIP165
