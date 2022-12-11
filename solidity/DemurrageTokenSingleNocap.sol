@@ -269,7 +269,7 @@ contract DemurrageTokenSingleCap {
 		return uint128((block.timestamp - periodStart) / periodDuration + 1);
 	}
 
-	// Add an entered demurrage period to the redistribution array
+	// Retrieve next redistribution if the period threshold has been crossed
 	function checkPeriod() private view returns (bytes32) {
 		bytes32 lastRedistribution;
 		uint256 currentPeriod;
@@ -359,10 +359,12 @@ contract DemurrageTokenSingleCap {
 		bytes32 currentRedistribution;
 		bytes32 nextRedistribution;
 		uint256 currentPeriod;
-		uint256 currentDemurrageAmount;
+		//uint256 currentDemurrageAmount;
+		uint256 lastDemurrageAmount;
+		bytes32 lastRedistribution;
 		uint256 nextRedistributionDemurrage;
 		uint256 demurrageCounts;
-		uint256 periodTimestamp;
+		//uint256 periodTimestamp;
 		uint256 nextPeriod;
 
 		applyDemurrage();
@@ -371,18 +373,22 @@ contract DemurrageTokenSingleCap {
 			return false;
 		}
 
+		lastRedistribution = redistributions[lastPeriod];
 		currentPeriod = toRedistributionPeriod(currentRedistribution);
 		nextPeriod = currentPeriod + 1;
-		periodTimestamp = getPeriodTimeDelta(currentPeriod);
+		//periodTimestamp = getPeriodTimeDelta(currentPeriod);
 
-		currentDemurrageAmount = demurrageAmount; 
+		//currentDemurrageAmount = demurrageAmount; 
 
-		demurrageCounts = demurrageCycles(periodTimestamp);
-		if (demurrageCounts > 0) {
-			nextRedistributionDemurrage = growBy(currentDemurrageAmount, demurrageCounts);
-		} else {
-			nextRedistributionDemurrage = currentDemurrageAmount;
-		}
+		//demurrageCounts = demurrageCycles(periodTimestamp);
+		//if (demurrageCounts > 0) {
+		//	nextRedistributionDemurrage = growBy(currentDemurrageAmount, demurrageCounts);
+		//} else {
+		//	nextRedistributionDemurrage = currentDemurrageAmount;
+		//}
+		lastDemurrageAmount = toRedistributionDemurrageModifier(lastRedistribution);
+		demurrageCounts = periodDuration / 60;
+		nextRedistributionDemurrage = decayBy(lastDemurrageAmount, demurrageCounts);
 		
 		nextRedistribution = toRedistribution(0, nextRedistributionDemurrage, totalSupply(), nextPeriod);
 		redistributions.push(nextRedistribution);
