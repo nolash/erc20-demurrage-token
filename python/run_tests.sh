@@ -13,6 +13,7 @@ for m in ${modes[@]}; do
 	ERC20_DEMURRAGE_TOKEN_TEST_MODE=$m python tests/test_growth.py
 	ERC20_DEMURRAGE_TOKEN_TEST_MODE=$m python tests/test_amounts.py
 	ERC20_DEMURRAGE_TOKEN_TEST_MODE=$m python tests/test_single.py
+	ERC20_DEMURRAGE_TOKEN_TEST_MODE=$m python tests/test_burn.py
 done
 
 #modes=(SingleCap) # other contracts need to be updted
