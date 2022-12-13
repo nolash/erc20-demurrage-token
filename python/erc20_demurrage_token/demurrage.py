@@ -9,8 +9,7 @@ from chainlib.eth.constant import ZERO_ADDRESS
 # local imports
 from .token import DemurrageToken
 
-logging.basicConfig(level=logging.DEBUG)
-logg = logging.getLogger()
+logg = logging.getLogger(__name__)
 
 
 class DemurrageCalculator:
