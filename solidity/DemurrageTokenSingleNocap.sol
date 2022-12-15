@@ -355,16 +355,15 @@ contract DemurrageTokenSingleCap {
 	}
 
 	// Recalculate the demurrage modifier for the new period
+	// Note that the supply for the consecutive period will be taken at the time of code execution, and thus not necessarily at the time when the redistribution period threshold was crossed.
 	function changePeriod() public returns (bool) {
 		bytes32 currentRedistribution;
 		bytes32 nextRedistribution;
 		uint256 currentPeriod;
-		//uint256 currentDemurrageAmount;
 		uint256 lastDemurrageAmount;
 		bytes32 lastRedistribution;
 		uint256 nextRedistributionDemurrage;
 		uint256 demurrageCounts;
-		//uint256 periodTimestamp;
 		uint256 nextPeriod;
 
 		applyDemurrage();
@@ -373,23 +372,14 @@ contract DemurrageTokenSingleCap {
 			return false;
 		}
 
+		// calculate the decay from previous redistributino
 		lastRedistribution = redistributions[lastPeriod];
 		currentPeriod = toRedistributionPeriod(currentRedistribution);
 		nextPeriod = currentPeriod + 1;
-		//periodTimestamp = getPeriodTimeDelta(currentPeriod);
-
-		//currentDemurrageAmount = demurrageAmount; 
-
-		//demurrageCounts = demurrageCycles(periodTimestamp);
-		//if (demurrageCounts > 0) {
-		//	nextRedistributionDemurrage = growBy(currentDemurrageAmount, demurrageCounts);
-		//} else {
-		//	nextRedistributionDemurrage = currentDemurrageAmount;
-		//}
 		lastDemurrageAmount = toRedistributionDemurrageModifier(lastRedistribution);
 		demurrageCounts = periodDuration / 60;
 		nextRedistributionDemurrage = decayBy(lastDemurrageAmount, demurrageCounts);
-		
+	
 		nextRedistribution = toRedistribution(0, nextRedistributionDemurrage, totalSupply(), nextPeriod);
 		redistributions.push(nextRedistribution);
 
@@ -499,6 +489,7 @@ contract DemurrageTokenSingleCap {
 	}
 
 	// Explicitly and irretrievably burn tokens
+	// Only token minters can burn tokens
 	function burn(uint256 _value) public {
 		require(minter[msg.sender]);
 		require(_value <= account[msg.sender]);

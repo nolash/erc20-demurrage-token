@@ -40,6 +40,7 @@ class TestDemurragePeriods(TestDemurrage):
         logg.info('deployed with mode {}'.format(self.mode))
 
 
+    # verify that tax level calculation is in ppm as expected
     def test_ppm(self):
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
@@ -72,6 +73,7 @@ class TestDemurragePeriods(TestDemurrage):
 
 
 
+    # verify balances and supply after multiple demurrage periods
     def test_over_time(self):
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)

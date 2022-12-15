@@ -1,0 +1,5 @@
+The contract is intended for slow rates of decay (e.g. 2% per month). Very high levels of decay (2% per minute) will lead to overflows, and will need a more flexible implementation to support it.
+
+The contract is written with frequent usage in mind. If used for tokens with low usage freqency (e.g. several days idle), it is recommended to run a continuous process triggering the changePeriod() contract call, to reduce the amount of exponential calculation the application of demurrage will trigger.
+
+When changing the period, the supply for the consecutive period will be taken at the time of code execution, and thus not necessarily at the time when the redistribution period threshold was crossed. 

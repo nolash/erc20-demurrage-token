@@ -33,7 +33,6 @@ class TestBurn(TestDemurrage):
         super(TestBurn, self).setUp()
 
 
-    # tax_level = ppm
     def deploy(self, tax_level=None):
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
@@ -51,7 +50,8 @@ class TestBurn(TestDemurrage):
 
         logg.info('deployed with mode {}'.format(self.mode))
 
-        
+
+    # Burn tokens and immediately check balances and supply
     def test_burn_basic(self):
         self.deploy()
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
@@ -92,6 +92,7 @@ class TestBurn(TestDemurrage):
         self.assertEqual(burned, 600000)
 
 
+    # burn tokens and check sink balance and supply after first redistribution period
     def test_burned_redistribution(self):
         self.deploy()
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
@@ -149,7 +150,7 @@ class TestBurn(TestDemurrage):
         self.assert_within_lower(bal, 500000000, 0.0025)
 
 
-
+    # burn tokens and check sink and taxed balance and supply after first redistribution period
     def test_burned_other_redistribution(self):
         self.deploy()
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
@@ -218,6 +219,7 @@ class TestBurn(TestDemurrage):
         self.assert_within_lower(sink_bal, bal, 0.09) # TODO is this ok variance, 1.0 is ppm?
 
 
+    # verify expected results of balance and supply after multiple redistribution periods
     def test_burn_accumulate(self):
         self.deploy(tax_level=2/1000)
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)

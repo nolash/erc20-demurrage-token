@@ -95,13 +95,6 @@ class TestDemurrage(EthTesterCase):
 
     def setUp(self):
         super(TestDemurrage, self).setUp()
-#        token_deploy = TestTokenDeploy()
-#        self.settings = token_deploy.settings
-#        self.sink_address = token_deploy.sink_address
-#        self.start_block = token_deploy.start_block
-#        self.start_time = token_deploy.start_time
-#        self.default_supply = self.default_supply
-#        self.default_supply_cap = self.default_supply_cap
         period = PERIOD
         try:
             period = getattr(self, 'period')
