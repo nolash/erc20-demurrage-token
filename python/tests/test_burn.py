@@ -25,12 +25,16 @@ logg = logging.getLogger()
 
 testdir = os.path.dirname(__file__)
 
+TAX_LEVEL = 2
 
 class TestBurn(TestDemurrage):
 
     def setUp(self):
         super(TestBurn, self).setUp()
-   
+
+
+    # tax_level = ppm
+    def deploy(self, tax_level=None):
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
@@ -39,14 +43,17 @@ class TestBurn(TestDemurrage):
             self.mode = 'MultiNocap'
         logg.debug('executing test setup default mode {}'.format(self.mode))
 
+        if tax_level != None:
+            self.deployer.settings.demurrage_level = tax_level * (10 ** 32)
         self.deployer.settings.sink_address = self.accounts[9]
         self.deployer.sink_address = self.accounts[9]
-        self.deploy(c, self.mode)
+        super(TestBurn, self).deploy(c, self.mode)
 
         logg.info('deployed with mode {}'.format(self.mode))
 
         
     def test_burn_basic(self):
+        self.deploy()
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
@@ -86,6 +93,7 @@ class TestBurn(TestDemurrage):
 
 
     def test_burned_redistribution(self):
+        self.deploy()
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
@@ -143,6 +151,7 @@ class TestBurn(TestDemurrage):
 
 
     def test_burned_other_redistribution(self):
+        self.deploy()
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
@@ -210,6 +219,7 @@ class TestBurn(TestDemurrage):
 
 
     def test_burn_accumulate(self):
+        self.deploy(tax_level=2/1000)
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
@@ -222,9 +232,10 @@ class TestBurn(TestDemurrage):
         (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.sink_address, self.default_supply)
         r = self.rpc.do(o)
 
+        balance_share = int(self.default_supply / 2)
         nonce_oracle = RPCNonceOracle(self.sink_address, self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
-        (tx_hash, o) = c.transfer(self.address, self.sink_address, self.accounts[1], int(self.default_supply / 2))
+        (tx_hash, o) = c.transfer(self.address, self.sink_address, self.accounts[1], balance_share)
         r = self.rpc.do(o)
 
         new_supply = None
@@ -238,7 +249,9 @@ class TestBurn(TestDemurrage):
         bob_bal = c.parse_balance(r)
         prev_bob_bal = bob_bal
 
-        for i in range(1, 101):
+        iterations = 100
+
+        for i in range(1, iterations + 1):
             nonce_oracle = RPCNonceOracle(self.sink_address, self.rpc)
             c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
@@ -269,12 +282,13 @@ class TestBurn(TestDemurrage):
             o = c.balance(self.address, self.accounts[1], sender_address=self.accounts[0])
             r = self.rpc.do(o)
             bob_bal = c.parse_balance(r)
-
             bob_refund = prev_bob_bal - bob_bal
 
             o = c.balance(self.address, self.sink_address, sender_address=self.accounts[0])
             r = self.rpc.do(o)
             burner_bal = c.parse_balance(r)
+
+            sum_supply = bob_bal + burner_bal
           
             o = c.total_burned(self.address, sender_address=self.accounts[0])
             r = self.rpc.do(o)
@@ -285,11 +299,19 @@ class TestBurn(TestDemurrage):
             total_burned_base = c.parse_balance(r)
 
             expected_supply = self.default_supply - (burn_rate * i)
-            logg.info('checking burn round {} balance burner {} bob {} supply {} expected {} burned {} base {}'.format(i, burner_bal, bob_bal, new_supply, expected_supply, total_burned, total_burned_base))
+            logg.info('checking burn round {} balance burner {} bob {} supply {} expected {} summed {} burned {} base {}'.format(i, burner_bal, bob_bal, new_supply, expected_supply, sum_supply, total_burned, total_burned_base))
             self.assertEqual(new_supply, expected_supply)
 
         sum_supply = burner_bal + bob_bal
         logg.debug('balances sink {} bob {} total {} supply real {} original {}'.format(sink_bal, bob_bal, sum_supply, new_supply, self.default_supply))
+
+        self.assert_within_lower(sum_supply, new_supply, 0.00001)
+        self.assert_within_greater(burner_bal, balance_share - total_burned, 0.1)
+
+        bob_delta = self.default_supply * ((2 / 1000000) / 1000)
+        self.assert_within_lower(bob_bal, balance_share - bob_delta, 0.1)
+        
+        self.assertEqual(total_burned, iterations * burn_rate)
 
 
 if __name__ == '__main__':

@@ -133,6 +133,13 @@ class TestDemurrage(EthTesterCase):
         logg.debug('asserted within lower {} <= {} <= {}'.format(lower_target, v, target))
 
 
+    def assert_within_greater(self, v, target, tolerance_ppm):
+        higher_target = target + (target * (tolerance_ppm / 1000000))
+        self.assertLessEqual(v, higher_target)
+        self.assertGreaterEqual(v, target)
+        logg.debug('asserted within lower {} <= {} <= {}'.format(target, v, higher_target))
+
+
     def tearDown(self):
         pass
 
