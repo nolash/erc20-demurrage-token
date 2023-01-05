@@ -425,11 +425,42 @@ contract DemurrageTokenSingleCap {
 	function approve(address _spender, uint256 _value) public returns (bool) {
 		uint256 baseValue;
 
+		if (allowance[msg.sender][_spender] > 0) {
+			require(_value == 0, 'ZERO_FIRST');
+		}
+		
 		changePeriod();
 
 		baseValue = toBaseAmount(_value);
-		allowance[msg.sender][_spender] += baseValue;
+		allowance[msg.sender][_spender] = baseValue;
 		emit Approval(msg.sender, _spender, _value);
+		return true;
+	}
+
+	// Reduce allowance by amount
+	function decreaseAllowance(address _spender, uint256 _value) public returns (bool) {
+		uint256 baseValue;
+
+		baseValue = toBaseAmount(_value);
+		require(allowance[msg.sender][_spender] <= baseValue);
+		
+		changePeriod();
+
+		allowance[msg.sender][_spender] -= baseValue;
+		emit Approval(msg.sender, _spender, allowance[msg.sender][_spender]);
+		return true;
+	}
+
+	// Increase allowance by amount
+	function increaseAllowance(address _spender, uint256 _value) public returns (bool) {
+		uint256 baseValue;
+
+		changePeriod();
+
+		baseValue = toBaseAmount(_value);
+
+		allowance[msg.sender][_spender] += baseValue;
+		emit Approval(msg.sender, _spender, allowance[msg.sender][_spender]);
 		return true;
 	}
 

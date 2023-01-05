@@ -1,7 +1,9 @@
-- 0.1.2
+- 0.2.0
 	* Add token burn function
 	* Fix gas leak when calculating decay on period change
 	* Remove all but SingleNocap contract in make install
+	* Make approve explicitly set value
+	* Add increaseAllowance and decreaseAllowance methods
 - 0.1.1
 	* Settable demurrage steps for apply demurrage cli tool
 - 0.1.0

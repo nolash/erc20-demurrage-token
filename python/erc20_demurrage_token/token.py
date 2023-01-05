@@ -117,6 +117,34 @@ class DemurrageToken(ERC20):
         return DemurrageToken.__bytecode[name]
 
 
+    def increase_allowance(self, contract_address, sender_address, address, value, tx_format=TxFormat.JSONRPC):
+        enc = ABIContractEncoder()
+        enc.method('increaseAllowance')
+        enc.typ(ABIContractType.ADDRESS)
+        enc.typ(ABIContractType.UINT256)
+        enc.address(address)
+        enc.uint256(value)
+        data = enc.get()
+        tx = self.template(sender_address, contract_address, use_nonce=True)
+        tx = self.set_code(tx, data)
+        tx = self.finalize(tx, tx_format)
+        return tx
+
+
+    def decrease_allowance(self, contract_address, sender_address, address, value, tx_format=TxFormat.JSONRPC):
+        enc = ABIContractEncoder()
+        enc.method('decreaseAllowance')
+        enc.typ(ABIContractType.ADDRESS)
+        enc.typ(ABIContractType.UINT256)
+        enc.address(address)
+        enc.uint256(value)
+        data = enc.get()
+        tx = self.template(sender_address, contract_address, use_nonce=True)
+        tx = self.set_code(tx, data)
+        tx = self.finalize(tx, tx_format)
+        return tx
+
+
     def add_minter(self, contract_address, sender_address, address, tx_format=TxFormat.JSONRPC):
         enc = ABIContractEncoder()
         enc.method('addMinter')
