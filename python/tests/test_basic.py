@@ -360,6 +360,12 @@ class TestBasic(TestDemurrageDefault):
         balance = c.parse_balance_of(r)
         self.assertEqual(balance, 500)
 
+        (tx_hash, o) = c.transfer_from(self.address, self.accounts[2], self.accounts[1], self.accounts[3], 1)
+        self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 0)
+
 
 if __name__ == '__main__':
     unittest.main()

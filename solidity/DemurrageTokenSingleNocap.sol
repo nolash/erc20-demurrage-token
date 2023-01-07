@@ -442,7 +442,7 @@ contract DemurrageTokenSingleCap {
 		uint256 baseValue;
 
 		baseValue = toBaseAmount(_value);
-		require(allowance[msg.sender][_spender] <= baseValue);
+		require(allowance[msg.sender][_spender] >= baseValue);
 		
 		changePeriod();
 
@@ -487,7 +487,9 @@ contract DemurrageTokenSingleCap {
 		baseValue = toBaseAmount(_value);
 		require(allowance[_from][msg.sender] >= baseValue);
 
+		allowance[_from][msg.sender] -= baseValue;
 		result = transferBase(_from, _to, baseValue);
+
 		emit Transfer(_from, _to, _value);
 		return result;
 	}
