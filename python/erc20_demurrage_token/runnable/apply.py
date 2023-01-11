@@ -26,6 +26,9 @@ from chainlib.eth.connection import EthHTTPConnection
 from chainlib.eth.tx import receipt
 from chainlib.eth.constant import ZERO_ADDRESS
 from hexathon import to_int as hex_to_int
+import chainlib.eth.cli
+from chainlib.eth.settings import process_settings
+from chainlib.settings import ChainSettings
 from chainlib.eth.cli.arg import (
         Arg,
         ArgFlag,
@@ -35,6 +38,7 @@ from chainlib.eth.cli.config import (
         Config,
         process_config,
         )
+from chainlib.eth.cli.log import process_log
 
 # local imports
 import erc20_demurrage_token
@@ -43,9 +47,12 @@ from erc20_demurrage_token import (
         DemurrageTokenSettings,
         )
 
+logg = logging.getLogger()
+
 
 def process_config_local(config, arg, args, flags):
     config.add(args.steps, '_STEPS', False)
+    return config
 
 
 arg_flags = ArgFlag()

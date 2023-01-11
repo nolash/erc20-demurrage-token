@@ -18,6 +18,8 @@ from chainlib.eth.connection import EthHTTPConnection
 from chainlib.eth.tx import receipt
 from chainlib.eth.constant import ZERO_ADDRESS
 import chainlib.eth.cli
+from chainlib.eth.settings import process_settings
+from chainlib.settings import ChainSettings
 from chainlib.eth.cli.arg import (
         Arg,
         ArgFlag,
@@ -27,6 +29,7 @@ from chainlib.eth.cli.config import (
         Config,
         process_config,
         )
+from chainlib.eth.cli.log import process_log
 
 # local imports
 import erc20_demurrage_token
@@ -35,14 +38,18 @@ from erc20_demurrage_token import (
         DemurrageTokenSettings,
         )
 
+logg = logging.getLogger()
+
+
 def process_config_local(config, arg, args, flags):
-    config.add(args.name, 'TOKEN_NAME', False)
-    config.add(args.symbol, 'TOKEN_SYMBOL', False)
-    config.add(args.decimals, 'TOKEN_DECIMALS', False)
+    config.add(args.token_name, 'TOKEN_NAME', False)
+    config.add(args.token_symbol, 'TOKEN_SYMBOL', False)
+    config.add(args.token_decimals, 'TOKEN_DECIMALS', False)
     config.add(args.sink_address, 'TOKEN_SINK_ADDRESS', False)
     config.add(args.redistribution_period, 'TOKEN_REDISTRIBUTION_PERIOD', False)
     config.add(args.demurrage_level, 'TOKEN_DEMURRAGE_LEVEL', False)
-    #config.add(args.supply_limit, 'TOKEN_DECIMALS', False)
+    config.add(0, 'TOKEN_SUPPLY_LIMIT', False)
+    return config
 
 
 arg_flags = ArgFlag()
@@ -74,6 +81,7 @@ logg.debug('settings loaded:\n{}'.format(settings))
 
 
 def main():
+    chain_spec = settings.get('CHAIN_SPEC')
     conn = settings.get('CONN')
     signer = settings.get('SIGNER')
     signer_address = settings.get('SENDER_ADDRESS')
