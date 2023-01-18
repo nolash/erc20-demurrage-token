@@ -14,7 +14,13 @@ contract DemurrageTokenSingleCap {
 	uint256 constant maskRedistributionDemurrage	= 0x0000000000ffffffffffffffffffffffffffff00000000000000000000000000; // ((1 << 36) - 1) << 140
 
 	// Account balances
-	mapping (address => uint256) account;
+	mapping (address => bytes32[] ) account;
+	uint8 constant shiftAccountValue		= 0;
+	uint256 constant maskAccountValue 		= 0x0000000000000000000000000000000000000000000000ffffffffffffffffff; // (1 << 72) - 1
+	uint8 constant shiftAccountPeriod		= 72;
+	uint256 constant maskAccountPeriod 		= 0x00000000000000000000000000000000000000ffffffff000000000000000000; // ((1 << 32) - 1) << 72
+	uint8 constant shiftAccountUsed			= 255;
+	uint256 constant maskAccountUsed 		= 0x8000000000000000000000000000000000000000000000000000000000000000; // (1 << 255)
 	
 	// Cached demurrage amount, ppm with 38 digit resolution
 	uint128 public demurrageAmount;
@@ -163,43 +169,36 @@ contract DemurrageTokenSingleCap {
 		return (baseBalance * currentDemurragedAmount) / (nanoDivider * 1000000000000);
 	}
 
+
 	/// Balance unmodified by demurrage
 	function baseBalanceOf(address _account) public view returns (uint256) {
-		return account[_account];
+		uint256 lastPeriodUsed;
+
+		lastPeriodUsed = account[_account].length;
+		if (lastPeriodUsed == 0) {
+			return 0;
+		}
+		return uint256(account[_account][lastPeriodUsed]) & maskAccountValue;
 	}
+
 
 	/// Increases base balance for a single account
 	function increaseBaseBalance(address _account, uint256 _delta) private returns (bool) {
-		uint256 oldBalance;
-		uint256 newBalance;
-		uint256 workAccount;
-
-		workAccount = uint256(account[_account]);
-	
 		if (_delta == 0) {
 			return false;
 		}
-
-		oldBalance = baseBalanceOf(_account);
-		account[_account] = oldBalance + _delta;
+		
+		movePeriodBalance(_account, int256(_delta));
 		return true;
 	}
 
 	/// Decreases base balance for a single account
 	function decreaseBaseBalance(address _account, uint256 _delta) private returns (bool) {
-		uint256 oldBalance;
-	       	uint256 newBalance;
-		uint256 workAccount;
-
-		workAccount = uint256(account[_account]);
-
 		if (_delta == 0) {
 			return false;
 		}
 
-		oldBalance = baseBalanceOf(_account);	
-		require(oldBalance >= _delta, 'ERR_OVERSPEND'); // overspend guard
-		account[_account] = oldBalance - _delta;
+		movePeriodBalance(_account, int256(_delta) * -1);
 		return true;
 	}
 
@@ -352,6 +351,54 @@ contract DemurrageTokenSingleCap {
 	// Amount of demurrage cycles inbetween the current timestamp and the given target time
 	function demurrageCycles(uint256 _target) public view returns (uint256) {
 		return (block.timestamp - _target) / 60;
+	}
+
+
+	// Deserialize the pemurrage period for the given account is participating in
+	function accountPeriod(address _account) public view returns (uint256) {
+		uint256 accountPeriods;
+
+		accountPeriods = account[_account].length;
+		if (accountPeriods == 0) {
+			return 0;
+		}
+		return accountPeriodBase(_account, accountPeriods - 1);
+	}
+
+	function accountPeriodBase(address _account, uint256 _idx) private view returns (uint256) {
+		return (uint256(account[_account][_idx]) & maskAccountPeriod) >> shiftAccountPeriod;
+	}
+
+	function movePeriodBalance(address _account, int256 _delta) private {
+		int256 oldBalance;
+		uint256 newBalance;
+		uint256 workAccount;
+
+		//workAccount = uint256(account[_index][_account]);
+
+		oldBalance = int256(baseBalanceOf(_account));
+		newBalance = uint256(oldBalance + _delta);
+		require(uint72(newBalance) > uint72(uint256(oldBalance)), 'ERR_WOULDWRAP'); // revert if increase would result in a wrapped value
+		workAccount = (1 << 255);
+
+		workAccount |= ((uint32(lastPeriod) << shiftAccountPeriod) & maskAccountPeriod);
+		workAccount |= (baseBalanceOf(_account) & maskAccountValue);
+		account[_account].push(bytes32(workAccount));
+	}
+
+	function registerAccountPeriod(address _account, int256 _delta) public {
+		uint256 accountPeriods;
+		uint256 lastPeriodUsed;
+
+		accountPeriods = account[_account].length;
+		if (lastPeriodUsed == 0) {
+			account[_account].push(bytes32(uint256(_delta) | (1 << 255)));
+			return;
+		}
+		lastPeriodUsed = accountPeriodBase(_account, accountPeriods - 1);
+		if (lastPeriodUsed != lastPeriod) {
+			movePeriodBalance(_account, _delta);
+		}
 	}
 
 	// Recalculate the demurrage modifier for the new period
@@ -525,7 +572,7 @@ contract DemurrageTokenSingleCap {
 	// Only token minters can burn tokens
 	function burn(uint256 _value) public {
 		require(minter[msg.sender]);
-		require(_value <= account[msg.sender]);
+		require(_value <= balanceOf(msg.sender));
 		uint256 _delta = toBaseAmount(_value);
 
 		applyDemurrage();
