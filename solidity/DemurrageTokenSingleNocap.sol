@@ -10,11 +10,24 @@ contract DemurrageTokenSingleCap {
 	uint256 constant maskRedistributionPeriod 	= 0x00000000000000000000000000000000000000000000000000000000ffffffff; // (1 << 32) - 1
 	uint8 constant shiftRedistributionValue 	= 32;
 	uint256 constant maskRedistributionValue	= 0x00000000000000000000000000000000000000ffffffffffffffffff00000000; // ((1 << 72) - 1) << 32
-	uint8 constant shiftRedistributionDemurrage	= 104;
-	uint256 constant maskRedistributionDemurrage	= 0x0000000000ffffffffffffffffffffffffffff00000000000000000000000000; // ((1 << 36) - 1) << 140
+	uint8 constant shiftRedistributionParticipants	= 104;
+	uint256 constant maskRedistributionParticipants	= 0x00000000000000000000000000000fffffffff00000000000000000000000000; // ((1 << 36) - 1) << 104
+	uint8 constant shiftRedistributionDemurrage	= 140;
+	uint256 constant maskRedistributionDemurrage	= 0x000000000000000000000000fffff00000000000000000000000000000000000; // ((1 << 20) - 1) << 140
+
+	//uint8 constant shiftRedistributionDemurrage	= 104;
+	//uint256 constant maskRedistributionDemurrage	= 0x0000000000ffffffffffffffffffffffffffff00000000000000000000000000; // ((1 << 36) - 1) << 140
+
+	// Account bit field, with associated shifts and masks
+	// Mirrors structure of redistributions for consistency
+	mapping (address => bytes32) account; // uint152(unused) | uint32(period) | uint72(value)
+	uint8 constant shiftAccountValue		= 0;
+	uint256 constant maskAccountValue 		= 0x0000000000000000000000000000000000000000000000ffffffffffffffffff; // (1 << 72) - 1
+	uint8 constant shiftAccountPeriod		= 72;
+	uint256 constant maskAccountPeriod 		= 0x00000000000000000000000000000000000000ffffffff000000000000000000; // ((1 << 32) - 1) << 72
 
 	// Account balances
-	mapping (address => uint256) account;
+	//mapping (address => uint256) account;
 	
 	// Cached demurrage amount, ppm with 38 digit resolution
 	uint128 public demurrageAmount;
@@ -148,6 +161,36 @@ contract DemurrageTokenSingleCap {
 		return true;
 	}
 
+	// Deserialize the pemurrage period for the given account is participating in
+	function accountPeriod(address _account) public view returns (uint256) {
+		return (uint256(account[_account]) & maskAccountPeriod) >> shiftAccountPeriod;
+	}
+
+	// Add number of participants for the current redistribution period by one
+	function incrementRedistributionParticipants() private returns (bool) {
+		bytes32 currentRedistribution;
+		uint256 tmpRedistribution;
+		uint256 participants;
+
+		currentRedistribution = redistributions[redistributions.length-1];
+		participants = toRedistributionParticipants(currentRedistribution) + 1;
+		tmpRedistribution = uint256(currentRedistribution);
+		tmpRedistribution &= (~maskRedistributionParticipants);
+		tmpRedistribution |= ((participants << shiftRedistributionParticipants) & maskRedistributionParticipants);
+
+		redistributions[redistributions.length-1] = bytes32(tmpRedistribution);
+
+		return true;
+	}
+
+	// Save the given demurrage period as the currently participation period for the given address
+	function registerAccountPeriod(address _account, uint256 _period) private returns (bool) {
+		account[_account] &= bytes32(~maskAccountPeriod);
+		account[_account] |= bytes32((_period << shiftAccountPeriod) & maskAccountPeriod);
+		incrementRedistributionParticipants();
+		return true;
+	}
+
 	/// Implements ERC20
 	function balanceOf(address _account) public view returns (uint256) {
 		uint256 baseBalance;
@@ -165,7 +208,7 @@ contract DemurrageTokenSingleCap {
 
 	/// Balance unmodified by demurrage
 	function baseBalanceOf(address _account) public view returns (uint256) {
-		return account[_account];
+		return uint256(account[_account]) & maskAccountValue;
 	}
 
 	/// Increases base balance for a single account
@@ -181,7 +224,11 @@ contract DemurrageTokenSingleCap {
 		}
 
 		oldBalance = baseBalanceOf(_account);
-		account[_account] = oldBalance + _delta;
+		newBalance = oldBalance + _delta;
+		require(uint160(newBalance) > uint160(oldBalance), 'ERR_WOULDWRAP'); // revert if increase would result in a wrapped value
+		workAccount &= (~maskAccountValue); 
+		workAccount |= (newBalance & maskAccountValue);
+		account[_account] = bytes32(workAccount);
 		return true;
 	}
 
@@ -199,9 +246,53 @@ contract DemurrageTokenSingleCap {
 
 		oldBalance = baseBalanceOf(_account);	
 		require(oldBalance >= _delta, 'ERR_OVERSPEND'); // overspend guard
-		account[_account] = oldBalance - _delta;
+		newBalance = oldBalance - _delta;
+		workAccount &= (~maskAccountValue);
+		workAccount |= (newBalance & maskAccountValue);
+		account[_account] = bytes32(workAccount);
 		return true;
 	}
+
+
+//	/// Balance unmodified by demurrage
+//	function baseBalanceOf(address _account) public view returns (uint256) {
+//		return account[_account];
+//	}
+//
+//	/// Increases base balance for a single account
+//	function increaseBaseBalance(address _account, uint256 _delta) private returns (bool) {
+//		uint256 oldBalance;
+//		uint256 newBalance;
+//		uint256 workAccount;
+//
+//		workAccount = uint256(account[_account]);
+//	
+//		if (_delta == 0) {
+//			return false;
+//		}
+//
+//		oldBalance = baseBalanceOf(_account);
+//		account[_account] = oldBalance + _delta;
+//		return true;
+//	}
+//
+//	/// Decreases base balance for a single account
+//	function decreaseBaseBalance(address _account, uint256 _delta) private returns (bool) {
+//		uint256 oldBalance;
+//	       	uint256 newBalance;
+//		uint256 workAccount;
+//
+//		workAccount = uint256(account[_account]);
+//
+//		if (_delta == 0) {
+//			return false;
+//		}
+//
+//		oldBalance = baseBalanceOf(_account);	
+//		require(oldBalance >= _delta, 'ERR_OVERSPEND'); // overspend guard
+//		account[_account] = oldBalance - _delta;
+//		return true;
+//	}
 
 	// Creates new tokens out of thin air, and allocates them to the given address
 	// Triggers tax
@@ -243,6 +334,11 @@ contract DemurrageTokenSingleCap {
 	// Serializes the number of participants part of the redistribution word
 	function toRedistributionDemurrageModifier(bytes32 redistribution) public pure returns (uint256) {
 		return (uint256(redistribution) & maskRedistributionDemurrage) >> shiftRedistributionDemurrage;
+	}
+
+	// Serializes the number of participants part of the redistribution word
+	function toRedistributionParticipants(bytes32 redistribution) public pure returns (uint256) {
+		return (uint256(redistribution) & maskRedistributionParticipants) >> shiftRedistributionParticipants;
 	}
 
 	// Client accessor to the redistributions array length
@@ -308,6 +404,7 @@ contract DemurrageTokenSingleCap {
 		increaseBaseBalance(sinkAddress, baseUnit);
 		lastPeriod += 1;
 		totalSink += baseUnit;
+		registerAccountPeriod(sinkAddress, lastPeriod);
 		return unit;
 	}
 
@@ -500,6 +597,10 @@ contract DemurrageTokenSingleCap {
 
 		decreaseBaseBalance(_from, _value);
 		increaseBaseBalance(_to, _value);
+		period = actualPeriod();
+		if (accountPeriod(_from) != period && _from != _to) {
+			registerAccountPeriod(_from, period);
+		}
 
 		return true;
 	}
@@ -525,7 +626,7 @@ contract DemurrageTokenSingleCap {
 	// Only token minters can burn tokens
 	function burn(uint256 _value) public {
 		require(minter[msg.sender]);
-		require(_value <= account[msg.sender]);
+		//require(_value <= account[msg.sender]);
 		uint256 _delta = toBaseAmount(_value);
 
 		applyDemurrage();

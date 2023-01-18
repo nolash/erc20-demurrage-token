@@ -90,6 +90,7 @@ class TestRedistributionSingle(TestDemurrageSingle):
         r = self.rpc.do(o)
         balance = c.parse_balance(r)
         expected_balance = new_supply - (new_supply * tax_modifier)
+        logg.debug('expected balance {}'.format(expected_balance))
         self.assert_within_lower(balance, expected_balance, 1)
 
 
