@@ -20,7 +20,7 @@ from erc20_demurrage_token import (
         DemurrageToken,
         )
 
-logg = logging.getLogger()
+logg = logging.getLogger(__name__)
 
 #BLOCKTIME = 5 # seconds
 TAX_LEVEL = int(10000 * 2) # 2%
@@ -95,13 +95,6 @@ class TestDemurrage(EthTesterCase):
 
     def setUp(self):
         super(TestDemurrage, self).setUp()
-#        token_deploy = TestTokenDeploy()
-#        self.settings = token_deploy.settings
-#        self.sink_address = token_deploy.sink_address
-#        self.start_block = token_deploy.start_block
-#        self.start_time = token_deploy.start_time
-#        self.default_supply = self.default_supply
-#        self.default_supply_cap = self.default_supply_cap
         period = PERIOD
         try:
             period = getattr(self, 'period')
@@ -131,6 +124,13 @@ class TestDemurrage(EthTesterCase):
         self.assertGreaterEqual(v, lower_target)
         self.assertLessEqual(v, target)
         logg.debug('asserted within lower {} <= {} <= {}'.format(lower_target, v, target))
+
+
+    def assert_within_greater(self, v, target, tolerance_ppm):
+        higher_target = target + (target * (tolerance_ppm / 1000000))
+        self.assertLessEqual(v, higher_target)
+        self.assertGreaterEqual(v, target)
+        logg.debug('asserted within lower {} <= {} <= {}'.format(target, v, higher_target))
 
 
     def tearDown(self):

@@ -33,6 +33,10 @@ test: all
 	python ../python/tests/test_pure.py
 
 install: all
+	#cp -v DemurrageToken*.{json,bin} ../python/erc20_demurrage_token/data/
+	cp -v DemurrageTokenSingleNocap.{json,bin} ../python/erc20_demurrage_token/data/
+
+install-broken: all
 	cp -v DemurrageToken*.{json,bin} ../python/erc20_demurrage_token/data/
 	
 .PHONY: test install
