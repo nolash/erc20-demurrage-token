@@ -276,7 +276,52 @@ class TestBasic(TestDemurrageDefault):
         r = self.rpc.do(o)
         self.assertEqual(r['status'], 1)
 
-       
+      
+    def test_approve(self):
+        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+        (tx_hash, o) = c.approve(self.address, self.accounts[0], self.accounts[1], 500)
+        self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+ 
+        (tx_hash, o) = c.approve(self.address, self.accounts[0], self.accounts[1], 600)
+        self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 0)
+
+        (tx_hash, o) = c.approve(self.address, self.accounts[0], self.accounts[1], 0)
+        self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+
+        (tx_hash, o) = c.approve(self.address, self.accounts[0], self.accounts[1], 600)
+        self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+
+        (tx_hash, o) = c.increase_allowance(self.address, self.accounts[0], self.accounts[1], 200)
+        self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+
+        (tx_hash, o) = c.decrease_allowance(self.address, self.accounts[0], self.accounts[1], 800)
+        self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+
+        (tx_hash, o) = c.approve(self.address, self.accounts[0], self.accounts[1], 42)
+        self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+
 
     def test_transfer_from(self):
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
@@ -314,6 +359,12 @@ class TestBasic(TestDemurrageDefault):
         r = self.rpc.do(o)
         balance = c.parse_balance_of(r)
         self.assertEqual(balance, 500)
+
+        (tx_hash, o) = c.transfer_from(self.address, self.accounts[2], self.accounts[1], self.accounts[3], 1)
+        self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 0)
 
 
 if __name__ == '__main__':

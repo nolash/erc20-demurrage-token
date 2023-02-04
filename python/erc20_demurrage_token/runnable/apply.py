@@ -16,17 +16,7 @@ import math
 
 # external imports
 import confini
-from funga.eth.signer import EIP155Signer
-from funga.eth.keystore.dict import DictKeystore
-from chainlib.chain import ChainSpec
-from chainlib.eth.nonce import (
-        RPCNonceOracle,
-        OverrideNonceOracle,
-        )
-from chainlib.eth.gas import (
-        RPCGasOracle,
-        OverrideGasOracle,
-        )
+import chainlib.eth.cli
 from chainlib.eth.block import (
         block_latest,
         block_by_number,
@@ -35,8 +25,20 @@ from chainlib.eth.block import (
 from chainlib.eth.connection import EthHTTPConnection
 from chainlib.eth.tx import receipt
 from chainlib.eth.constant import ZERO_ADDRESS
-import chainlib.eth.cli
 from hexathon import to_int as hex_to_int
+import chainlib.eth.cli
+from chainlib.eth.settings import process_settings
+from chainlib.settings import ChainSettings
+from chainlib.eth.cli.arg import (
+        Arg,
+        ArgFlag,
+        process_args,
+        )
+from chainlib.eth.cli.config import (
+        Config,
+        process_config,
+        )
+from chainlib.eth.cli.log import process_log
 
 # local imports
 import erc20_demurrage_token
@@ -45,32 +47,38 @@ from erc20_demurrage_token import (
         DemurrageTokenSettings,
         )
 
-logging.basicConfig(level=logging.WARNING)
 logg = logging.getLogger()
 
-script_dir = os.path.dirname(__file__)
-data_dir = os.path.join(script_dir, '..', 'data')
 
-config_dir = os.path.join(data_dir, 'config')
+def process_config_local(config, arg, args, flags):
+    config.add(args.steps, '_STEPS', False)
+    return config
 
-arg_flags = chainlib.eth.cli.argflag_std_write | chainlib.eth.cli.Flag.EXEC
-argparser = chainlib.eth.cli.ArgumentParser(arg_flags)
+
+arg_flags = ArgFlag()
+arg = Arg(arg_flags)
+flags = arg_flags.STD_WRITE | arg_flags.EXEC | arg_flags.WALLET
+
+argparser = chainlib.eth.cli.ArgumentParser()
+argparser = process_args(argparser, arg, flags)
 argparser.add_argument('--steps', type=int, default=0, help='Max demurrage steps to apply per round')
 args = argparser.parse_args()
-config = chainlib.eth.cli.Config.from_args(args, arg_flags, default_fee_limit=DemurrageToken.gas(), base_config_dir=config_dir)
-config.add(args.steps, '_STEPS', False)
+
+logg = process_log(args, logg)
+
+config = Config()
+config = process_config(config, arg, args, flags)
+config = process_config_local(config, arg, args, flags)
 logg.debug('config loaded:\n{}'.format(config))
 
-wallet = chainlib.eth.cli.Wallet()
-wallet.from_config(config)
-
-rpc = chainlib.eth.cli.Rpc(wallet=wallet)
-conn = rpc.connect_by_config(config)
-
-chain_spec = ChainSpec.from_chain_str(config.get('CHAIN_SPEC'))
+settings = ChainSettings()
+settings = process_settings(settings, config)
+logg.debug('settings loaded:\n{}'.format(settings))
 
 
 def main():
+    chain_spec = settings.get('CHAIN_SPEC')
+    conn = settings.get('CONN')
     o = block_latest()
     r = conn.do(o)
  
@@ -87,9 +95,9 @@ def main():
     block_start_timestamp = block_start.timestamp
     block_start_datetime = datetime.datetime.fromtimestamp(block_start_timestamp)
 
-    gas_oracle = rpc.get_gas_oracle()
+    gas_oracle = settings.get('FEE_ORACLE')
     c = DemurrageToken(chain_spec, gas_oracle=gas_oracle)
-    o = c.demurrage_timestamp(config.get('_EXEC_ADDRESS'))
+    o = c.demurrage_timestamp(settings.get('EXEC'))
     r = conn.do(o)
 
     demurrage_timestamp = None
@@ -120,17 +128,17 @@ def main():
 
     last_tx_hash = None
     for i in range(rounds):
-        signer = rpc.get_signer()
-        signer_address = rpc.get_sender_address()
+        signer = settings.get('SIGNER')
+        signer_address = settings.get('SENDER_ADDRESS')
 
-        nonce_oracle = rpc.get_nonce_oracle()
+        nonce_oracle = settings.get('NONCE_ORACLE')
 
         c = DemurrageToken(chain_spec, signer=signer, gas_oracle=gas_oracle, nonce_oracle=nonce_oracle)
         (tx_hash_hex, o) = c.apply_demurrage(config.get('_EXEC_ADDRESS'), signer_address, limit=config.get('_STEPS'))
-        if config.get('_RPC_SEND'):
+        if settings.get('RPC_SEND'):
             print(tx_hash_hex)
             conn.do(o)
-            if config.get('_WAIT_ALL') or (i == rounds - 1 and config.get('_WAIT')):
+            if config.true('_WAIT_ALL') or (i == rounds - 1 and config.true('_WAIT')):
                 r = conn.wait(tx_hash_hex)
                 if r['status'] == 0:
                     sys.stderr.write('EVM revert while deploying contract. Wish I had more to tell you')

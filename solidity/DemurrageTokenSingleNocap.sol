@@ -1,7 +1,6 @@
-pragma solidity > 0.6.11;
+pragma solidity >= 0.8.0;
 
 // SPDX-License-Identifier: GPL-3.0-or-later
-
 contract DemurrageTokenSingleCap {
 
 	// Redistribution bit field, with associated shifts and masks
@@ -12,7 +11,7 @@ contract DemurrageTokenSingleCap {
 	uint8 constant shiftRedistributionValue 	= 32;
 	uint256 constant maskRedistributionValue	= 0x00000000000000000000000000000000000000ffffffffffffffffff00000000; // ((1 << 72) - 1) << 32
 	uint8 constant shiftRedistributionDemurrage	= 104;
-	uint256 constant maskRedistributionDemurrage	= 0x0000000000ffffffffffffffffffffffffffff00000000000000000000000000; // ((1 << 20) - 1) << 140
+	uint256 constant maskRedistributionDemurrage	= 0x0000000000ffffffffffffffffffffffffffff00000000000000000000000000; // ((1 << 36) - 1) << 140
 
 	// Account balances
 	mapping (address => uint256) account;
@@ -38,13 +37,17 @@ contract DemurrageTokenSingleCap {
 	uint256 public decimals;
 
 	// Implements ERC20
-	uint256 public totalSupply;
+	//uint256 public totalSupply;
+	uint256 supply;
 
 	// Last executed period
 	uint256 public lastPeriod;
 
 	// Last sink redistribution amount
 	uint256 public totalSink;
+
+	// Value of burnt tokens (burnt tokens do not decay)
+	uint256 public burned;
 
 	// 128 bit resolution of the demurrage divisor
 	// (this constant x 1000000 is contained within 128 bits)
@@ -94,6 +97,9 @@ contract DemurrageTokenSingleCap {
 
 	// Temporary event used in development, will be removed on prod
 	event Debug(bytes32 _foo);
+
+	// Emitted when tokens are burned
+	event Burn(address indexed _burner, uint256 _value);
 
 	// EIP173
 	event OwnershipTransferred(address indexed previousOwner, address indexed newOwner); // EIP173
@@ -206,7 +212,7 @@ contract DemurrageTokenSingleCap {
 
 		changePeriod();
 		baseAmount = toBaseAmount(_amount);
-		totalSupply += _amount;
+		supply += _amount;
 		increaseBaseBalance(_beneficiary, baseAmount);
 		emit Mint(msg.sender, _beneficiary, _amount);
 		saveRedistributionSupply();
@@ -249,7 +255,7 @@ contract DemurrageTokenSingleCap {
 		uint256 currentRedistribution;
 		uint256 grownSupply;
 
-		grownSupply = totalSupply;
+		grownSupply = totalSupply();
 		currentRedistribution = uint256(redistributions[redistributions.length-1]);
 		currentRedistribution &= (~maskRedistributionValue);
 		currentRedistribution |= (grownSupply << shiftRedistributionValue);
@@ -263,7 +269,7 @@ contract DemurrageTokenSingleCap {
 		return uint128((block.timestamp - periodStart) / periodDuration + 1);
 	}
 
-	// Add an entered demurrage period to the redistribution array
+	// Retrieve next redistribution if the period threshold has been crossed
 	function checkPeriod() private view returns (bytes32) {
 		bytes32 lastRedistribution;
 		uint256 currentPeriod;
@@ -349,14 +355,15 @@ contract DemurrageTokenSingleCap {
 	}
 
 	// Recalculate the demurrage modifier for the new period
+	// Note that the supply for the consecutive period will be taken at the time of code execution, and thus not necessarily at the time when the redistribution period threshold was crossed.
 	function changePeriod() public returns (bool) {
 		bytes32 currentRedistribution;
 		bytes32 nextRedistribution;
 		uint256 currentPeriod;
-		uint256 currentDemurrageAmount;
+		uint256 lastDemurrageAmount;
+		bytes32 lastRedistribution;
 		uint256 nextRedistributionDemurrage;
 		uint256 demurrageCounts;
-		uint256 periodTimestamp;
 		uint256 nextPeriod;
 
 		applyDemurrage();
@@ -365,20 +372,15 @@ contract DemurrageTokenSingleCap {
 			return false;
 		}
 
+		// calculate the decay from previous redistributino
+		lastRedistribution = redistributions[lastPeriod];
 		currentPeriod = toRedistributionPeriod(currentRedistribution);
 		nextPeriod = currentPeriod + 1;
-		periodTimestamp = getPeriodTimeDelta(currentPeriod);
-
-		currentDemurrageAmount = demurrageAmount; 
-
-		demurrageCounts = demurrageCycles(periodTimestamp);
-		if (demurrageCounts > 0) {
-			nextRedistributionDemurrage = growBy(currentDemurrageAmount, demurrageCounts);
-		} else {
-			nextRedistributionDemurrage = currentDemurrageAmount;
-		}
-		
-		nextRedistribution = toRedistribution(0, nextRedistributionDemurrage, totalSupply, nextPeriod);
+		lastDemurrageAmount = toRedistributionDemurrageModifier(lastRedistribution);
+		demurrageCounts = periodDuration / 60;
+		nextRedistributionDemurrage = decayBy(lastDemurrageAmount, demurrageCounts);
+	
+		nextRedistribution = toRedistribution(0, nextRedistributionDemurrage, totalSupply(), nextPeriod);
 		redistributions.push(nextRedistribution);
 
 		applyDefaultRedistribution(nextRedistribution);
@@ -423,11 +425,42 @@ contract DemurrageTokenSingleCap {
 	function approve(address _spender, uint256 _value) public returns (bool) {
 		uint256 baseValue;
 
+		if (allowance[msg.sender][_spender] > 0) {
+			require(_value == 0, 'ZERO_FIRST');
+		}
+		
 		changePeriod();
 
 		baseValue = toBaseAmount(_value);
-		allowance[msg.sender][_spender] += baseValue;
+		allowance[msg.sender][_spender] = baseValue;
 		emit Approval(msg.sender, _spender, _value);
+		return true;
+	}
+
+	// Reduce allowance by amount
+	function decreaseAllowance(address _spender, uint256 _value) public returns (bool) {
+		uint256 baseValue;
+
+		baseValue = toBaseAmount(_value);
+		require(allowance[msg.sender][_spender] >= baseValue);
+		
+		changePeriod();
+
+		allowance[msg.sender][_spender] -= baseValue;
+		emit Approval(msg.sender, _spender, allowance[msg.sender][_spender]);
+		return true;
+	}
+
+	// Increase allowance by amount
+	function increaseAllowance(address _spender, uint256 _value) public returns (bool) {
+		uint256 baseValue;
+
+		changePeriod();
+
+		baseValue = toBaseAmount(_value);
+
+		allowance[msg.sender][_spender] += baseValue;
+		emit Approval(msg.sender, _spender, allowance[msg.sender][_spender]);
 		return true;
 	}
 
@@ -454,7 +487,9 @@ contract DemurrageTokenSingleCap {
 		baseValue = toBaseAmount(_value);
 		require(allowance[_from][msg.sender] >= baseValue);
 
+		allowance[_from][msg.sender] -= baseValue;
 		result = transferBase(_from, _to, baseValue);
+
 		emit Transfer(_from, _to, _value);
 		return result;
 	}
@@ -484,6 +519,29 @@ contract DemurrageTokenSingleCap {
 		owner = newOwner;
 		newOwner = address(0);
 		emit OwnershipTransferred(oldOwner, owner);
+	}
+
+	// Explicitly and irretrievably burn tokens
+	// Only token minters can burn tokens
+	function burn(uint256 _value) public {
+		require(minter[msg.sender]);
+		require(_value <= account[msg.sender]);
+		uint256 _delta = toBaseAmount(_value);
+
+		applyDemurrage();
+		decreaseBaseBalance(msg.sender, _delta);
+		burned += _value;
+		emit Burn(msg.sender, _value);
+	}
+
+	// Implements ERC20
+	function totalSupply() public view returns (uint256) {
+		return supply - burned;
+	}
+
+	// Return total number of burned tokens
+	function totalBurned() public view returns (uint256) {
+		return burned;
 	}
 
 	// Implements EIP165

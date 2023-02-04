@@ -24,7 +24,7 @@ from erc20_demurrage_token import DemurrageToken
 # test imports
 from erc20_demurrage_token.unittest.base import TestDemurrageDefault
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logg = logging.getLogger()
 
 testdir = os.path.dirname(__file__)
@@ -88,18 +88,31 @@ class TestRedistribution(TestDemurrageDefault):
         (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[0], supply)
         self.rpc.do(o)
 
-        self.backend.time_travel(self.start_time + (self.period_seconds * 10))
+        self.backend.time_travel(self.start_time + (self.period_seconds * 100))
 
-        for i in range(1, 11):
-            logg.debug('checking period {}'.format(i))
+        balance_minter = None
+        balance_sink = None
+        real_supply = None
 
+        for i in range(1, 101):
             (tx_hash, o) = c.change_period(self.address, self.accounts[0])
             self.rpc.do(o)
             o = receipt(tx_hash)
             r = self.rpc.do(o)
             self.assertEqual(r['status'], 1)
 
-        i = 10
+            o = c.balance_of(self.address, self.sink_address, sender_address=self.accounts[0])
+            r = self.rpc.do(o)
+            balance_sink = c.parse_balance(r)
+
+            o = c.balance_of(self.address, self.accounts[0], sender_address=self.accounts[0])
+            r = self.rpc.do(o)
+            balance_minter = c.parse_balance(r)
+            
+            real_supply = balance_sink + balance_minter
+            logg.info('period {} testing sink {} mint {} adds up to supply {} of original {} (delta {})'.format(i, balance_sink, balance_minter, real_supply, supply, supply - real_supply))
+
+        i = 100
         o = c.redistributions(self.address, i, sender_address=self.accounts[0])
         redistribution = self.rpc.do(o)
 
@@ -122,7 +135,7 @@ class TestRedistribution(TestDemurrageDefault):
         r = self.rpc.do(o)
         balance_minter = c.parse_balance(r)
 
-        logg.debug('testing sink {} mint {} adds up to supply {} with demurrage between {} and {}'.format(balance_sink, balance_minter, supply, demurrage_previous, demurrage))
+        logg.debug('testing sink {} mint {} adds up to supply {} with demurrage between {} and {}'.format(balance_sink, balance_minter, real_supply, demurrage_previous, demurrage))
 
         self.assert_within_lower(balance_minter + balance_sink, supply, 0.001)
 

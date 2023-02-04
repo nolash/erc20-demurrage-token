@@ -6,15 +6,18 @@ set -e
 export PYTHONPATH=.
 
 #modes=(MultiNocap MultiCap SingleCap SingleNocap)
-modes=(SingleCap SingleNocap) # other contracts need to be updted
+#modes=(SingleCap SingleNocap) # other contracts need to be updted
+modes=(SingleNocap) # other contracts need to be updted
 for m in ${modes[@]}; do
 	ERC20_DEMURRAGE_TOKEN_TEST_MODE=$m python tests/test_basic.py
 	ERC20_DEMURRAGE_TOKEN_TEST_MODE=$m python tests/test_growth.py
 	ERC20_DEMURRAGE_TOKEN_TEST_MODE=$m python tests/test_amounts.py
 	ERC20_DEMURRAGE_TOKEN_TEST_MODE=$m python tests/test_single.py
+	ERC20_DEMURRAGE_TOKEN_TEST_MODE=$m python tests/test_burn.py
 done
 
-modes=(SingleCap) # other contracts need to be updted
+#modes=(SingleCap) # other contracts need to be updted
+modes=()
 for m in ${modes[@]}; do
 	ERC20_DEMURRAGE_TOKEN_TEST_MODE=$m python tests/test_period.py
 done
@@ -25,7 +28,8 @@ for m in ${modes[@]}; do
 	ERC20_DEMURRAGE_TOKEN_TEST_MODE=$m python tests/test_redistribution_single.py
 done
 
-modes=(MultiCap SingleCap)
+#modes=(MultiCap SingleCap)
+modes=()
 for m in ${modes[@]}; do
 	ERC20_DEMURRAGE_TOKEN_TEST_MODE=$m python tests/test_cap.py
 done

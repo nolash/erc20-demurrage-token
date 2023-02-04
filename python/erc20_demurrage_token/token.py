@@ -117,6 +117,34 @@ class DemurrageToken(ERC20):
         return DemurrageToken.__bytecode[name]
 
 
+    def increase_allowance(self, contract_address, sender_address, address, value, tx_format=TxFormat.JSONRPC):
+        enc = ABIContractEncoder()
+        enc.method('increaseAllowance')
+        enc.typ(ABIContractType.ADDRESS)
+        enc.typ(ABIContractType.UINT256)
+        enc.address(address)
+        enc.uint256(value)
+        data = enc.get()
+        tx = self.template(sender_address, contract_address, use_nonce=True)
+        tx = self.set_code(tx, data)
+        tx = self.finalize(tx, tx_format)
+        return tx
+
+
+    def decrease_allowance(self, contract_address, sender_address, address, value, tx_format=TxFormat.JSONRPC):
+        enc = ABIContractEncoder()
+        enc.method('decreaseAllowance')
+        enc.typ(ABIContractType.ADDRESS)
+        enc.typ(ABIContractType.UINT256)
+        enc.address(address)
+        enc.uint256(value)
+        data = enc.get()
+        tx = self.template(sender_address, contract_address, use_nonce=True)
+        tx = self.set_code(tx, data)
+        tx = self.finalize(tx, tx_format)
+        return tx
+
+
     def add_minter(self, contract_address, sender_address, address, tx_format=TxFormat.JSONRPC):
         enc = ABIContractEncoder()
         enc.method('addMinter')
@@ -153,6 +181,33 @@ class DemurrageToken(ERC20):
         tx = self.set_code(tx, data)
         tx = self.finalize(tx, tx_format)
         return tx
+
+
+    def burn(self, contract_address, sender_address, value, tx_format=TxFormat.JSONRPC):
+        enc = ABIContractEncoder()
+        enc.method('burn')
+        enc.typ(ABIContractType.UINT256)
+        enc.uint256(value)
+        data = enc.get()
+        tx = self.template(sender_address, contract_address, use_nonce=True)
+        tx = self.set_code(tx, data)
+        tx = self.finalize(tx, tx_format)
+        return tx
+
+
+    def total_burned(self, contract_address, sender_address=ZERO_ADDRESS, id_generator=None):
+        j = JSONRPCRequest(id_generator)
+        o = j.template()
+        o['method'] = 'eth_call'
+        enc = ABIContractEncoder()
+        enc.method('totalBurned')
+        data = add_0x(enc.get())
+        tx = self.template(sender_address, contract_address)
+        tx = self.set_code(tx, data)
+        o['params'].append(self.normalize(tx))
+        o['params'].append('latest')
+        o = j.finalize(o)
+        return o
 
 
     def to_base_amount(self, contract_address, value, sender_address=ZERO_ADDRESS, id_generator=None):
@@ -526,6 +581,7 @@ class DemurrageToken(ERC20):
     def parse_supply_cap(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)
 
+
     @classmethod
     def parse_grow_by(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)
@@ -548,4 +604,9 @@ class DemurrageToken(ERC20):
 
     @classmethod
     def parse_resolution_factor(self, v):
+        return abi_decode_single(ABIContractType.UINT256, v)
+
+
+    @classmethod
+    def parse_total_burned(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)
