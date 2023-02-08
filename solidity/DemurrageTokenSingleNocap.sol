@@ -1,17 +1,24 @@
 pragma solidity >= 0.8.0;
 
+
 // SPDX-License-Identifier: GPL-3.0-or-later
 contract DemurrageTokenSingleCap {
 
+	struct redistributionItem {
+		uint32 period;
+		uint72 value;
+		uint104 demurrage;
+	}
+	redistributionItem[] public redistributions; // uint51(unused) | uint64(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
 	// Redistribution bit field, with associated shifts and masks
 	// (Uses sub-byte boundaries)
-	bytes32[] public redistributions; // uint51(unused) | uint64(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
-	uint8 constant shiftRedistributionPeriod 	= 0;
-	uint256 constant maskRedistributionPeriod 	= 0x00000000000000000000000000000000000000000000000000000000ffffffff; // (1 << 32) - 1
-	uint8 constant shiftRedistributionValue 	= 32;
-	uint256 constant maskRedistributionValue	= 0x00000000000000000000000000000000000000ffffffffffffffffff00000000; // ((1 << 72) - 1) << 32
-	uint8 constant shiftRedistributionDemurrage	= 104;
-	uint256 constant maskRedistributionDemurrage	= 0x0000000000ffffffffffffffffffffffffffff00000000000000000000000000; // ((1 << 36) - 1) << 140
+//	bytes32[] public redistributions; // uint51(unused) | uint64(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
+//	uint8 constant shiftRedistributionPeriod 	= 0;
+//	uint256 constant maskRedistributionPeriod 	= 0x00000000000000000000000000000000000000000000000000000000ffffffff; // (1 << 32) - 1
+//	uint8 constant shiftRedistributionValue 	= 32;
+//	uint256 constant maskRedistributionValue	= 0x00000000000000000000000000000000000000ffffffffffffffffff00000000; // ((1 << 72) - 1) << 32
+//	uint8 constant shiftRedistributionDemurrage	= 104;
+//	uint256 constant maskRedistributionDemurrage	= 0x0000000000ffffffffffffffffffffffffffff00000000000000000000000000; // ((1 << 36) - 1) << 140
 
 	// Account balances
 	mapping (address => uint256) account;
@@ -105,6 +112,8 @@ contract DemurrageTokenSingleCap {
 	event OwnershipTransferred(address indexed previousOwner, address indexed newOwner); // EIP173
 
 	constructor(string memory _name, string memory _symbol, uint8 _decimals, uint128 _taxLevelMinute, uint256 _periodMinutes, address _defaultSinkAddress) public {
+		redistributionItem memory initialRedistribution;
+
 		// ACL setup
 		owner = msg.sender;
 		minter[owner] = true;
@@ -120,7 +129,7 @@ contract DemurrageTokenSingleCap {
 		periodDuration = _periodMinutes * 60;
 		demurrageAmount = uint128(nanoDivider) * 100;
 		taxLevel = _taxLevelMinute; // Represents 38 decimal places
-		bytes32 initialRedistribution = toRedistribution(0, demurrageAmount, 0, 1);
+		initialRedistribution = toRedistribution(0, demurrageAmount, 0, 1);
 		redistributions.push(initialRedistribution);
 
 		// Misc settings
@@ -221,46 +230,82 @@ contract DemurrageTokenSingleCap {
 
 	// Deserializes the redistribution word
 	// uint95(unused) | uint20(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
-	function toRedistribution(uint256 _participants, uint256 _demurrageModifierPpm, uint256 _value, uint256 _period) public pure returns(bytes32) {
-		bytes32 redistribution;
+//	function toRedistribution(uint256 _participants, uint256 _demurrageModifierPpm, uint256 _value, uint256 _period) public pure returns(bytes32) {
+//		bytes32 redistribution;
+//
+//		redistribution |= bytes32((_demurrageModifierPpm << shiftRedistributionDemurrage) & maskRedistributionDemurrage);
+//		redistribution |= bytes32((_value << shiftRedistributionValue) & maskRedistributionValue); 
+//		redistribution |= bytes32(_period & maskRedistributionPeriod);
+//		return redistribution;
+//	}
 
-		redistribution |= bytes32((_demurrageModifierPpm << shiftRedistributionDemurrage) & maskRedistributionDemurrage);
-		redistribution |= bytes32((_value << shiftRedistributionValue) & maskRedistributionValue); 
-		redistribution |= bytes32(_period & maskRedistributionPeriod);
+	function toRedistribution(uint256 _participants, uint256 _demurrageModifierPpm, uint256 _value, uint256 _period) public pure returns(redistributionItem memory) {
+		redistributionItem memory redistribution;
+
+		redistribution.period = uint32(_period);
+		redistribution.value = uint72(_value);
+		redistribution.demurrage = uint104(_demurrageModifierPpm);
 		return redistribution;
+
+	}
+//
+//	// Serializes the demurrage period part of the redistribution word
+//	function toRedistributionPeriod(bytes32 redistribution) public pure returns (uint256) {
+//		return uint256(redistribution) & maskRedistributionPeriod;
+//	}
+//
+
+	function toRedistributionPeriod(redistributionItem memory _redistribution) public pure returns (uint256) {
+		return uint256(_redistribution.period);
 	}
 
-	// Serializes the demurrage period part of the redistribution word
-	function toRedistributionPeriod(bytes32 redistribution) public pure returns (uint256) {
-		return uint256(redistribution) & maskRedistributionPeriod;
+//	// Serializes the supply part of the redistribution word
+//	function toRedistributionSupply(bytes32 redistribution) public pure returns (uint256) {
+//		return (uint256(redistribution) & kkRedistributionValue) >> shiftRedistributionValue;
+//	}
+	
+	function toRedistributionSupply(redistributionItem memory _redistribution) public pure returns (uint256) {
+		return uint256(_redistribution.value);
 	}
 
-	// Serializes the supply part of the redistribution word
-	function toRedistributionSupply(bytes32 redistribution) public pure returns (uint256) {
-		return (uint256(redistribution) & maskRedistributionValue) >> shiftRedistributionValue;
+//
+//	// Serializes the number of participants part of the redistribution word
+//	function toRedistributionDemurrageModifier(bytes32 redistribution) public pure returns (uint256) {
+//		return (uint256(redistribution) & maskRedistributionDemurrage) >> shiftRedistributionDemurrage;
+//	}
+
+	function toRedistributionDemurrageModifier(redistributionItem memory _redistribution) public pure returns (uint256) {
+		return uint256(_redistribution.demurrage);
 	}
 
-	// Serializes the number of participants part of the redistribution word
-	function toRedistributionDemurrageModifier(bytes32 redistribution) public pure returns (uint256) {
-		return (uint256(redistribution) & maskRedistributionDemurrage) >> shiftRedistributionDemurrage;
-	}
 
 	// Client accessor to the redistributions array length
 	function redistributionCount() public view returns (uint256) {
 		return redistributions.length;
 	}
-
-	// Save the current total supply amount to the current redistribution period
+//
+//	// Save the current total supply amount to the current redistribution period
+//	function saveRedistributionSupply() private returns (bool) {
+//		uint256 currentRedistribution;
+//		uint256 grownSupply;
+//
+//		grownSupply = totalSupply();
+//		currentRedistribution = uint256(redistributions[redistributions.length-1]);
+//		currentRedistribution &= (~maskRedistributionValue);
+//		currentRedistribution |= (grownSupply << shiftRedistributionValue);
+//
+//		redistributions[redistributions.length-1] = bytes32(currentRedistribution);
+//		return true;
+//	}
 	function saveRedistributionSupply() private returns (bool) {
-		uint256 currentRedistribution;
+		redistributionItem memory currentRedistribution;
 		uint256 grownSupply;
 
 		grownSupply = totalSupply();
-		currentRedistribution = uint256(redistributions[redistributions.length-1]);
-		currentRedistribution &= (~maskRedistributionValue);
-		currentRedistribution |= (grownSupply << shiftRedistributionValue);
+		currentRedistribution = redistributions[redistributions.length-1];
+		currentRedistribution.value = uint72(grownSupply);
 
-		redistributions[redistributions.length-1] = bytes32(currentRedistribution);
+		redistributions[redistributions.length-1] = currentRedistribution;
 		return true;
 	}
 
@@ -270,14 +315,15 @@ contract DemurrageTokenSingleCap {
 	}
 
 	// Retrieve next redistribution if the period threshold has been crossed
-	function checkPeriod() private view returns (bytes32) {
-		bytes32 lastRedistribution;
+	function checkPeriod() private view returns (redistributionItem memory) {
+		redistributionItem memory lastRedistribution;
+		redistributionItem memory emptyRedistribution;
 		uint256 currentPeriod;
 
 		lastRedistribution =  redistributions[lastPeriod];
 		currentPeriod = this.actualPeriod();
 		if (currentPeriod <= toRedistributionPeriod(lastRedistribution)) {
-			return bytes32(0x00);
+			return emptyRedistribution;
 		}
 		return lastRedistribution;
 	}
@@ -289,7 +335,7 @@ contract DemurrageTokenSingleCap {
 		return difference / resolutionFactor;
 	}
 
-	function getDistributionFromRedistribution(bytes32 _redistribution) public returns (uint256) {
+	function getDistributionFromRedistribution(redistributionItem memory _redistribution) public returns (uint256) {
 		uint256 redistributionSupply;
 		uint256 redistributionDemurrage;
 
@@ -299,7 +345,7 @@ contract DemurrageTokenSingleCap {
 	}
 
 	// Returns the amount sent to the sink address
-	function applyDefaultRedistribution(bytes32 _redistribution) private returns (uint256) {
+	function applyDefaultRedistribution(redistributionItem memory _redistribution) private returns (uint256) {
 		uint256 unit;
 		uint256 baseUnit;
 	
@@ -354,21 +400,34 @@ contract DemurrageTokenSingleCap {
 		return (block.timestamp - _target) / 60;
 	}
 
+	function isEmptyRedistribution(redistributionItem memory _redistribution) public pure returns(bool) {
+		if (_redistribution.period > 0) {
+			return false;
+		}
+		if (_redistribution.value > 0) {
+			return false;
+		}
+		if (_redistribution.demurrage > 0) {
+			return false;
+		}
+		return true;
+	}
+
 	// Recalculate the demurrage modifier for the new period
 	// Note that the supply for the consecutive period will be taken at the time of code execution, and thus not necessarily at the time when the redistribution period threshold was crossed.
 	function changePeriod() public returns (bool) {
-		bytes32 currentRedistribution;
-		bytes32 nextRedistribution;
+		redistributionItem memory currentRedistribution;
+		redistributionItem memory nextRedistribution;
+		redistributionItem memory lastRedistribution;
 		uint256 currentPeriod;
 		uint256 lastDemurrageAmount;
-		bytes32 lastRedistribution;
 		uint256 nextRedistributionDemurrage;
 		uint256 demurrageCounts;
 		uint256 nextPeriod;
 
 		applyDemurrage();
 		currentRedistribution = checkPeriod();
-		if (currentRedistribution == bytes32(0x00)) {
+		if (isEmptyRedistribution(currentRedistribution)) {
 			return false;
 		}
 
@@ -389,18 +448,18 @@ contract DemurrageTokenSingleCap {
 	}
 
 	// Reverse a value reduced by demurrage by the given period to its original value
-	function growBy(uint256 _value, uint256 _period) public view returns (uint256) {
-		uint256 valueFactor;
-		uint256 truncatedTaxLevel;
-	      
-		valueFactor = growthResolutionFactor;
-		truncatedTaxLevel = taxLevel / nanoDivider;
-
-		for (uint256 i = 0; i < _period; i++) {
-			valueFactor = valueFactor + ((valueFactor * truncatedTaxLevel) / growthResolutionFactor);
-		}
-		return (valueFactor * _value) / growthResolutionFactor;
-	}
+//	function growBy(uint256 _value, uint256 _period) public view returns (uint256) {
+//		uint256 valueFactor;
+//		uint256 truncatedTaxLevel;
+//	      
+//		valueFactor = growthResolutionFactor;
+//		truncatedTaxLevel = taxLevel / nanoDivider;
+//
+//		for (uint256 i = 0; i < _period; i++) {
+//			valueFactor = valueFactor + ((valueFactor * truncatedTaxLevel) / growthResolutionFactor);
+//		}
+//		return (valueFactor * _value) / growthResolutionFactor;
+//	}
 
 	// Calculate a value reduced by demurrage by the given period
 	function decayBy(uint256 _value, uint256 _period) public view returns (uint256) {
