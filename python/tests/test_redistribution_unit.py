@@ -177,6 +177,7 @@ class TestRedistribution(TestDemurrageUnit):
 
         o = c.redistributions(self.address, 0, sender_address=self.accounts[0])
         redistribution = self.rpc.do(o)
+        logg.debug('redistribution {}'.format(redistribution))
         o = c.to_redistribution_supply(self.address, redistribution, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         supply = c.parse_to_redistribution_item(r)
