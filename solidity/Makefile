@@ -1,6 +1,6 @@
 SOLC = /usr/bin/solc
 
-all: multi single
+all: single_nocap
 
 multi_nocap:
 	$(SOLC) DemurrageTokenMultiNocap.sol --abi --evm-version byzantium | awk 'NR>3' > DemurrageTokenMultiNocap.json
@@ -33,6 +33,7 @@ test: all
 	python ../python/tests/test_pure.py
 
 install: all
-	cp -v DemurrageToken*.{json,bin} ../python/erc20_demurrage_token/data/
+	cp -v DemurrageToken*.json ../python/erc20_demurrage_token/data/
+	cp -v DemurrageToken*.bin ../python/erc20_demurrage_token/data/
 	
 .PHONY: test install

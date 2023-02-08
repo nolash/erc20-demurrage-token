@@ -10,15 +10,6 @@ contract DemurrageTokenSingleCap {
 		uint104 demurrage;
 	}
 	redistributionItem[] public redistributions; // uint51(unused) | uint64(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
-	// Redistribution bit field, with associated shifts and masks
-	// (Uses sub-byte boundaries)
-//	bytes32[] public redistributions; // uint51(unused) | uint64(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
-//	uint8 constant shiftRedistributionPeriod 	= 0;
-//	uint256 constant maskRedistributionPeriod 	= 0x00000000000000000000000000000000000000000000000000000000ffffffff; // (1 << 32) - 1
-//	uint8 constant shiftRedistributionValue 	= 32;
-//	uint256 constant maskRedistributionValue	= 0x00000000000000000000000000000000000000ffffffffffffffffff00000000; // ((1 << 72) - 1) << 32
-//	uint8 constant shiftRedistributionDemurrage	= 104;
-//	uint256 constant maskRedistributionDemurrage	= 0x0000000000ffffffffffffffffffffffffffff00000000000000000000000000; // ((1 << 36) - 1) << 140
 
 	// Account balances
 	mapping (address => uint256) account;
@@ -229,16 +220,6 @@ contract DemurrageTokenSingleCap {
 	}
 
 	// Deserializes the redistribution word
-	// uint95(unused) | uint20(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
-//	function toRedistribution(uint256 _participants, uint256 _demurrageModifierPpm, uint256 _value, uint256 _period) public pure returns(bytes32) {
-//		bytes32 redistribution;
-//
-//		redistribution |= bytes32((_demurrageModifierPpm << shiftRedistributionDemurrage) & maskRedistributionDemurrage);
-//		redistribution |= bytes32((_value << shiftRedistributionValue) & maskRedistributionValue); 
-//		redistribution |= bytes32(_period & maskRedistributionPeriod);
-//		return redistribution;
-//	}
-
 	function toRedistribution(uint256 _participants, uint256 _demurrageModifierPpm, uint256 _value, uint256 _period) public pure returns(redistributionItem memory) {
 		redistributionItem memory redistribution;
 
@@ -248,32 +229,18 @@ contract DemurrageTokenSingleCap {
 		return redistribution;
 
 	}
-//
-//	// Serializes the demurrage period part of the redistribution word
-//	function toRedistributionPeriod(bytes32 redistribution) public pure returns (uint256) {
-//		return uint256(redistribution) & maskRedistributionPeriod;
-//	}
-//
 
+	// Serializes the demurrage period part of the redistribution word
 	function toRedistributionPeriod(redistributionItem memory _redistribution) public pure returns (uint256) {
 		return uint256(_redistribution.period);
 	}
 
-//	// Serializes the supply part of the redistribution word
-//	function toRedistributionSupply(bytes32 redistribution) public pure returns (uint256) {
-//		return (uint256(redistribution) & kkRedistributionValue) >> shiftRedistributionValue;
-//	}
-	
+	// Serializes the supply part of the redistribution word
 	function toRedistributionSupply(redistributionItem memory _redistribution) public pure returns (uint256) {
 		return uint256(_redistribution.value);
 	}
 
-//
-//	// Serializes the number of participants part of the redistribution word
-//	function toRedistributionDemurrageModifier(bytes32 redistribution) public pure returns (uint256) {
-//		return (uint256(redistribution) & maskRedistributionDemurrage) >> shiftRedistributionDemurrage;
-//	}
-
+	// Serializes the number of participants part of the redistribution word
 	function toRedistributionDemurrageModifier(redistributionItem memory _redistribution) public pure returns (uint256) {
 		return uint256(_redistribution.demurrage);
 	}
@@ -283,20 +250,8 @@ contract DemurrageTokenSingleCap {
 	function redistributionCount() public view returns (uint256) {
 		return redistributions.length;
 	}
-//
-//	// Save the current total supply amount to the current redistribution period
-//	function saveRedistributionSupply() private returns (bool) {
-//		uint256 currentRedistribution;
-//		uint256 grownSupply;
-//
-//		grownSupply = totalSupply();
-//		currentRedistribution = uint256(redistributions[redistributions.length-1]);
-//		currentRedistribution &= (~maskRedistributionValue);
-//		currentRedistribution |= (grownSupply << shiftRedistributionValue);
-//
-//		redistributions[redistributions.length-1] = bytes32(currentRedistribution);
-//		return true;
-//	}
+
+	// Save the current total supply amount to the current redistribution period
 	function saveRedistributionSupply() private returns (bool) {
 		redistributionItem memory currentRedistribution;
 		uint256 grownSupply;
