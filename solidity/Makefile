@@ -32,11 +32,15 @@ test: all
 	python ../python/tests/test_redistribution.py
 	python ../python/tests/test_pure.py
 
-install: all
+#install: all
+install: single_nocap
 	#cp -v DemurrageToken*.{json,bin} ../python/erc20_demurrage_token/data/
-	cp -v DemurrageTokenSingleNocap.{json,bin} ../python/erc20_demurrage_token/data/
+	cp -v DemurrageTokenSingleNocap.json ../python/erc20_demurrage_token/data/
+	cp -v DemurrageTokenSingleNocap.bin ../python/erc20_demurrage_token/data/
 
 install-broken: all
 	cp -v DemurrageToken*.{json,bin} ../python/erc20_demurrage_token/data/
+
+
 	
 .PHONY: test install
