@@ -18,7 +18,7 @@ from chainlib.eth.block import (
 from erc20_demurrage_token import DemurrageToken
 
 # test imports
-from erc20_demurrage_token.unittest.base import TestDemurrageDefault
+from erc20_demurrage_token.unittest import TestDemurrageDefault
 
 logging.basicConfig(level=logging.DEBUG)
 logg = logging.getLogger()
@@ -28,42 +28,20 @@ testdir = os.path.dirname(__file__)
 
 class TestGrowth(TestDemurrageDefault):
 
-#    def test_grow_by(self):
-#        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
-#        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
-#
-#        growth_factor = (1000000 + self.tax_level) / 1000000
-#        v = 1000000000
-#        o = c.grow_by(self.address, v, 1, sender_address=self.accounts[0])
-#        r = self.rpc.do(o)
-#        g = c.parse_grow_by(r)
-#        self.assertEqual(int(v * growth_factor),  g)
-#
-#        period = 10
-#        growth_factor = (1 + (self.tax_level) / 1000000) ** period
-#        o = c.grow_by(self.address, v, period, sender_address=self.accounts[0])
-#        r = self.rpc.do(o)
-#        g = c.parse_grow_by(r)
-#        self.assertEqual(int(v * growth_factor),  g)
-
-
     def test_decay_by(self):
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
-        growth_factor = (1000000 - self.tax_level) / 1000000
         v = 1000000000
-        o = c.decay_by(self.address, v, 1, sender_address=self.accounts[0])
+        o = c.decay_by(self.address, v, 20000, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         g = c.parse_decay_by(r)
-        self.assertEqual(int(v * growth_factor),  g)
-
-        period = 10
-        growth_factor = (1 - (self.tax_level) / 1000000) ** period
-        o = c.decay_by(self.address, v, period, sender_address=self.accounts[0])
+        self.assertEqual(int(g), 990690498)
+       
+        o = c.decay_by(self.address, v, 43200, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         g = c.parse_decay_by(r)
-        self.assertEqual(int(v * growth_factor), g)
+        self.assertEqual(int(g), 980000000)
 
 
 if __name__ == '__main__':
