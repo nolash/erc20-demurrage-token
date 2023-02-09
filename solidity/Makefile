@@ -15,8 +15,8 @@ multi_cap:
 multi: multi_nocap multi_cap
 
 single_nocap:
-	$(SOLC) DemurrageTokenSingleNocap.sol --abi --evm-version byzantium | awk 'NR>3' > DemurrageTokenSingleNocap.json
-	$(SOLC) DemurrageTokenSingleNocap.sol --bin --evm-version byzantium | awk 'NR>3' > DemurrageTokenSingleNocap.bin
+	$(SOLC) DemurrageTokenSingleNocap.sol --abi --evm-version byzantium | awk 'NR==4' > DemurrageTokenSingleNocap.json
+	$(SOLC) DemurrageTokenSingleNocap.sol --bin --evm-version byzantium | awk 'NR==4' > DemurrageTokenSingleNocap.bin
 	truncate -s -1 DemurrageTokenSingleNocap.bin
 
 single_cap:
