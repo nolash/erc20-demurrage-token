@@ -1,6 +1,7 @@
 # standard imports
 import logging
 import os
+import math
 
 # external imports
 from chainlib.eth.unittest.ethtester import EthTesterCase
@@ -19,6 +20,10 @@ from erc20_demurrage_token import (
         DemurrageTokenSettings,
         DemurrageToken,
         )
+from erc20_demurrage_token.fixed import (
+        to_fixed,
+        from_fixed,
+        )
 
 logg = logging.getLogger()
 
@@ -26,8 +31,7 @@ logg = logging.getLogger()
 TAX_LEVEL = int(10000 * 2) # 2%
 # calc "1-(0.98)^(1/518400)" <- 518400 = 30 days of blocks
 # 0.00000003897127107225
-#PERIOD = int(60/BLOCKTIME) * 60 * 24 * 30 # month
-PERIOD = 10
+PERIOD = 43200
 
 
 class TestTokenDeploy:
@@ -41,7 +45,8 @@ class TestTokenDeploy:
         self.settings.name = token_name
         self.settings.symbol = token_symbol
         self.settings.decimals = 6
-        self.settings.demurrage_level = tax_level ** (1 / period)
+        tax_level_input = to_fixed((1 - (tax_level / 1000000)) ** (1 / period))
+        self.settings.demurrage_level = tax_level_input
         self.settings.period_minutes = period
         self.settings.sink_address = sink_address
         self.sink_address = self.settings.sink_address
@@ -59,11 +64,10 @@ class TestTokenDeploy:
             self.start_time = int(r['timestamp'])
 
         self.default_supply = supply
-        #self.default_supply_cap = int(self.default_supply * 10)
         self.default_supply_cap = 0
 
 
-    def deploy(self, rpc, deployer_address, interface, mode, supply_cap=0):
+    def deploy(self, rpc, deployer_address, interface, supply_cap=0):
         tx_hash = None
         o = None
         (tx_hash, o) = interface.constructor(deployer_address, self.settings, redistribute=False, cap=0)
@@ -100,7 +104,7 @@ class TestDemurrage(EthTesterCase):
 
 
     def deploy(self, interface):
-        self.address = self.deployer.deploy(self.rpc, self.accounts[0], interface, mode, supply_cap=self.default_supply_cap)
+        self.address = self.deployer.deploy(self.rpc, self.accounts[0], interface, supply_cap=self.default_supply_cap)
         self.start_block = self.deployer.start_block
         self.start_time = self.deployer.start_time
         self.tax_level = self.deployer.tax_level
@@ -117,6 +121,12 @@ class TestDemurrage(EthTesterCase):
         logg.debug('asserted within lower {} <= {} <= {}'.format(lower_target, v, target))
 
 
+    def assert_equal_decimals(self, v, target, precision):
+        target = int(target * (10 ** precision))
+        target = target / (10 ** precision)
+        self.assertEqual(v, target)
+
+
     def tearDown(self):
         pass
 
@@ -130,5 +140,3 @@ class TestDemurrageDefault(TestDemurrage):
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
         self.deploy(c)
-
-        logg.info('deployed with mode {}'.format(self.mode))

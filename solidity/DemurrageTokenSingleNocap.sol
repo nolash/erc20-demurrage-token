@@ -90,7 +90,7 @@ contract DemurrageTokenSingleCap {
 	event Mint(address indexed _minter, address indexed _beneficiary, uint256 _value);
 
 	// New demurrage cache milestone calculated
-	event Decayed(uint256 indexed _period, uint256 indexed _periodCount, uint256 indexed _oldAmount, uint256 _newAmount);
+	event Decayed(uint256 indexed _period, uint256 indexed _periodCount, int128 indexed _oldAmount, int128 _newAmount);
 
 	// When a new period threshold has been crossed
 	event Period(uint256 _period);
@@ -214,6 +214,10 @@ contract DemurrageTokenSingleCap {
 		return true;
 	}
 
+	function changePeriod() public {
+		applyDemurrage();	
+	}
+
 	// Creates new tokens out of thin air, and allocates them to the given address
 	// Triggers tax
 	function mintTo(address _beneficiary, uint256 _amount) external returns (bool) {
@@ -221,7 +225,7 @@ contract DemurrageTokenSingleCap {
 
 		require(minter[msg.sender], 'ERR_ACCESS');
 
-		//changePeriod();
+		changePeriod();
 		baseAmount = toBaseAmount(_amount);
 		supply += _amount;
 		increaseBaseBalance(_beneficiary, baseAmount);
@@ -328,33 +332,38 @@ contract DemurrageTokenSingleCap {
 		return (block.timestamp - _lastTimestamp) / 60;
 	}
 
-//	// Calculate and cache the demurrage value corresponding to the (period of the) time of the method call
-//	function applyDemurrage() public returns (bool) {
-//		return applyDemurrageLimited(0);
-//	}
-//
-//	function applyDemurrageLimited(uint256 _rounds) public returns (bool) {
-//		uint256 periodCount;
-//		uint256 lastDemurrageAmount;
-//
-//		periodCount = getMinutesDelta(demurrageTimestamp);
-//		if (periodCount == 0) {
-//			return false;
-//		}
-//		lastDemurrageAmount = demurrageAmount;
-//	
-//		// safety limit for exponential calculation to ensure that we can always
-//		// execute this code no matter how much time passes.			
-//		if (_rounds > 0 && _rounds < periodCount) {
-//			periodCount = _rounds;
-//		}
-//
-//		demurrageAmount = uint128(decayBy(lastDemurrageAmount, periodCount));
-//		//demurragePeriod = epochPeriodCount; 
-//		demurrageTimestamp = demurrageTimestamp + (periodCount * 60);
-//		emit Decayed(demurrageTimestamp, periodCount, lastDemurrageAmount, demurrageAmount);
-//		return true;
-//	}
+	// Calculate and cache the demurrage value corresponding to the (period of the) time of the method call
+	function applyDemurrage() public returns (uint256) {
+		return applyDemurrageLimited(0);
+	}
+
+	function applyDemurrageLimited(uint256 _rounds) public returns (uint256) {
+		int128 v;
+		uint256 periodCount;
+		int128 periodPoint;
+		int128 lastDemurrageAmount;
+
+		periodCount = getMinutesDelta(demurrageTimestamp);
+		if (periodCount == 0) {
+			return 0;
+		}
+		lastDemurrageAmount = demurrageAmount;
+	
+		// safety limit for exponential calculation to ensure that we can always
+		// execute this code no matter how much time passes.			
+		if (_rounds > 0 && _rounds < periodCount) {
+			periodCount = _rounds;
+		}
+
+		periodPoint = ABDKMath64x64.fromUInt(periodCount);
+		v = ABDKMath64x64.mul(taxLevel, periodPoint);
+		v = ABDKMath64x64.exp(v);
+
+		demurrageAmount = ABDKMath64x64.mul(demurrageAmount, v);
+		demurrageTimestamp = demurrageTimestamp + (periodCount * 60);
+		emit Decayed(demurrageTimestamp, periodCount, lastDemurrageAmount, demurrageAmount);
+		return periodCount;
+	}
 
 	// Return timestamp of start of period threshold
 	function getPeriodTimeDelta(uint256 _periodCount) public view returns (uint256) {
@@ -436,8 +445,6 @@ contract DemurrageTokenSingleCap {
 		valuePoint = ABDKMath64x64.fromUInt(_value);
 		periodPoint = ABDKMath64x64.fromUInt(_period);
 
-		//valuePoint -= ABDKMath64x64.mul(ABDKMath64x64.exp(ABDKMath64x64.mul(taxLevel, periodPoint)), valuePoint);
-		//valuePoint -= ABDKMath64x64.exp(ABDKMath64x64.mul(taxLevel, periodPoint));
 		v = ABDKMath64x64.mul(taxLevel, periodPoint);
 		v = ABDKMath64x64.exp(v);
 		v = ABDKMath64x64.mul(valuePoint, v);

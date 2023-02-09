@@ -24,6 +24,7 @@ from hexathon import (
 
 # local imports
 from erc20_demurrage_token.data import data_dir
+from erc20_demurrage_token.fixed import from_fixed
 
 logg = logging.getLogger(__name__)
 
@@ -100,7 +101,8 @@ class DemurrageToken(ERC20):
 
     @staticmethod
     def abi(multi=True, cap=False):
-        name = DemurrageToken.__to_contract_name(multi, cap)
+        #name = DemurrageToken.__to_contract_name(multi, cap)
+        name = 'DemurrageTokenSingleNocap'
         if DemurrageToken.__abi.get(name) == None:
             f = open(os.path.join(data_dir, name + '.json'), 'r')
             DemurrageToken.__abi[name] = json.load(f)
@@ -110,7 +112,8 @@ class DemurrageToken(ERC20):
 
     @staticmethod
     def bytecode(multi=True, cap=False):
-        name = DemurrageToken.__to_contract_name(multi, cap)
+        #name = DemurrageToken.__to_contract_name(multi, cap)
+        name = 'DemurrageTokenSingleNocap'
         if DemurrageToken.__bytecode.get(name) == None:
             f = open(os.path.join(data_dir, name + '.bin'), 'r')
             DemurrageToken.__bytecode[name] = f.read()
@@ -561,7 +564,8 @@ class DemurrageToken(ERC20):
 
     @classmethod
     def parse_demurrage_amount(self, v):
-        return abi_decode_single(ABIContractType.UINT256, v)
+        #        return abi_decode_single(ABIContractType.UINT256, v)
+        return from_fixed(v)
 
 
     @classmethod
