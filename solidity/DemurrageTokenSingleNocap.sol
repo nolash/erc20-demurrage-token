@@ -138,96 +138,97 @@ contract DemurrageTokenSingleCap {
 	}
 
 
-//	// Change sink address for redistribution
-//	function setSinkAddress(address _sinkAddress) public {
-//		require(msg.sender == owner);
-//		sinkAddress = _sinkAddress;
-//	}
-//
-//	// Given address will be allowed to call the mintTo() function
-//	function addMinter(address _minter) public returns (bool) {
-//		require(msg.sender == owner);
-//		minter[_minter] = true;
-//		return true;
-//	}
-//
-//	// Given address will no longer be allowed to call the mintTo() function
-//	function removeMinter(address _minter) public returns (bool) {
-//		require(msg.sender == owner || _minter == msg.sender);
-//		minter[_minter] = false;
-//		return true;
-//	}
-//
-//	/// Implements ERC20
-//	function balanceOf(address _account) public view returns (uint256) {
-//		uint256 baseBalance;
-//		uint256 currentDemurragedAmount;
-//		uint256 periodCount;
-//
-//		baseBalance = baseBalanceOf(_account);
-//
-//		periodCount = getMinutesDelta(demurrageTimestamp);
-//
-//		currentDemurragedAmount = uint128(decayBy(demurrageAmount * 10000000000, periodCount));
-//
-//		return (baseBalance * currentDemurragedAmount) / (nanoDivider * 1000000000000);
-//	}
-//
-//	/// Balance unmodified by demurrage
-//	function baseBalanceOf(address _account) public view returns (uint256) {
-//		return account[_account];
-//	}
-//
-//	/// Increases base balance for a single account
-//	function increaseBaseBalance(address _account, uint256 _delta) private returns (bool) {
-//		uint256 oldBalance;
-//		uint256 newBalance;
-//		uint256 workAccount;
-//
-//		workAccount = uint256(account[_account]);
-//	
-//		if (_delta == 0) {
-//			return false;
-//		}
-//
-//		oldBalance = baseBalanceOf(_account);
-//		account[_account] = oldBalance + _delta;
-//		return true;
-//	}
-//
-//	/// Decreases base balance for a single account
-//	function decreaseBaseBalance(address _account, uint256 _delta) private returns (bool) {
-//		uint256 oldBalance;
-//	       	uint256 newBalance;
-//		uint256 workAccount;
-//
-//		workAccount = uint256(account[_account]);
-//
-//		if (_delta == 0) {
-//			return false;
-//		}
-//
-//		oldBalance = baseBalanceOf(_account);	
-//		require(oldBalance >= _delta, 'ERR_OVERSPEND'); // overspend guard
-//		account[_account] = oldBalance - _delta;
-//		return true;
-//	}
-//
-//	// Creates new tokens out of thin air, and allocates them to the given address
-//	// Triggers tax
-//	function mintTo(address _beneficiary, uint256 _amount) external returns (bool) {
-//		uint256 baseAmount;
-//
-//		require(minter[msg.sender], 'ERR_ACCESS');
-//
-//		changePeriod();
-//		baseAmount = toBaseAmount(_amount);
-//		supply += _amount;
-//		increaseBaseBalance(_beneficiary, baseAmount);
-//		emit Mint(msg.sender, _beneficiary, _amount);
-//		saveRedistributionSupply();
-//		return true;
-//	}
+	// Change sink address for redistribution
+	function setSinkAddress(address _sinkAddress) public {
+		require(msg.sender == owner);
+		sinkAddress = _sinkAddress;
+	}
+
+	// Given address will be allowed to call the mintTo() function
+	function addMinter(address _minter) public returns (bool) {
+		require(msg.sender == owner);
+		minter[_minter] = true;
+		return true;
+	}
+
+	// Given address will no longer be allowed to call the mintTo() function
+	function removeMinter(address _minter) public returns (bool) {
+		require(msg.sender == owner || _minter == msg.sender);
+		minter[_minter] = false;
+		return true;
+	}
+
+	/// Implements ERC20
+	function balanceOf(address _account) public view returns (uint256) {
+		int128 baseBalance;
+		int128 currentDemurragedAmount;
+		uint256 periodCount;
+
+		baseBalance = ABDKMath64x64.fromUInt(baseBalanceOf(_account));
+
+		periodCount = getMinutesDelta(demurrageTimestamp);
+
+		currentDemurragedAmount = ABDKMath64x64.mul(baseBalance, demurrageAmount);
+		return decayBy(ABDKMath64x64.toUInt(currentDemurragedAmount), periodCount);
+
+		//return (baseBalance * currentDemurragedAmount) / (nanoDivider * 1000000000000);
+	}
+
+	// Balance unmodified by demurrage
+	function baseBalanceOf(address _account) public view returns (uint256) {
+		return account[_account];
+	}
+
+	/// Increases base balance for a single account
+	function increaseBaseBalance(address _account, uint256 _delta) private returns (bool) {
+		uint256 oldBalance;
+		uint256 newBalance;
+		uint256 workAccount;
+
+		workAccount = uint256(account[_account]);
+	
+		if (_delta == 0) {
+			return false;
+		}
+
+		oldBalance = baseBalanceOf(_account);
+		account[_account] = oldBalance + _delta;
+		return true;
+	}
+
+	/// Decreases base balance for a single account
+	function decreaseBaseBalance(address _account, uint256 _delta) private returns (bool) {
+		uint256 oldBalance;
+	       	uint256 newBalance;
+		uint256 workAccount;
+
+		workAccount = uint256(account[_account]);
+
+		if (_delta == 0) {
+			return false;
+		}
+
+		oldBalance = baseBalanceOf(_account);	
+		require(oldBalance >= _delta, 'ERR_OVERSPEND'); // overspend guard
+		account[_account] = oldBalance - _delta;
+		return true;
+	}
+
+	// Creates new tokens out of thin air, and allocates them to the given address
+	// Triggers tax
+	function mintTo(address _beneficiary, uint256 _amount) external returns (bool) {
+		uint256 baseAmount;
+
+		require(minter[msg.sender], 'ERR_ACCESS');
+
+		//changePeriod();
+		baseAmount = toBaseAmount(_amount);
+		supply += _amount;
+		increaseBaseBalance(_beneficiary, baseAmount);
+		emit Mint(msg.sender, _beneficiary, _amount);
+		saveRedistributionSupply();
+		return true;
+	}
 
 	// Deserializes the redistribution word
 	function toRedistribution(uint256 _participants, uint256 _demurrageModifierPpm, uint256 _value, uint256 _period) public pure returns(redistributionItem memory) {
@@ -239,46 +240,46 @@ contract DemurrageTokenSingleCap {
 		return redistribution;
 
 	}
-//
-//	// Serializes the demurrage period part of the redistribution word
-//	function toRedistributionPeriod(redistributionItem memory _redistribution) public pure returns (uint256) {
-//		return uint256(_redistribution.period);
-//	}
-//
-//	// Serializes the supply part of the redistribution word
-//	function toRedistributionSupply(redistributionItem memory _redistribution) public pure returns (uint256) {
-//		return uint256(_redistribution.value);
-//	}
-//
-//	// Serializes the number of participants part of the redistribution word
-//	function toRedistributionDemurrageModifier(redistributionItem memory _redistribution) public pure returns (uint256) {
-//		return uint256(_redistribution.demurrage);
-//	}
-//
-//
-//	// Client accessor to the redistributions array length
-//	function redistributionCount() public view returns (uint256) {
-//		return redistributions.length;
-//	}
-//
-//	// Save the current total supply amount to the current redistribution period
-//	function saveRedistributionSupply() private returns (bool) {
-//		redistributionItem memory currentRedistribution;
-//		uint256 grownSupply;
-//
-//		grownSupply = totalSupply();
-//		currentRedistribution = redistributions[redistributions.length-1];
-//		currentRedistribution.value = uint72(grownSupply);
-//
-//		redistributions[redistributions.length-1] = currentRedistribution;
-//		return true;
-//	}
-//
-//	// Get the demurrage period of the current block number
-//	function actualPeriod() public view returns (uint128) {
-//		return uint128((block.timestamp - periodStart) / periodDuration + 1);
-//	}
-//
+
+	// Serializes the demurrage period part of the redistribution word
+	function toRedistributionPeriod(redistributionItem memory _redistribution) public pure returns (uint256) {
+		return uint256(_redistribution.period);
+	}
+
+	// Serializes the supply part of the redistribution word
+	function toRedistributionSupply(redistributionItem memory _redistribution) public pure returns (uint256) {
+		return uint256(_redistribution.value);
+	}
+
+	// Serializes the number of participants part of the redistribution word
+	function toRedistributionDemurrageModifier(redistributionItem memory _redistribution) public pure returns (uint256) {
+		return uint256(_redistribution.demurrage);
+	}
+
+
+	// Client accessor to the redistributions array length
+	function redistributionCount() public view returns (uint256) {
+		return redistributions.length;
+	}
+
+	// Save the current total supply amount to the current redistribution period
+	function saveRedistributionSupply() private returns (bool) {
+		redistributionItem memory currentRedistribution;
+		uint256 grownSupply;
+
+		grownSupply = totalSupply();
+		currentRedistribution = redistributions[redistributions.length-1];
+		currentRedistribution.value = uint72(grownSupply);
+
+		redistributions[redistributions.length-1] = currentRedistribution;
+		return true;
+	}
+
+	// Get the demurrage period of the current block number
+	function actualPeriod() public view returns (uint128) {
+		return uint128((block.timestamp - periodStart) / periodDuration + 1);
+	}
+
 //	// Retrieve next redistribution if the period threshold has been crossed
 //	function checkPeriod() private view returns (redistributionItem memory) {
 //		redistributionItem memory lastRedistribution;
@@ -292,14 +293,14 @@ contract DemurrageTokenSingleCap {
 //		}
 //		return lastRedistribution;
 //	}
-//
+
 //	function getDistribution(uint256 _supply, uint256 _demurrageAmount) public view returns (uint256) {
 //		uint256 difference;
 //
 //		difference = _supply * (resolutionFactor - (_demurrageAmount * 10000000000));
 //		return difference / resolutionFactor;
 //	}
-//
+
 //	function getDistributionFromRedistribution(redistributionItem memory _redistribution) public returns (uint256) {
 //		uint256 redistributionSupply;
 //		uint256 redistributionDemurrage;
@@ -321,12 +322,12 @@ contract DemurrageTokenSingleCap {
 //		totalSink += baseUnit;
 //		return unit;
 //	}
-//
-//	// Calculate the time delta in whole minutes passed between given timestamp and current timestamp
-//	function getMinutesDelta(uint256 _lastTimestamp) public view returns (uint256) {
-//		return (block.timestamp - _lastTimestamp) / 60;
-//	}
-//
+
+	// Calculate the time delta in whole minutes passed between given timestamp and current timestamp
+	function getMinutesDelta(uint256 _lastTimestamp) public view returns (uint256) {
+		return (block.timestamp - _lastTimestamp) / 60;
+	}
+
 //	// Calculate and cache the demurrage value corresponding to the (period of the) time of the method call
 //	function applyDemurrage() public returns (bool) {
 //		return applyDemurrageLimited(0);
@@ -354,30 +355,30 @@ contract DemurrageTokenSingleCap {
 //		emit Decayed(demurrageTimestamp, periodCount, lastDemurrageAmount, demurrageAmount);
 //		return true;
 //	}
-//
-//	// Return timestamp of start of period threshold
-//	function getPeriodTimeDelta(uint256 _periodCount) public view returns (uint256) {
-//		return periodStart + (_periodCount * periodDuration);
-//	}
-//
-//	// Amount of demurrage cycles inbetween the current timestamp and the given target time
-//	function demurrageCycles(uint256 _target) public view returns (uint256) {
-//		return (block.timestamp - _target) / 60;
-//	}
-//
-//	function isEmptyRedistribution(redistributionItem memory _redistribution) public pure returns(bool) {
-//		if (_redistribution.period > 0) {
-//			return false;
-//		}
-//		if (_redistribution.value > 0) {
-//			return false;
-//		}
-//		if (_redistribution.demurrage > 0) {
-//			return false;
-//		}
-//		return true;
-//	}
-//
+
+	// Return timestamp of start of period threshold
+	function getPeriodTimeDelta(uint256 _periodCount) public view returns (uint256) {
+		return periodStart + (_periodCount * periodDuration);
+	}
+
+	// Amount of demurrage cycles inbetween the current timestamp and the given target time
+	function demurrageCycles(uint256 _target) public view returns (uint256) {
+		return (block.timestamp - _target) / 60;
+	}
+
+	function isEmptyRedistribution(redistributionItem memory _redistribution) public pure returns(bool) {
+		if (_redistribution.period > 0) {
+			return false;
+		}
+		if (_redistribution.value > 0) {
+			return false;
+		}
+		if (_redistribution.demurrage > 0) {
+			return false;
+		}
+		return true;
+	}
+
 //	// Recalculate the demurrage modifier for the new period
 //	// Note that the supply for the consecutive period will be taken at the time of code execution, and thus not necessarily at the time when the redistribution period threshold was crossed.
 //	function changePeriod() public returns (bool) {
@@ -425,21 +426,8 @@ contract DemurrageTokenSingleCap {
 ////		}
 ////		return (valueFactor * _value) / growthResolutionFactor;
 ////	}
-//
-//	// Calculate a value reduced by demurrage by the given period
-//	function decayBy(uint256 _value, uint256 _period) public view returns (uint256) {
-//		uint256 valueFactor;
-//		uint256 truncatedTaxLevel;
-//	      
-//		valueFactor = growthResolutionFactor;
-//		truncatedTaxLevel = taxLevel / nanoDivider;
-//
-//		for (uint256 i = 0; i < _period; i++) {
-//			valueFactor = valueFactor - ((valueFactor * truncatedTaxLevel) / growthResolutionFactor);
-//		}
-//		return (valueFactor * _value) / growthResolutionFactor;
-//	}
 
+	// Calculate a value reduced by demurrage by the given period
 	function decayBy(uint256 _value, uint256 _period)  public view returns (uint256) {
 		int128 valuePoint;
 		int128 periodPoint;
@@ -456,11 +444,14 @@ contract DemurrageTokenSingleCap {
 		return ABDKMath64x64.toUInt(v);
 	}
 
-//
-//	// Inflates the given amount according to the current demurrage modifier
-//	function toBaseAmount(uint256 _value) public view returns (uint256) {
-//		return (_value * resolutionFactor) / (demurrageAmount * 10000000000);
-//	}
+
+	// Inflates the given amount according to the current demurrage modifier
+	function toBaseAmount(uint256 _value) public view returns (uint256) {
+		int128 r;
+		//return (_value * resolutionFactor) / (demurrageAmount * 10000000000);
+		r = ABDKMath64x64.mul(demurrageAmount, ABDKMath64x64.fromUInt(_value));
+		return ABDKMath64x64.toUInt(r);
+	}
 //
 //	// Implements ERC20, triggers tax and/or redistribution
 //	function approve(address _spender, uint256 _value) public returns (bool) {
@@ -544,46 +535,46 @@ contract DemurrageTokenSingleCap {
 //
 //		return true;
 //	}
-//
-//	// Implements EIP173
-//	function transferOwnership(address _newOwner) public returns (bool) {
-//		require(msg.sender == owner);
-//		newOwner = _newOwner;
-//	}
-//
-//	// Implements OwnedAccepter
-//	function acceptOwnership() public returns (bool) {
-//		address oldOwner;
-//
-//		require(msg.sender == newOwner);
-//		oldOwner = owner; 
-//		owner = newOwner;
-//		newOwner = address(0);
-//		emit OwnershipTransferred(oldOwner, owner);
-//	}
-//
-//	// Explicitly and irretrievably burn tokens
-//	// Only token minters can burn tokens
-//	function burn(uint256 _value) public {
-//		require(minter[msg.sender]);
-//		require(_value <= account[msg.sender]);
-//		uint256 _delta = toBaseAmount(_value);
-//
-//		applyDemurrage();
-//		decreaseBaseBalance(msg.sender, _delta);
-//		burned += _value;
-//		emit Burn(msg.sender, _value);
-//	}
-//
-//	// Implements ERC20
-//	function totalSupply() public view returns (uint256) {
-//		return supply - burned;
-//	}
-//
-//	// Return total number of burned tokens
-//	function totalBurned() public view returns (uint256) {
-//		return burned;
-//	}
+
+	// Implements EIP173
+	function transferOwnership(address _newOwner) public returns (bool) {
+		require(msg.sender == owner);
+		newOwner = _newOwner;
+	}
+
+	// Implements OwnedAccepter
+	function acceptOwnership() public returns (bool) {
+		address oldOwner;
+
+		require(msg.sender == newOwner);
+		oldOwner = owner; 
+		owner = newOwner;
+		newOwner = address(0);
+		emit OwnershipTransferred(oldOwner, owner);
+	}
+
+	// Explicitly and irretrievably burn tokens
+	// Only token minters can burn tokens
+	function burn(uint256 _value) public {
+		require(minter[msg.sender]);
+		require(_value <= account[msg.sender]);
+		uint256 _delta = toBaseAmount(_value);
+
+		//applyDemurrage();
+		decreaseBaseBalance(msg.sender, _delta);
+		burned += _value;
+		emit Burn(msg.sender, _value);
+	}
+
+	// Implements ERC20
+	function totalSupply() public view returns (uint256) {
+		return supply - burned;
+	}
+
+	// Return total number of burned tokens
+	function totalBurned() public view returns (uint256) {
+		return burned;
+	}
 
 	// Implements EIP165
 	function supportsInterface(bytes4 _sum) public pure returns (bool) {
