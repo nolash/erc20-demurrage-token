@@ -455,93 +455,92 @@ contract DemurrageTokenSingleCap {
 	// Inflates the given amount according to the current demurrage modifier
 	function toBaseAmount(uint256 _value) public view returns (uint256) {
 		int128 r;
-		//return (_value * resolutionFactor) / (demurrageAmount * 10000000000);
-		r = ABDKMath64x64.mul(demurrageAmount, ABDKMath64x64.fromUInt(_value));
+		r = ABDKMath64x64.div(ABDKMath64x64.fromUInt(_value), demurrageAmount);
 		return ABDKMath64x64.toUInt(r);
 	}
-//
-//	// Implements ERC20, triggers tax and/or redistribution
-//	function approve(address _spender, uint256 _value) public returns (bool) {
-//		uint256 baseValue;
-//
-//		if (allowance[msg.sender][_spender] > 0) {
-//			require(_value == 0, 'ZERO_FIRST');
-//		}
-//		
-//		changePeriod();
-//
-//		baseValue = toBaseAmount(_value);
-//		allowance[msg.sender][_spender] = baseValue;
-//		emit Approval(msg.sender, _spender, _value);
-//		return true;
-//	}
-//
-//	// Reduce allowance by amount
-//	function decreaseAllowance(address _spender, uint256 _value) public returns (bool) {
-//		uint256 baseValue;
-//
-//		baseValue = toBaseAmount(_value);
-//		require(allowance[msg.sender][_spender] >= baseValue);
-//		
-//		changePeriod();
-//
-//		allowance[msg.sender][_spender] -= baseValue;
-//		emit Approval(msg.sender, _spender, allowance[msg.sender][_spender]);
-//		return true;
-//	}
-//
-//	// Increase allowance by amount
-//	function increaseAllowance(address _spender, uint256 _value) public returns (bool) {
-//		uint256 baseValue;
-//
-//		changePeriod();
-//
-//		baseValue = toBaseAmount(_value);
-//
-//		allowance[msg.sender][_spender] += baseValue;
-//		emit Approval(msg.sender, _spender, allowance[msg.sender][_spender]);
-//		return true;
-//	}
-//
-//	// Implements ERC20, triggers tax and/or redistribution
-//	function transfer(address _to, uint256 _value) public returns (bool) {
-//		uint256 baseValue;
-//		bool result;
-//
-//		changePeriod();
-//
-//		baseValue = toBaseAmount(_value);
-//		result = transferBase(msg.sender, _to, baseValue);
-//		emit Transfer(msg.sender, _to, _value);
-//		return result;
-//	}
-//
-//	// Implements ERC20, triggers tax and/or redistribution
-//	function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
-//		uint256 baseValue;
-//		bool result;
-//
-//		changePeriod();
-//
-//		baseValue = toBaseAmount(_value);
-//		require(allowance[_from][msg.sender] >= baseValue);
-//
-//		allowance[_from][msg.sender] -= baseValue;
-//		result = transferBase(_from, _to, baseValue);
-//
-//		emit Transfer(_from, _to, _value);
-//		return result;
-//	}
-//
-//	// ERC20 transfer backend for transfer, transferFrom
-//	function transferBase(address _from, address _to, uint256 _value) private returns (bool) {
-//		uint256 period;
-//
-//		decreaseBaseBalance(_from, _value);
-//		increaseBaseBalance(_to, _value);
-//
-//		return true;
-//	}
+
+	// Implements ERC20, triggers tax and/or redistribution
+	function approve(address _spender, uint256 _value) public returns (bool) {
+		uint256 baseValue;
+
+		if (allowance[msg.sender][_spender] > 0) {
+			require(_value == 0, 'ZERO_FIRST');
+		}
+		
+		changePeriod();
+
+		baseValue = toBaseAmount(_value);
+		allowance[msg.sender][_spender] = baseValue;
+		emit Approval(msg.sender, _spender, _value);
+		return true;
+	}
+
+	// Reduce allowance by amount
+	function decreaseAllowance(address _spender, uint256 _value) public returns (bool) {
+		uint256 baseValue;
+
+		baseValue = toBaseAmount(_value);
+		require(allowance[msg.sender][_spender] >= baseValue);
+		
+		changePeriod();
+
+		allowance[msg.sender][_spender] -= baseValue;
+		emit Approval(msg.sender, _spender, allowance[msg.sender][_spender]);
+		return true;
+	}
+
+	// Increase allowance by amount
+	function increaseAllowance(address _spender, uint256 _value) public returns (bool) {
+		uint256 baseValue;
+
+		changePeriod();
+
+		baseValue = toBaseAmount(_value);
+
+		allowance[msg.sender][_spender] += baseValue;
+		emit Approval(msg.sender, _spender, allowance[msg.sender][_spender]);
+		return true;
+	}
+
+	// Implements ERC20, triggers tax and/or redistribution
+	function transfer(address _to, uint256 _value) public returns (bool) {
+		uint256 baseValue;
+		bool result;
+
+		changePeriod();
+
+		baseValue = toBaseAmount(_value);
+		result = transferBase(msg.sender, _to, baseValue);
+		emit Transfer(msg.sender, _to, _value);
+		return result;
+	}
+
+	// Implements ERC20, triggers tax and/or redistribution
+	function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
+		uint256 baseValue;
+		bool result;
+
+		changePeriod();
+
+		baseValue = toBaseAmount(_value);
+		require(allowance[_from][msg.sender] >= baseValue);
+
+		allowance[_from][msg.sender] -= baseValue;
+		result = transferBase(_from, _to, baseValue);
+
+		emit Transfer(_from, _to, _value);
+		return result;
+	}
+
+	// ERC20 transfer backend for transfer, transferFrom
+	function transferBase(address _from, address _to, uint256 _value) private returns (bool) {
+		uint256 period;
+
+		decreaseBaseBalance(_from, _value);
+		increaseBaseBalance(_to, _value);
+
+		return true;
+	}
 
 	// Implements EIP173
 	function transferOwnership(address _newOwner) public returns (bool) {

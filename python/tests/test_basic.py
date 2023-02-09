@@ -219,7 +219,7 @@ class TestBasic(TestDemurrageDefault):
         (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[1], 1024)
         self.rpc.do(o)
 
-        self.backend.time_travel(self.start_time + 61)
+        self.backend.time_travel(self.start_time + (60 * 43200))
         (tx_hash, o) = c.apply_demurrage(self.address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         o = c.to_base_amount(self.address, 1000, sender_address=self.accounts[0])
