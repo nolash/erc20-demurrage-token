@@ -4,6 +4,7 @@
 	* Add sealable features for supply, sink address, expiry and minters (when sealed cannot be changed)
 	* Deployer script now takes demurrage amount as ppm instead of literal growth fraction
 	* Retire old multi and cap contracts
+	* Replace contract bitfields for redistributions with structs
 - 0.1.1
 	* Settable demurrage steps for apply demurrage cli tool
 - 0.1.0
