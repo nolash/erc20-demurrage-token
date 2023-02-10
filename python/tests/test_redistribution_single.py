@@ -18,10 +18,10 @@ from hexathon import (
         add_0x,
         same as hex_same,
         )
+from dexif import from_fixed
 
 # local imports
 from erc20_demurrage_token import DemurrageToken
-from erc20_demurrage_token.fixed import from_fixed
 
 # test imports
 from erc20_demurrage_token.unittest import TestDemurrageDefault
@@ -63,7 +63,6 @@ class TestRedistribution(TestDemurrageDefault):
 
             o = c.to_redistribution_demurrage_modifier(self.address, redistribution, sender_address=self.accounts[0])
             r = self.rpc.do(o)
-            #demurrage = c.parse_to_redistribution_item(r)
             demurrage = from_fixed(r)
 
             o = c.redistributions(self.address, i-1, sender_address=self.accounts[0])
@@ -71,7 +70,6 @@ class TestRedistribution(TestDemurrageDefault):
 
             o = c.to_redistribution_demurrage_modifier(self.address, redistribution, sender_address=self.accounts[0])
             r = self.rpc.do(o)
-            #demurrage_previous = c.parse_to_redistribution_item(r)
             demurrage_previous = from_fixed(r)
 
             o = c.balance_of(self.address, self.sink_address, sender_address=self.accounts[0])

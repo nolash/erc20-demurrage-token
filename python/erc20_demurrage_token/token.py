@@ -21,10 +21,10 @@ from hexathon import (
         add_0x,
         strip_0x,
         )
+from dexif import from_fixed
 
 # local imports
 from erc20_demurrage_token.data import data_dir
-from erc20_demurrage_token.fixed import from_fixed
 
 logg = logging.getLogger(__name__)
 
@@ -82,10 +82,10 @@ class DemurrageToken(ERC20):
                 'SingleCap',
                 ]
 
-    def constructor(self, sender_address, settings, redistribute=True, cap=0, tx_format=TxFormat.JSONRPC):
+    def constructor(self, sender_address, settings, cap=0, tx_format=TxFormat.JSONRPC):
         if int(cap) < 0:
             raise ValueError('cap must be 0 or positive integer')
-        code = DemurrageToken.bytecode(multi=redistribute, cap=cap>0)
+        code = DemurrageToken.bytecode()
         enc = ABIContractEncoder()
         enc.string(settings.name)
         enc.string(settings.symbol)
@@ -603,18 +603,7 @@ class DemurrageToken(ERC20):
     @classmethod
     def parse_redistributions(self, v):
         return strip_0x(v)
-        #return DemurrageRedistribution(v)
-#        d = ABIContractDecoder()
-#        v = strip_0x(v)
-#        d.typ(ABIContractType.BYTES32)
-#        d.typ(ABIContractType.BYTES32)
-#        d.typ(ABIContractType.BYTES32)
-#        d.val(v[:64])
-#        d.val(v[64:128])
-#        d.val(v[128:192])
-#        r = d.decode()
-#        return ''.join(r)
-
+        
 
     @classmethod
     def parse_account_period(self, v):

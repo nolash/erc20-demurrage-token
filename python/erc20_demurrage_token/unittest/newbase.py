@@ -20,19 +20,12 @@ from erc20_demurrage_token import (
         DemurrageTokenSettings,
         DemurrageToken,
         )
-from erc20_demurrage_token.fixed import (
-        to_fixed,
-        from_fixed,
-        )
+from dexif import *
 
 logg = logging.getLogger()
 
-#BLOCKTIME = 5 # seconds
 TAX_LEVEL = int(10000 * 2) # 2%
-# calc "1-(0.98)^(1/518400)" <- 518400 = 30 days of blocks
-# 0.00000003897127107225
-PERIOD = 43200
-
+PERIOD = 43200 # 30 days in minutes
 
 class TestTokenDeploy:
 

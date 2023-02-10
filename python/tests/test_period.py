@@ -18,11 +18,11 @@ from chainlib.eth.contract import (
         )
 from hexathon import same as hex_same
 from hexathon import strip_0x
+from dexif import from_fixed
 
 # local imports
 from erc20_demurrage_token import DemurrageToken
 from erc20_demurrage_token import DemurrageRedistribution
-from erc20_demurrage_token.fixed import from_fixed
 
 # test imports
 from erc20_demurrage_token.unittest import TestDemurrageDefault

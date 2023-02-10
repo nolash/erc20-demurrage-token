@@ -13,13 +13,13 @@ from hexathon import (
         strip_0x,
         add_0x,
         )
+from dexif import to_fixed
 
 # local imports
 from erc20_demurrage_token import DemurrageToken
 
 # test imports
 from erc20_demurrage_token.unittest import TestDemurrageDefault
-from erc20_demurrage_token.fixed import to_fixed
 
 logging.basicConfig(level=logging.DEBUG)
 logg = logging.getLogger()

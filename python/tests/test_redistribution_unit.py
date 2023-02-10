@@ -16,10 +16,10 @@ from hexathon import (
         strip_0x,
         add_0x,
         )
+from dexif import to_fixed
 
 # local imports
 from erc20_demurrage_token import DemurrageToken
-from erc20_demurrage_token.fixed import to_fixed
 from erc20_demurrage_token import DemurrageRedistribution
 
 # test imports
