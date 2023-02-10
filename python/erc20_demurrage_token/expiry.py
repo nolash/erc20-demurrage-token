@@ -13,7 +13,7 @@ from chainlib.eth.constant import ZERO_ADDRESS
 
 class ExpiryContract(TxFactory):
 
-    def set_expires_period(self, contract_address, sender_address, expire_timestamp, tx_format=TxFormat.JSONRPC):
+    def set_expire_period(self, contract_address, sender_address, expire_timestamp, tx_format=TxFormat.JSONRPC):
         enc = ABIContractEncoder()
         enc.method('setExpirePeriod')
         enc.typ(ABIContractType.UINT256)

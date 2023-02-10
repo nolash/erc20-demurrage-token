@@ -37,7 +37,7 @@ class TestExpire(TestDemurrageDefault):
             (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[i+1], mint_amount)
             r = self.rpc.do(o)
 
-        (tx_hash, o) = c.set_expires_period(self.address, self.accounts[0], 2)
+        (tx_hash, o) = c.set_expire_period(self.address, self.accounts[0], 2)
         r = self.rpc.do(o)
         o = receipt(tx_hash)
         r = self.rpc.do(o)

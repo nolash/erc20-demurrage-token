@@ -39,5 +39,8 @@ done
 #	ERC20_DEMURRAGE_TOKEN_TEST_MODE=$m python tests/test_redistribution.py
 #done
 
+python tests/test_expiry.py
+python tests/test_seal.py
+
 set +e
 set +x

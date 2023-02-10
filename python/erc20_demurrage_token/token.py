@@ -430,6 +430,18 @@ class DemurrageToken(ERC20, SealedContract, ExpiryContract):
         return o
 
 
+    def set_sink_address(self, contract_address, sender_address, address, tx_format=TxFormat.JSONRPC):
+        enc = ABIContractEncoder()
+        enc.method('setSinkAddress')
+        enc.typ(ABIContractType.ADDRESS)
+        enc.address(address)
+        data = enc.get()
+        tx = self.template(sender_address, contract_address, use_nonce=True)
+        tx = self.set_code(tx, data)
+        tx = self.finalize(tx, tx_format)
+        return tx
+
+
     def apply_demurrage(self, contract_address, sender_address, limit=0, tx_format=TxFormat.JSONRPC):
         if limit == 0:
             return self.transact_noarg('applyDemurrage', contract_address, sender_address)

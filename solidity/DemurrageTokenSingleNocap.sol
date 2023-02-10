@@ -155,7 +155,7 @@ contract DemurrageTokenSingleCap {
 	}
 
 	function seal(uint256 _state) public returns(uint256) {
-		require(_state < 8, 'ERR_INVALID_STATE');
+		require(_state < 16, 'ERR_INVALID_STATE');
 		require(_state & sealState == 0, 'ERR_ALREADY_LOCKED');
 		sealState |= _state;
 		emit SealStateChange(sealState);
