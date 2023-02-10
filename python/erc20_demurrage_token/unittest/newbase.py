@@ -114,6 +114,17 @@ class TestDemurrage(EthTesterCase):
         logg.debug('contract address {} start block {} start time {}'.format(self.address, self.start_block, self.start_time))
 
 
+    def assert_within(self, v, target, tolerance_ppm):
+        lower_target = target - (target * (tolerance_ppm / 1000000))
+        higher_target = target + (target * (tolerance_ppm / 1000000))
+        #self.assertGreaterEqual(v, lower_target)
+        #self.assertLessEqual(v, higher_target)
+        if v >= lower_target and v <= higher_target:
+            logg.debug('asserted within {} <= {} <= {}'.format(lower_target, v, higher_target))
+            return
+        raise AssertionError('{} not within lower {} and higher {}'.format(v, lower_target, higher_target))
+
+
     def assert_within_lower(self, v, target, tolerance_ppm):
         lower_target = target - (target * (tolerance_ppm / 1000000))
         self.assertGreaterEqual(v, lower_target)

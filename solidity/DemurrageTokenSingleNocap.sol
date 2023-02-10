@@ -298,14 +298,11 @@ contract DemurrageTokenSingleCap {
 		return lastRedistribution;
 	}
 
-	function getDistribution(uint256 _supply, int128 _demurrageAmount) public pure returns (uint256) {
+	function getDistribution(uint256 _supply, int128 _demurrageAmount) public view returns (uint256) {
 		int128 difference;
 
-//		difference = _supply * (resolutionFactor - (_demurrageAmount * 10000000000));
-//		return difference / resolutionFactor;
-		difference = ABDKMath64x64.mul(ABDKMath64x64.fromUInt(_supply), _demurrageAmount);
-		return ABDKMath64x64.toUInt(difference);
-		//return _supply;
+		difference = ABDKMath64x64.mul(ABDKMath64x64.fromUInt(_supply), ABDKMath64x64.sub(ABDKMath64x64.fromUInt(1), _demurrageAmount));
+		return _supply - ABDKMath64x64.toUInt(difference);
 			
 	}
 

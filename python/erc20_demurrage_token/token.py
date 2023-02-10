@@ -306,18 +306,18 @@ class DemurrageToken(ERC20):
         return o
 
 
-    def to_redistribution(self, contract_address, participants, demurrage_modifier_ppm, value, period, sender_address=ZERO_ADDRESS, id_generator=None):
+    def to_redistribution(self, contract_address, participants, demurrage_modifier, value, period, sender_address=ZERO_ADDRESS, id_generator=None):
         j = JSONRPCRequest(id_generator)
         o = j.template()
         o['method'] = 'eth_call'
         enc = ABIContractEncoder()
         enc.method('toRedistribution')
         enc.typ(ABIContractType.UINT256)
-        enc.typ(ABIContractType.UINT256)
+        enc.typ_literal('int128')
         enc.typ(ABIContractType.UINT256)
         enc.typ(ABIContractType.UINT256)
         enc.uint256(participants)
-        enc.uint256(demurrage_modifier_ppm)
+        enc.uint256(demurrage_modifier)
         enc.uint256(value)
         enc.uint256(period)
         data = add_0x(enc.get())
@@ -536,7 +536,7 @@ class DemurrageToken(ERC20):
         enc = ABIContractEncoder()
         enc.method('getDistribution')
         enc.typ(ABIContractType.UINT256)
-        enc.typ(ABIContractType.UINT256)
+        enc.typ_literal('int128')
         enc.uint256(supply)
         enc.uint256(demurrage_amount)
         data = add_0x(enc.get())
@@ -555,7 +555,7 @@ class DemurrageToken(ERC20):
         enc = ABIContractEncoder()
         enc.method('getDistributionFromRedistribution')
         v = strip_0x(redistribution)
-        enc.typ_literal('(uint32,uint72,uint104)')
+        enc.typ_literal('(uint32,uint72,uint64)')
         enc.bytes32(v[:64])
         enc.bytes32(v[64:128])
         enc.bytes32(v[128:192])
