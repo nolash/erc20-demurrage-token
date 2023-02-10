@@ -25,6 +25,8 @@ from dexif import from_fixed
 
 # local imports
 from erc20_demurrage_token.data import data_dir
+from erc20_demurrage_token.seal import SealedContract
+from erc20_demurrage_token.expiry import ExpiryContract
 
 logg = logging.getLogger(__name__)
 
@@ -71,7 +73,7 @@ class DemurrageTokenSettings:
                 )
 
 
-class DemurrageToken(ERC20):
+class DemurrageToken(ERC20, SealedContract, ExpiryContract):
 
     __abi = {}
     __bytecode = {}
@@ -457,6 +459,8 @@ class DemurrageToken(ERC20):
         tx = self.set_code(tx, data)
         tx = self.finalize(tx, tx_format)
         return tx
+
+
 
 
     def tax_level(self, contract_address, sender_address=ZERO_ADDRESS):

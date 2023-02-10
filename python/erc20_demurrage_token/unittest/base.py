@@ -92,7 +92,7 @@ class TestDemurrage(EthTesterCase):
             period = getattr(self, 'period')
         except AttributeError as e:
             pass
-        self.deployer = TestTokenDeploy(self.rpc, period=period)
+        self.deployer = TestTokenDeploy(self.rpc, period=period, sink_address=self.accounts[9])
         self.default_supply = self.deployer.default_supply
         self.default_supply_cap = self.deployer.default_supply_cap
         self.start_block = None

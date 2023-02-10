@@ -80,6 +80,10 @@ contract DemurrageTokenSingleCap {
 	// Address to send unallocated redistribution tokens
 	address public sinkAddress; 
 
+	// timestamp when token contract expires
+	uint256 public expires;
+	bool expired;
+
 	// Implements ERC20
 	event Transfer(address indexed _from, address indexed _to, uint256 _value);
 
@@ -107,6 +111,19 @@ contract DemurrageTokenSingleCap {
 
 	// EIP173
 	event OwnershipTransferred(address indexed previousOwner, address indexed newOwner); // EIP173
+
+	event SealStateChange(uint256 _sealState);
+
+	event Expired(uint256 _timestamp);
+
+	// property sealing 
+	uint256 public sealState;
+	uint8 constant MINTER_STATE = 1;
+	uint8 constant SINK_STATE = 2;
+	uint8 constant EXPIRY_STATE = 4;
+	uint8 constant CAP_STATE = 8;
+	uint256 constant public maxSealState = 15;
+
 
 	constructor(string memory _name, string memory _symbol, uint8 _decimals, int128 _taxLevel, uint256 _periodMinutes, address _defaultSinkAddress) {
 		require(_taxLevel < (1 << 64));
@@ -137,15 +154,69 @@ contract DemurrageTokenSingleCap {
 		sinkAddress = _defaultSinkAddress;
 	}
 
+	function seal(uint256 _state) public returns(uint256) {
+		require(_state < 8, 'ERR_INVALID_STATE');
+		require(_state & sealState == 0, 'ERR_ALREADY_LOCKED');
+		sealState |= _state;
+		emit SealStateChange(sealState);
+		return uint256(sealState);
+	}
+
+	function isSealed(uint256 _state) public returns(bool) {
+		require(_state < maxSealState);
+		if (_state == 0) {
+			return sealState == maxSealState;
+		}
+		return _state & sealState == _state;
+	}
+
+	function setExpires(uint256 _expires) public {
+		require(!isSealed(EXPIRY_STATE));
+		require(!expired);
+		require(msg.sender == owner);
+		expires = _expires;
+	}
+
 
 	// Change sink address for redistribution
 	function setSinkAddress(address _sinkAddress) public {
+		require(!isSealed(SINK_STATE));
 		require(msg.sender == owner);
 		sinkAddress = _sinkAddress;
 	}
 
+	function applyExpiry() public returns(bool) {
+		if (expired) {
+			return true;
+		}
+		if (expires == 0) {
+			return false;
+		}
+		if (block.timestamp >= expires) {
+			account[sinkAddress] = totalSupply();
+			expired = true;
+			emit Expired(block.timestamp);
+		}
+		return expired;
+	}
+
+	function isExpiredAccount(address _account) public view returns(uint8) {
+		uint8 expiry_state;
+		
+		if (expired) {
+			expiry_state = 1;
+		} else if (expires > 0 && block.timestamp >= expires) {
+			expiry_state = 1;
+		}
+		if (expiry_state > 0 && _account == sinkAddress) {
+			expiry_state = 2;	
+		}
+		return expiry_state;
+	}
+
 	// Given address will be allowed to call the mintTo() function
 	function addMinter(address _minter) public returns (bool) {
+		require(!isSealed(MINTER_STATE));
 		require(msg.sender == owner);
 		minter[_minter] = true;
 		return true;
@@ -153,6 +224,7 @@ contract DemurrageTokenSingleCap {
 
 	// Given address will no longer be allowed to call the mintTo() function
 	function removeMinter(address _minter) public returns (bool) {
+		require(!isSealed(MINTER_STATE));
 		require(msg.sender == owner || _minter == msg.sender);
 		minter[_minter] = false;
 		return true;
@@ -163,6 +235,14 @@ contract DemurrageTokenSingleCap {
 		int128 baseBalance;
 		int128 currentDemurragedAmount;
 		uint256 periodCount;
+		uint8 expiryState;
+
+		expiryState = isExpiredAccount(_account);
+		if (expiryState == 1) {
+			return 0;
+		} else if (expiryState == 2) {
+			return totalSupply();
+		}
 
 		baseBalance = ABDKMath64x64.fromUInt(baseBalanceOf(_account));
 
@@ -369,19 +449,22 @@ contract DemurrageTokenSingleCap {
 	}
 
 	// Calculate and cache the demurrage value corresponding to the (period of the) time of the method call
-	function applyDemurrage() public returns (uint256) {
+	function applyDemurrage() public returns (bool) {
 		return applyDemurrageLimited(0);
 	}
 
-	function applyDemurrageLimited(uint256 _rounds) public returns (uint256) {
+	// returns true if expired
+	function applyDemurrageLimited(uint256 _rounds) public returns (bool) {
 		int128 v;
 		uint256 periodCount;
 		int128 periodPoint;
 		int128 lastDemurrageAmount;
 
+		require(!applyExpiry());
+
 		periodCount = getMinutesDelta(demurrageTimestamp);
 		if (periodCount == 0) {
-			return 0;
+			return false;
 		}
 		lastDemurrageAmount = demurrageAmount;
 	
@@ -398,7 +481,7 @@ contract DemurrageTokenSingleCap {
 
 		demurrageTimestamp = demurrageTimestamp + (periodCount * 60);
 		emit Decayed(demurrageTimestamp, periodCount, lastDemurrageAmount, demurrageAmount);
-		return periodCount;
+		return false;
 	}
 
 	// Return timestamp of start of period threshold
