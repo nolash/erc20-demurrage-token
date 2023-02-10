@@ -77,16 +77,8 @@ class DemurrageToken(ERC20, SealedContract, ExpiryContract):
 
     __abi = {}
     __bytecode = {}
-    valid_modes = [
-                'MultiNocap',
-                'SingleNocap',
-                'MultiCap',
-                'SingleCap',
-                ]
 
-    def constructor(self, sender_address, settings, cap=0, tx_format=TxFormat.JSONRPC):
-        if int(cap) < 0:
-            raise ValueError('cap must be 0 or positive integer')
+    def constructor(self, sender_address, settings, tx_format=TxFormat.JSONRPC):
         code = DemurrageToken.bytecode()
         enc = ABIContractEncoder()
         enc.string(settings.name)
@@ -95,8 +87,6 @@ class DemurrageToken(ERC20, SealedContract, ExpiryContract):
         enc.uint256(settings.demurrage_level)
         enc.uint256(settings.period_minutes)
         enc.address(settings.sink_address)
-        if cap > 0:
-            enc.uint256(cap)
         code += enc.get()
         tx = self.template(sender_address, None, use_nonce=True)
         tx = self.set_code(tx, code)
@@ -109,23 +99,7 @@ class DemurrageToken(ERC20, SealedContract, ExpiryContract):
 
 
     @staticmethod
-    def __to_contract_name(multi, cap):
-        name = 'DemurrageToken'
-        if multi:
-            name += 'Multi'
-        else:
-            name += 'Single'
-        if cap:
-            name += 'Cap'
-        else:
-            name += 'Nocap'
-        logg.debug('bytecode name {}'.format(name))
-        return name
-
-
-    @staticmethod
-    def abi(multi=True, cap=False):
-        #name = DemurrageToken.__to_contract_name(multi, cap)
+    def abi(multi=True):
         name = 'DemurrageTokenSingleNocap'
         if DemurrageToken.__abi.get(name) == None:
             f = open(os.path.join(data_dir, name + '.json'), 'r')
@@ -135,8 +109,7 @@ class DemurrageToken(ERC20, SealedContract, ExpiryContract):
 
 
     @staticmethod
-    def bytecode(multi=True, cap=False):
-        #name = DemurrageToken.__to_contract_name(multi, cap)
+    def bytecode(multi=True):
         name = 'DemurrageTokenSingleNocap'
         if DemurrageToken.__bytecode.get(name) == None:
             f = open(os.path.join(data_dir, name + '.bin'), 'r')
@@ -184,6 +157,17 @@ class DemurrageToken(ERC20, SealedContract, ExpiryContract):
         tx = self.finalize(tx, tx_format)
         return tx
 
+
+    def set_max_supply(self, contract_address, sender_address, cap, tx_format=TxFormat.JSONRPC):
+        enc = ABIContractEncoder()
+        enc.method('setMaxSupply')
+        enc.typ(ABIContractType.UINT256)
+        enc.uint256(cap)
+        data = enc.get()
+        tx = self.template(sender_address, contract_address, use_nonce=True)
+        tx = self.set_code(tx, data)
+        tx = self.finalize(tx, tx_format)
+        return tx
 
     def remove_minter(self, contract_address, sender_address, address, tx_format=TxFormat.JSONRPC):
         enc = ABIContractEncoder()
@@ -503,8 +487,8 @@ class DemurrageToken(ERC20, SealedContract, ExpiryContract):
         return self.call_noarg('demurrageTimestamp', contract_address, sender_address=sender_address)
 
 
-    def supply_cap(self, contract_address, sender_address=ZERO_ADDRESS):
-        return self.call_noarg('supplyCap', contract_address, sender_address=sender_address)
+    def max_supply(self, contract_address, sender_address=ZERO_ADDRESS):
+        return self.call_noarg('maxSupply', contract_address, sender_address=sender_address)
 
 
 #    def grow_by(self, contract_address, value, period, sender_address=ZERO_ADDRESS, id_generator=None):

@@ -156,6 +156,37 @@ class TestSeal(TestDemurrageDefault):
         self.assertTrue(c.parse_is_sealed(r))
 
 
+    def test_seal_cap(self):
+        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+    
+        (tx_hash, o) = c.set_max_supply(self.address, self.accounts[0], 100)
+        r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+
+        (tx_hash, o) = c.set_max_supply(self.address, self.accounts[0], 200)
+        r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+
+        (tx_hash, o) = c.seal(self.address, self.accounts[0], ContractState.CAP_STATE)
+        r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+
+        (tx_hash, o) = c.set_max_supply(self.address, self.accounts[0], 300)
+        r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 0)
+
+        o = c.is_sealed(self.address, ContractState.CAP_STATE, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        self.assertTrue(c.parse_is_sealed(r))
 
 
 if __name__ == '__main__':

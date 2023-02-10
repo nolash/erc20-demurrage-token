@@ -84,6 +84,9 @@ contract DemurrageTokenSingleCap {
 	uint256 public expires;
 	bool expired;
 
+	// supply xap
+	uint256 public maxSupply;
+
 	// Implements ERC20
 	event Transfer(address indexed _from, address indexed _to, uint256 _value);
 
@@ -115,6 +118,8 @@ contract DemurrageTokenSingleCap {
 	event SealStateChange(uint256 _sealState);
 
 	event Expired(uint256 _timestamp);
+
+	event Cap(uint256 indexed _oldCap, uint256 _newCap);
 
 	// property sealing 
 	uint256 public sealState;
@@ -171,10 +176,22 @@ contract DemurrageTokenSingleCap {
 	}
 
 	function setExpirePeriod(uint256 _expirePeriod) public {
+		uint256 r;
+
 		require(!isSealed(EXPIRY_STATE));
 		require(!expired);
 		require(msg.sender == owner);
-		expires = periodStart + (_expirePeriod * periodDuration);
+		r = periodStart + (_expirePeriod * periodDuration);
+		require(r > expires);
+		expires = r;
+	}
+	
+	function setMaxSupply(uint256 _cap) public {
+		require(!isSealed(CAP_STATE));
+		require(msg.sender == owner);
+		require(_cap > supply);
+		emit Cap(maxSupply, _cap);
+		maxSupply = _cap;
 	}
 
 
@@ -283,10 +300,13 @@ contract DemurrageTokenSingleCap {
 
 		require(applyExpiry() == 0);
 		require(minter[msg.sender], 'ERR_ACCESS');
-
-		changePeriod();
-		baseAmount = toBaseAmount(_amount);
+changePeriod();
+		if (maxSupply > 0) {
+			require(supply + _amount <= maxSupply);
+		}
 		supply += _amount;
+
+		baseAmount = toBaseAmount(_amount);
 		increaseBaseBalance(_beneficiary, baseAmount);
 		emit Mint(msg.sender, _beneficiary, _amount);
 		saveRedistributionSupply();

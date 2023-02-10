@@ -34,7 +34,7 @@ PERIOD = 43200
 class TestTokenDeploy:
 
     """tax level is ppm, 1000000 = 100%"""
-    def __init__(self, rpc, token_symbol='FOO', token_name='Foo Token', sink_address=ZERO_ADDRESS, supply=10**12, tax_level=TAX_LEVEL, period=PERIOD):
+    def __init__(self, rpc, token_symbol='FOO', token_name='Foo Token', sink_address=ZERO_ADDRESS, tax_level=TAX_LEVEL, period=PERIOD):
         self.tax_level = tax_level
         self.period_seconds = period * 60
 
@@ -60,14 +60,11 @@ class TestTokenDeploy:
         except TypeError:
             self.start_time = int(r['timestamp'])
 
-        self.default_supply = supply
-        self.default_supply_cap = 0
-
 
     def deploy(self, rpc, deployer_address, interface, supply_cap=0):
         tx_hash = None
         o = None
-        (tx_hash, o) = interface.constructor(deployer_address, self.settings, cap=0)
+        (tx_hash, o) = interface.constructor(deployer_address, self.settings)
 
         r = rpc.do(o)
         o = receipt(tx_hash)
@@ -93,8 +90,8 @@ class TestDemurrage(EthTesterCase):
         except AttributeError as e:
             pass
         self.deployer = TestTokenDeploy(self.rpc, period=period, sink_address=self.accounts[9])
-        self.default_supply = self.deployer.default_supply
-        self.default_supply_cap = self.deployer.default_supply_cap
+        self.default_supply = 0
+        self.default_supply_cap = 0
         self.start_block = None
         self.address = None
         self.start_time = None
@@ -148,3 +145,6 @@ class TestDemurrageDefault(TestDemurrage):
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
         self.deploy(c)
+
+        self.default_supply = 10**12
+        self.default_supply_cap = self.default_supply

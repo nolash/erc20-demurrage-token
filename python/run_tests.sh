@@ -41,6 +41,7 @@ done
 
 python tests/test_expiry.py
 python tests/test_seal.py
+python tests/test_cap.py
 
 set +e
 set +x

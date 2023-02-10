@@ -18,7 +18,7 @@ from hexathon import (
 from erc20_demurrage_token import DemurrageToken
 
 # test imports
-from erc20_demurrage_token.unittest.base import TestDemurrageCap
+from erc20_demurrage_token.unittest import TestDemurrageDefault
 
 logging.basicConfig(level=logging.DEBUG)
 logg = logging.getLogger()
@@ -26,18 +26,27 @@ logg = logging.getLogger()
 testdir = os.path.dirname(__file__)
 
 
-class TestCap(TestDemurrageCap):
+class TestCap(TestDemurrageDefault):
 
-    def test_cap_set(self):
+    def test_cap(self):
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
-        o = c.supply_cap(self.address, sender_address=self.accounts[0])
+
+        o = c.total_supply(self.address, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        logg.debug('r {}'.format(r))
+
+        (tx_hash, o) = c.set_max_supply(self.address, self.accounts[0], self.default_supply_cap)
+        r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+
+        o = c.max_supply(self.address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         cap = c.parse_supply_cap(r)
         self.assertEqual(cap, self.default_supply_cap)
 
-
-    def test_cap(self):
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
         (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[1], self.default_supply_cap)
@@ -47,16 +56,6 @@ class TestCap(TestDemurrageCap):
         self.assertEqual(r['status'], 1)
 
         (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[2], 1)
-        r = self.rpc.do(o)
-        o = receipt(tx_hash)
-        r = self.rpc.do(o)
-        self.assertEqual(r['status'], 0)
-
-
-    def test_cap_first(self):
-        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
-        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
-        (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[1], self.default_supply_cap + 1)
         r = self.rpc.do(o)
         o = receipt(tx_hash)
         r = self.rpc.do(o)
