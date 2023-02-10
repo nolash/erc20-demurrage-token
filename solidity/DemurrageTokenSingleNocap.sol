@@ -170,11 +170,11 @@ contract DemurrageTokenSingleCap {
 		return _state & sealState == _state;
 	}
 
-	function setExpires(uint256 _expires) public {
+	function setExpirePeriod(uint256 _expirePeriod) public {
 		require(!isSealed(EXPIRY_STATE));
 		require(!expired);
 		require(msg.sender == owner);
-		expires = _expires;
+		expires = periodStart + (_expirePeriod * periodDuration);
 	}
 
 
@@ -185,6 +185,9 @@ contract DemurrageTokenSingleCap {
 		sinkAddress = _sinkAddress;
 	}
 
+	// Expire the contract if expire is set and we have gone over the threshold.
+	// Finalizes demurrage up to the timestamp of the expiry. 
+	// The first approve, transfer or transferFrom call that hits the ex == 2 will get the tx mined. but without the actual effect. Otherwise we would have to wait until an external egent called applyExpiry to get the correct final balance.
 	function applyExpiry() public returns(uint8) {
 		if (expired) {
 			return 1;

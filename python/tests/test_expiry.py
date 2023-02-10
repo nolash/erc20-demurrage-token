@@ -37,19 +37,22 @@ class TestExpire(TestDemurrageDefault):
             (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[i+1], mint_amount)
             r = self.rpc.do(o)
 
-        targetish_time = self.start_time + (self.period_seconds * 2)
-        (tx_hash, o) = c.set_expires(self.address, self.accounts[0], targetish_time)
+        (tx_hash, o) = c.set_expires_period(self.address, self.accounts[0], 2)
         r = self.rpc.do(o)
         o = receipt(tx_hash)
         r = self.rpc.do(o)
         self.assertEqual(r['status'], 1)
 
-        self.backend.time_travel(targetish_time + 60)
+        o = c.expires(self.address, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        expiry_time = c.parse_expires(r)
+
+        self.backend.time_travel(expiry_time + 60)
         o = block_latest()
         r = self.rpc.do(o)
         o = block_by_number(r)
         r = self.rpc.do(o)
-        self.assertGreaterEqual(r['timestamp'], targetish_time)
+        self.assertGreaterEqual(r['timestamp'], expiry_time)
         
         nonce_oracle = RPCNonceOracle(self.sink_address, self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
@@ -58,6 +61,12 @@ class TestExpire(TestDemurrageDefault):
         o = receipt(tx_hash)
         r = self.rpc.do(o)
         self.assertEqual(r['status'], 1)
+
+        (tx_hash, o) = c.transfer(self.address, self.sink_address, self.accounts[2], 1)
+        r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 0)
 
         o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
         r = self.rpc.do(o)
@@ -78,7 +87,7 @@ class TestExpire(TestDemurrageDefault):
         r = self.rpc.do(o)
         balance = c.parse_balance(r)
 
-        o = c.decay_by(self.address, supply, int((targetish_time - self.start_time) / 60), sender_address=self.sink_address)
+        o = c.decay_by(self.address, supply, int((expiry_time - self.start_time) / 60), sender_address=self.sink_address)
         r = self.rpc.do(o)
         target_balance = c.parse_balance(r)
 
