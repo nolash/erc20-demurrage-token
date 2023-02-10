@@ -4,7 +4,7 @@ pragma solidity >= 0.8.0;
 import "aux/ABDKMath64x64.sol";
 
 // SPDX-License-Identifier: GPL-3.0-or-later
-contract DemurrageTokenSingleCap {
+contract DemurrageTokenSingleNocap {
 
 	struct redistributionItem {
 		uint32 period;
@@ -35,7 +35,7 @@ contract DemurrageTokenSingleCap {
 	string public symbol;
 
 	// Implements ERC20
-	uint256 public decimals;
+	uint256 public immutable decimals;
 
 	// Implements ERC20
 	//uint256 public totalSupply;
@@ -69,7 +69,7 @@ contract DemurrageTokenSingleCap {
 	// Demurrage in ppm per minute
 	//uint256 public immutable taxLevel;
 	// 64x64
-	int128 public taxLevel;
+	int128 public immutable taxLevel;
 		
 	// Addresses allowed to mint new tokens
 	mapping (address => bool) minter;
