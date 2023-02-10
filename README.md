@@ -1,5 +1,7 @@
 # RedistributedDemurrageToken
 
+**this documentation is obsolete, will rewrite asap**
+
 ## Use Case
 * Network / Basic Income Token
   * 100 Sarafu is distributed to anyone in Kenya after user validation by the owner of a faucet which mints new Sarafu.
