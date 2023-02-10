@@ -9,7 +9,7 @@ contract DemurrageTokenSingleCap {
 	struct redistributionItem {
 		uint32 period;
 		uint72 value;
-		uint40 demurrage;
+		uint64 demurrage;
 	}
 	redistributionItem[] public redistributions; // uint51(unused) | uint64(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
 
@@ -99,7 +99,8 @@ contract DemurrageTokenSingleCap {
 	event Redistribution(address indexed _account, uint256 indexed _period, uint256 _value);
 
 	// Temporary event used in development, will be removed on prod
-	event Debug(bytes32 _foo);
+	//event Debug(bytes32 _foo);
+	event Debug(int128 indexed _foo, uint256 indexed _bar);
 
 	// Emitted when tokens are burned
 	event Burn(address indexed _burner, uint256 _value);
@@ -128,9 +129,8 @@ contract DemurrageTokenSingleCap {
 		periodDuration = _periodMinutes * 60;
 		demurrageAmount = ABDKMath64x64.fromUInt(1);
 
-		//taxLevel = ABDKMath64x64.mul(ABDKMath64x64.ln(ABDKMath64x64.sub(demurrageAmount, , ABDKMath64x64.fromUInt(_periodMinutes));
 		taxLevel = ABDKMath64x64.ln(_taxLevel);
-		initialRedistribution = toRedistribution(0, uint40(uint128(demurrageAmount)), 0, 1);
+		initialRedistribution = toRedistribution(0, demurrageAmount, 0, 1);
 		redistributions.push(initialRedistribution);
 
 		// Misc settings
@@ -170,8 +170,6 @@ contract DemurrageTokenSingleCap {
 
 		currentDemurragedAmount = ABDKMath64x64.mul(baseBalance, demurrageAmount);
 		return decayBy(ABDKMath64x64.toUInt(currentDemurragedAmount), periodCount);
-
-		//return (baseBalance * currentDemurragedAmount) / (nanoDivider * 1000000000000);
 	}
 
 	// Balance unmodified by demurrage
@@ -214,10 +212,6 @@ contract DemurrageTokenSingleCap {
 		return true;
 	}
 
-	function changePeriod() public {
-		applyDemurrage();	
-	}
-
 	// Creates new tokens out of thin air, and allocates them to the given address
 	// Triggers tax
 	function mintTo(address _beneficiary, uint256 _amount) external returns (bool) {
@@ -235,12 +229,12 @@ contract DemurrageTokenSingleCap {
 	}
 
 	// Deserializes the redistribution word
-	function toRedistribution(uint256 _participants, uint256 _demurrageModifierPpm, uint256 _value, uint256 _period) public pure returns(redistributionItem memory) {
+	function toRedistribution(uint256 _participants, int128 _demurrageModifier, uint256 _value, uint256 _period) public pure returns(redistributionItem memory) {
 		redistributionItem memory redistribution;
 
 		redistribution.period = uint32(_period);
 		redistribution.value = uint72(_value);
-		redistribution.demurrage = uint40(_demurrageModifierPpm);
+		redistribution.demurrage = uint64(uint128(_demurrageModifier) & 0xffffffffffffffff);
 		return redistribution;
 
 	}
@@ -256,8 +250,14 @@ contract DemurrageTokenSingleCap {
 	}
 
 	// Serializes the number of participants part of the redistribution word
-	function toRedistributionDemurrageModifier(redistributionItem memory _redistribution) public pure returns (uint256) {
-		return uint256(_redistribution.demurrage);
+	function toRedistributionDemurrageModifier(redistributionItem memory _redistribution) public pure returns (int128) {
+		int128 r;
+
+		r = int128(int64(_redistribution.demurrage) & int128(0x0000000000000000ffffffffffffffff));
+		if (r == 0) {
+			r = ABDKMath64x64.fromUInt(1);
+		}
+		return r;
 	}
 
 
@@ -284,48 +284,87 @@ contract DemurrageTokenSingleCap {
 		return uint128((block.timestamp - periodStart) / periodDuration + 1);
 	}
 
-//	// Retrieve next redistribution if the period threshold has been crossed
-//	function checkPeriod() private view returns (redistributionItem memory) {
-//		redistributionItem memory lastRedistribution;
-//		redistributionItem memory emptyRedistribution;
-//		uint256 currentPeriod;
-//
-//		lastRedistribution =  redistributions[lastPeriod];
-//		currentPeriod = this.actualPeriod();
-//		if (currentPeriod <= toRedistributionPeriod(lastRedistribution)) {
-//			return emptyRedistribution;
-//		}
-//		return lastRedistribution;
-//	}
+	// Retrieve next redistribution if the period threshold has been crossed
+	function checkPeriod() private view returns (redistributionItem memory) {
+		redistributionItem memory lastRedistribution;
+		redistributionItem memory emptyRedistribution;
+		uint256 currentPeriod;
 
-//	function getDistribution(uint256 _supply, uint256 _demurrageAmount) public view returns (uint256) {
-//		uint256 difference;
-//
+		lastRedistribution =  redistributions[lastPeriod];
+		currentPeriod = this.actualPeriod();
+		if (currentPeriod <= toRedistributionPeriod(lastRedistribution)) {
+			return emptyRedistribution;
+		}
+		return lastRedistribution;
+	}
+
+	function getDistribution(uint256 _supply, int128 _demurrageAmount) public pure returns (uint256) {
+		int128 difference;
+
 //		difference = _supply * (resolutionFactor - (_demurrageAmount * 10000000000));
 //		return difference / resolutionFactor;
-//	}
+		difference = ABDKMath64x64.mul(ABDKMath64x64.fromUInt(_supply), _demurrageAmount);
+		return ABDKMath64x64.toUInt(difference);
+		//return _supply;
+			
+	}
 
-//	function getDistributionFromRedistribution(redistributionItem memory _redistribution) public returns (uint256) {
-//		uint256 redistributionSupply;
-//		uint256 redistributionDemurrage;
-//
-//		redistributionSupply = toRedistributionSupply(_redistribution);
-//		redistributionDemurrage = toRedistributionDemurrageModifier(_redistribution);
-//		return getDistribution(redistributionSupply, redistributionDemurrage);
-//	}
-//
-//	// Returns the amount sent to the sink address
-//	function applyDefaultRedistribution(redistributionItem memory _redistribution) private returns (uint256) {
-//		uint256 unit;
-//		uint256 baseUnit;
-//	
-//		unit = getDistributionFromRedistribution(_redistribution);	
-//		baseUnit = toBaseAmount(unit) - totalSink;
-//		increaseBaseBalance(sinkAddress, baseUnit);
-//		lastPeriod += 1;
-//		totalSink += baseUnit;
-//		return unit;
-//	}
+	function getDistributionFromRedistribution(redistributionItem memory _redistribution) public returns (uint256) {
+		uint256 redistributionSupply;
+		int128 redistributionDemurrage;
+
+		redistributionSupply = toRedistributionSupply(_redistribution);
+		redistributionDemurrage = toRedistributionDemurrageModifier(_redistribution);
+		return getDistribution(redistributionSupply, redistributionDemurrage);
+	}
+
+	// Returns the amount sent to the sink address
+	function applyDefaultRedistribution(redistributionItem memory _redistribution) private returns (uint256) {
+		uint256 unit;
+		uint256 baseUnit;
+	
+		unit = getDistributionFromRedistribution(_redistribution);	
+		baseUnit = toBaseAmount(unit) - totalSink;
+		increaseBaseBalance(sinkAddress, baseUnit);
+		emit Redistribution(sinkAddress, _redistribution.period, unit);
+		lastPeriod += 1;
+		totalSink += baseUnit;
+		return unit;
+	}
+
+	// Recalculate the demurrage modifier for the new period
+	// Note that the supply for the consecutive period will be taken at the time of code execution, and thus not necessarily at the time when the redistribution period threshold was crossed.
+	function changePeriod() public returns (bool) {
+		redistributionItem memory currentRedistribution;
+		redistributionItem memory nextRedistribution;
+		redistributionItem memory lastRedistribution;
+		uint256 currentPeriod;
+		int128 lastDemurrageAmount;
+		int128 nextRedistributionDemurrage;
+		uint256 demurrageCounts;
+		uint256 nextPeriod;
+
+		applyDemurrage();
+		currentRedistribution = checkPeriod();
+		if (isEmptyRedistribution(currentRedistribution)) {
+			return false;
+		}
+
+		// calculate the decay from previous redistributino
+		lastRedistribution = redistributions[lastPeriod];
+		currentPeriod = toRedistributionPeriod(currentRedistribution);
+		nextPeriod = currentPeriod + 1;
+		lastDemurrageAmount = toRedistributionDemurrageModifier(lastRedistribution);
+		demurrageCounts = periodDuration / 60;
+		nextRedistributionDemurrage = ABDKMath64x64.mul(taxLevel, ABDKMath64x64.fromUInt(demurrageCounts));
+		nextRedistributionDemurrage = lastDemurrageAmount - ABDKMath64x64.exp(nextRedistributionDemurrage);
+		nextRedistribution = toRedistribution(0, nextRedistributionDemurrage, totalSupply(), nextPeriod);
+		redistributions.push(nextRedistribution);
+
+		applyDefaultRedistribution(nextRedistribution);
+		emit Period(nextPeriod);
+		return true;
+	}
 
 	// Calculate the time delta in whole minutes passed between given timestamp and current timestamp
 	function getMinutesDelta(uint256 _lastTimestamp) public view returns (uint256) {
@@ -388,53 +427,6 @@ contract DemurrageTokenSingleCap {
 		return true;
 	}
 
-//	// Recalculate the demurrage modifier for the new period
-//	// Note that the supply for the consecutive period will be taken at the time of code execution, and thus not necessarily at the time when the redistribution period threshold was crossed.
-//	function changePeriod() public returns (bool) {
-//		redistributionItem memory currentRedistribution;
-//		redistributionItem memory nextRedistribution;
-//		redistributionItem memory lastRedistribution;
-//		uint256 currentPeriod;
-//		uint256 lastDemurrageAmount;
-//		uint256 nextRedistributionDemurrage;
-//		uint256 demurrageCounts;
-//		uint256 nextPeriod;
-//
-//		applyDemurrage();
-//		currentRedistribution = checkPeriod();
-//		if (isEmptyRedistribution(currentRedistribution)) {
-//			return false;
-//		}
-//
-//		// calculate the decay from previous redistributino
-//		lastRedistribution = redistributions[lastPeriod];
-//		currentPeriod = toRedistributionPeriod(currentRedistribution);
-//		nextPeriod = currentPeriod + 1;
-//		lastDemurrageAmount = toRedistributionDemurrageModifier(lastRedistribution);
-//		demurrageCounts = periodDuration / 60;
-//		nextRedistributionDemurrage = decayBy(lastDemurrageAmount, demurrageCounts);
-//	
-//		nextRedistribution = toRedistribution(0, nextRedistributionDemurrage, totalSupply(), nextPeriod);
-//		redistributions.push(nextRedistribution);
-//
-//		applyDefaultRedistribution(nextRedistribution);
-//		emit Period(nextPeriod);
-//		return true;
-//	}
-//
-//	// Reverse a value reduced by demurrage by the given period to its original value
-////	function growBy(uint256 _value, uint256 _period) public view returns (uint256) {
-////		uint256 valueFactor;
-////		uint256 truncatedTaxLevel;
-////	      
-////		valueFactor = growthResolutionFactor;
-////		truncatedTaxLevel = taxLevel / nanoDivider;
-////
-////		for (uint256 i = 0; i < _period; i++) {
-////			valueFactor = valueFactor + ((valueFactor * truncatedTaxLevel) / growthResolutionFactor);
-////		}
-////		return (valueFactor * _value) / growthResolutionFactor;
-////	}
 
 	// Calculate a value reduced by demurrage by the given period
 	function decayBy(uint256 _value, uint256 _period)  public view returns (uint256) {

@@ -29,6 +29,28 @@ from erc20_demurrage_token.fixed import from_fixed
 logg = logging.getLogger(__name__)
 
 
+class DemurrageRedistribution:
+    
+    def __init__(self, v):
+        d = ABIContractDecoder()
+        v = strip_0x(v)
+        d.typ(ABIContractType.UINT256)
+        d.typ(ABIContractType.UINT256)
+        d.typ(ABIContractType.BYTES32)
+        d.val(v[:64])
+        d.val(v[64:128])
+        d.val(v[128:192])
+        r = d.decode()
+
+        self.period = r[0]
+        self.value = r[1]
+        self.demurrage = from_fixed(r[2])
+
+
+    def __str__(self):
+        return 'period {} value {} demurrage {}'.format(self.period, self.value, self.demurrage)
+
+
 class DemurrageTokenSettings:
 
     def __init__(self):
@@ -315,7 +337,7 @@ class DemurrageToken(ERC20):
         enc = ABIContractEncoder()
         enc.method('toRedistributionPeriod')
         v = strip_0x(redistribution)
-        enc.typ_literal('(uint32,uint72,uint104)')
+        enc.typ_literal('(uint32,uint72,uint64)')
         enc.bytes32(v[:64])
         enc.bytes32(v[64:128])
         enc.bytes32(v[128:192])
@@ -356,7 +378,7 @@ class DemurrageToken(ERC20):
         enc = ABIContractEncoder()
         enc.method('toRedistributionSupply')
         v = strip_0x(redistribution)
-        enc.typ_literal('(uint32,uint72,uint104)')
+        enc.typ_literal('(uint32,uint72,uint64)')
         enc.bytes32(v[:64])
         enc.bytes32(v[64:128])
         enc.bytes32(v[128:192])
@@ -376,7 +398,7 @@ class DemurrageToken(ERC20):
         enc = ABIContractEncoder()
         enc.method('toRedistributionDemurrageModifier')
         v = strip_0x(redistribution)
-        enc.typ_literal('(uint32,uint72,uint104)')
+        enc.typ_literal('(uint32,uint72,uint64)')
         enc.bytes32(v[:64])
         enc.bytes32(v[64:128])
         enc.bytes32(v[128:192])
@@ -580,16 +602,18 @@ class DemurrageToken(ERC20):
     
     @classmethod
     def parse_redistributions(self, v):
-        d = ABIContractDecoder()
-        v = strip_0x(v)
-        d.typ(ABIContractType.BYTES32)
-        d.typ(ABIContractType.BYTES32)
-        d.typ(ABIContractType.BYTES32)
-        d.val(v[:64])
-        d.val(v[64:128])
-        d.val(v[128:192])
-        r = d.decode()
-        return ''.join(r)
+        return strip_0x(v)
+        #return DemurrageRedistribution(v)
+#        d = ABIContractDecoder()
+#        v = strip_0x(v)
+#        d.typ(ABIContractType.BYTES32)
+#        d.typ(ABIContractType.BYTES32)
+#        d.typ(ABIContractType.BYTES32)
+#        d.val(v[:64])
+#        d.val(v[64:128])
+#        d.val(v[128:192])
+#        r = d.decode()
+#        return ''.join(r)
 
 
     @classmethod
@@ -640,3 +664,4 @@ class DemurrageToken(ERC20):
     @classmethod
     def parse_total_burned(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)
+

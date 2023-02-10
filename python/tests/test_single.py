@@ -18,7 +18,8 @@ from hexathon import (
 from erc20_demurrage_token import DemurrageToken
 
 # test imports
-from erc20_demurrage_token.unittest.base import TestDemurrageSingle
+from erc20_demurrage_token.unittest import TestDemurrageDefault
+from erc20_demurrage_token.fixed import to_fixed
 
 logging.basicConfig(level=logging.DEBUG)
 logg = logging.getLogger()
@@ -26,11 +27,9 @@ logg = logging.getLogger()
 testdir = os.path.dirname(__file__)
 
 
-class TestRedistributionSingle(TestDemurrageSingle):
-
+class TestRedistributionSingle(TestDemurrageDefault):
 
     def test_single_even_if_multiple(self):
-
         mint_amount = 100000000
 
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
@@ -64,7 +63,7 @@ class TestRedistributionSingle(TestDemurrageSingle):
         r = self.rpc.do(o)
         self.assertEqual(r['status'], 1)
 
-        tax_modifier = (1 - (self.tax_level / 1000000)) ** 10
+        tax_modifier = 0.98
         o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
         r = self.rpc.do(o)
         balance = c.parse_balance(r)

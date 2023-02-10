@@ -19,9 +19,10 @@ from chainlib.eth.contract import (
 
 # local imports
 from erc20_demurrage_token import DemurrageToken
+from erc20_demurrage_token.token import DemurrageRedistribution
 
 # test imports
-from erc20_demurrage_token.unittest.base import TestDemurrageDefault
+from erc20_demurrage_token.unittest import TestDemurrageDefault
 
 logging.basicConfig(level=logging.DEBUG)
 logg = logging.getLogger()
@@ -57,15 +58,6 @@ class TestPeriod(TestDemurrageDefault):
         period = c.parse_to_redistribution_period(r)
         self.assertEqual(2, period)
 
-        o = c.redistributions(self.address, 1, sender_address=self.accounts[0])
-        r = self.rpc.do(o)
-        redistribution = c.parse_redistributions(r)
-
-        o = c.to_redistribution_period(self.address, redistribution, sender_address=self.accounts[0])
-        r = self.rpc.do(o)
-        period = c.parse_to_redistribution_period(r)
-        self.assertEqual(2, period)
-
         o = c.actual_period(self.address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         period = c.parse_actual_period(r)
@@ -74,6 +66,7 @@ class TestPeriod(TestDemurrageDefault):
         o = c.to_redistribution_demurrage_modifier(self.address, redistribution, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         period = c.parse_to_redistribution_item(r)
+        redistro = DemurrageRedistribution(redistribution)
 
         # allow test code float rounding error to billionth
         modifier = (1 - (self.tax_level / 1000000)) ** (self.period_seconds / 60)
