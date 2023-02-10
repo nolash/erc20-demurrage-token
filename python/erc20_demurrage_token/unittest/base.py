@@ -67,7 +67,7 @@ class TestTokenDeploy:
     def deploy(self, rpc, deployer_address, interface, supply_cap=0):
         tx_hash = None
         o = None
-        (tx_hash, o) = interface.constructor(deployer_address, self.settings, redistribute=False, cap=0)
+        (tx_hash, o) = interface.constructor(deployer_address, self.settings, cap=0)
 
         r = rpc.do(o)
         o = receipt(tx_hash)
