@@ -185,33 +185,21 @@ contract DemurrageTokenSingleCap {
 		sinkAddress = _sinkAddress;
 	}
 
-	function applyExpiry() public returns(bool) {
+	function applyExpiry() public returns(uint8) {
 		if (expired) {
-			return true;
+			return 1;
 		}
 		if (expires == 0) {
-			return false;
+			return 0;
 		}
 		if (block.timestamp >= expires) {
-			account[sinkAddress] = totalSupply();
+			applyDemurrageLimited(expires - demurrageTimestamp / 60);
 			expired = true;
 			emit Expired(block.timestamp);
+			changePeriod();
+			return 2;
 		}
-		return expired;
-	}
-
-	function isExpiredAccount(address _account) public view returns(uint8) {
-		uint8 expiry_state;
-		
-		if (expired) {
-			expiry_state = 1;
-		} else if (expires > 0 && block.timestamp >= expires) {
-			expiry_state = 1;
-		}
-		if (expiry_state > 0 && _account == sinkAddress) {
-			expiry_state = 2;	
-		}
-		return expiry_state;
+		return 0;
 	}
 
 	// Given address will be allowed to call the mintTo() function
@@ -236,13 +224,6 @@ contract DemurrageTokenSingleCap {
 		int128 currentDemurragedAmount;
 		uint256 periodCount;
 		uint8 expiryState;
-
-		expiryState = isExpiredAccount(_account);
-		if (expiryState == 1) {
-			return 0;
-		} else if (expiryState == 2) {
-			return totalSupply();
-		}
 
 		baseBalance = ABDKMath64x64.fromUInt(baseBalanceOf(_account));
 
@@ -297,6 +278,7 @@ contract DemurrageTokenSingleCap {
 	function mintTo(address _beneficiary, uint256 _amount) external returns (bool) {
 		uint256 baseAmount;
 
+		require(applyExpiry() == 0);
 		require(minter[msg.sender], 'ERR_ACCESS');
 
 		changePeriod();
@@ -339,7 +321,6 @@ contract DemurrageTokenSingleCap {
 		}
 		return r;
 	}
-
 
 	// Client accessor to the redistributions array length
 	function redistributionCount() public view returns (uint256) {
@@ -449,22 +430,24 @@ contract DemurrageTokenSingleCap {
 	}
 
 	// Calculate and cache the demurrage value corresponding to the (period of the) time of the method call
-	function applyDemurrage() public returns (bool) {
+	function applyDemurrage() public returns (uint256) {
 		return applyDemurrageLimited(0);
 	}
 
 	// returns true if expired
-	function applyDemurrageLimited(uint256 _rounds) public returns (bool) {
+	function applyDemurrageLimited(uint256 _rounds) public returns (uint256) {
 		int128 v;
 		uint256 periodCount;
 		int128 periodPoint;
 		int128 lastDemurrageAmount;
 
-		require(!applyExpiry());
+		if (expired) {
+			return 0; 
+		}
 
 		periodCount = getMinutesDelta(demurrageTimestamp);
 		if (periodCount == 0) {
-			return false;
+			return 0;
 		}
 		lastDemurrageAmount = demurrageAmount;
 	
@@ -481,7 +464,7 @@ contract DemurrageTokenSingleCap {
 
 		demurrageTimestamp = demurrageTimestamp + (periodCount * 60);
 		emit Decayed(demurrageTimestamp, periodCount, lastDemurrageAmount, demurrageAmount);
-		return false;
+		return periodCount;
 	}
 
 	// Return timestamp of start of period threshold
@@ -534,7 +517,14 @@ contract DemurrageTokenSingleCap {
 	// Implements ERC20, triggers tax and/or redistribution
 	function approve(address _spender, uint256 _value) public returns (bool) {
 		uint256 baseValue;
+		uint8 ex;
 
+		ex = applyExpiry();
+		if (ex == 2) {
+			return false;	
+		} else if (ex > 0) {
+			revert('EXPIRED');
+		}
 		if (allowance[msg.sender][_spender] > 0) {
 			require(_value == 0, 'ZERO_FIRST');
 		}
@@ -578,7 +568,14 @@ contract DemurrageTokenSingleCap {
 	function transfer(address _to, uint256 _value) public returns (bool) {
 		uint256 baseValue;
 		bool result;
+		uint8 ex;
 
+		ex = applyExpiry();
+		if (ex == 2) {
+			return false;	
+		} else if (ex > 0) {
+			revert('EXPIRED');
+		}
 		changePeriod();
 
 		baseValue = toBaseAmount(_value);
@@ -591,7 +588,14 @@ contract DemurrageTokenSingleCap {
 	function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
 		uint256 baseValue;
 		bool result;
+		uint8 ex;
 
+		ex = applyExpiry();
+		if (ex == 2) {
+			return false;	
+		} else if (ex > 0) {
+			revert('EXPIRED');
+		}
 		changePeriod();
 
 		baseValue = toBaseAmount(_value);
@@ -634,6 +638,7 @@ contract DemurrageTokenSingleCap {
 	// Explicitly and irretrievably burn tokens
 	// Only token minters can burn tokens
 	function burn(uint256 _value) public {
+		require(applyExpiry() == 0);
 		require(minter[msg.sender]);
 		require(_value <= account[msg.sender]);
 		uint256 _delta = toBaseAmount(_value);
