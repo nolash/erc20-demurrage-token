@@ -320,7 +320,7 @@ contract DemurrageTokenSingleCap {
 		uint256 unit;
 		uint256 baseUnit;
 	
-		unit = getDistributionFromRedistribution(_redistribution);	
+		unit = totalSupply() - getDistributionFromRedistribution(_redistribution);	
 		baseUnit = toBaseAmount(unit) - totalSink;
 		increaseBaseBalance(sinkAddress, baseUnit);
 		emit Redistribution(sinkAddress, _redistribution.period, unit);
@@ -352,9 +352,9 @@ contract DemurrageTokenSingleCap {
 		currentPeriod = toRedistributionPeriod(currentRedistribution);
 		nextPeriod = currentPeriod + 1;
 		lastDemurrageAmount = toRedistributionDemurrageModifier(lastRedistribution);
-		demurrageCounts = periodDuration / 60;
-		nextRedistributionDemurrage = ABDKMath64x64.mul(taxLevel, ABDKMath64x64.fromUInt(demurrageCounts));
-		nextRedistributionDemurrage = lastDemurrageAmount - ABDKMath64x64.exp(nextRedistributionDemurrage);
+		demurrageCounts = (periodDuration * currentPeriod) / 60;
+		// TODO refactor decayby to take int128 then DRY with it
+		nextRedistributionDemurrage = ABDKMath64x64.exp(ABDKMath64x64.mul(taxLevel, ABDKMath64x64.fromUInt(demurrageCounts)));
 		nextRedistribution = toRedistribution(0, nextRedistributionDemurrage, totalSupply(), nextPeriod);
 		redistributions.push(nextRedistribution);
 
@@ -394,8 +394,8 @@ contract DemurrageTokenSingleCap {
 		periodPoint = ABDKMath64x64.fromUInt(periodCount);
 		v = ABDKMath64x64.mul(taxLevel, periodPoint);
 		v = ABDKMath64x64.exp(v);
-
 		demurrageAmount = ABDKMath64x64.mul(demurrageAmount, v);
+
 		demurrageTimestamp = demurrageTimestamp + (periodCount * 60);
 		emit Decayed(demurrageTimestamp, periodCount, lastDemurrageAmount, demurrageAmount);
 		return periodCount;
