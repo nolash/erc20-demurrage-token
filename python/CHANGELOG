@@ -1,3 +1,9 @@
+- 0.3.0
+	* Smart contracts use abdk math libraries, all exponential operations are static gas cost
+	* Add expiry features, after which balances are frozen and no more transfers or demurrage will occur
+	* Add sealable features for supply, sink address, expiry and minters (when sealed cannot be changed)
+	* Deployer script now takes demurrage amount as ppm instead of literal growth fraction
+	* Retire old multi and cap contracts
 - 0.1.1
 	* Settable demurrage steps for apply demurrage cli tool
 - 0.1.0

@@ -172,7 +172,7 @@ class TestPeriod(TestDemurrageDefault):
         r = self.rpc.do(o)
         self.assertEqual(r['status'], 1)
 
-        o = c.balance_of(self.address, ZERO_ADDRESS, sender_address=self.accounts[0])
+        o = c.balance_of(self.address, self.sink_address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         balance = c.parse_balance_of(r)
         self.assertGreater(balance, 0)
@@ -222,7 +222,7 @@ class TestPeriod(TestDemurrageDefault):
         r = self.rpc.do(o)
         self.assertEqual(r['status'], 1)
 
-        o = c.balance_of(self.address, ZERO_ADDRESS, sender_address=self.accounts[0])
+        o = c.balance_of(self.address, self.sink_address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         balance = c.parse_balance_of(r)
         self.assertLess(balance, old_sink_balance)

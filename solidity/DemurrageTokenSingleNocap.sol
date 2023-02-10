@@ -189,11 +189,10 @@ contract DemurrageTokenSingleCap {
 	function setMaxSupply(uint256 _cap) public {
 		require(!isSealed(CAP_STATE));
 		require(msg.sender == owner);
-		require(_cap > supply);
+		require(_cap > totalSupply());
 		emit Cap(maxSupply, _cap);
 		maxSupply = _cap;
 	}
-
 
 	// Change sink address for redistribution
 	function setSinkAddress(address _sinkAddress) public {
