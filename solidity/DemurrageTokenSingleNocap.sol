@@ -138,7 +138,6 @@ contract DemurrageTokenSingleNocap {
 
 		// ACL setup
 		owner = msg.sender;
-	//	minter[owner] = true;
 
 		// ERC20 setup
 		name = _name;
@@ -222,25 +221,19 @@ contract DemurrageTokenSingleNocap {
 	}
 
 	// Given address will be allowed to call the mintTo() function
-	function addMinter(address _minter) public returns (bool) {
+	function addWriter(address _minter) public returns (bool) {
 		require(!isSealed(MINTER_STATE));
 		require(msg.sender == owner);
 		minter[_minter] = true;
 		return true;
 	}
-	function addWriter(address _minter) public returns (bool) {
-		return addMinter(_minter);
-	}
 
 	// Given address will no longer be allowed to call the mintTo() function
-	function removeMinter(address _minter) public returns (bool) {
+	function deleteWriter(address _minter) public returns (bool) {
 		require(!isSealed(MINTER_STATE));
 		require(msg.sender == owner || _minter == msg.sender);
 		minter[_minter] = false;
 		return true;
-	}
-	function deleteWriter(address _minter) public returns (bool) {
-		return removeMinter(_minter);
 	}
 
 	/// Implements ERC20

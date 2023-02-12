@@ -77,6 +77,12 @@ class TestTokenDeploy:
         r = rpc.do(o)
         self.start_time = r['timestamp']
 
+        (tx_hash, o) = interface.add_writer(self.address, deployer_address, deployer_address)
+        r = rpc.do(o)
+        o = receipt(tx_hash)
+        r = rpc.do(o)
+        assert r['status'] == 1
+
         return self.address
 
 

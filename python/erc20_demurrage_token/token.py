@@ -146,9 +146,14 @@ class DemurrageToken(ERC20, SealedContract, ExpiryContract):
         return tx
 
 
+    # backwards compatibility
     def add_minter(self, contract_address, sender_address, address, tx_format=TxFormat.JSONRPC):
+        return self.add_writer(contract_address, sender_address, address, tx_format=tx_format)
+
+
+    def add_writer(self, contract_address, sender_address, address, tx_format=TxFormat.JSONRPC):
         enc = ABIContractEncoder()
-        enc.method('addMinter')
+        enc.method('addWriter')
         enc.typ(ABIContractType.ADDRESS)
         enc.address(address)
         data = enc.get()
@@ -169,9 +174,15 @@ class DemurrageToken(ERC20, SealedContract, ExpiryContract):
         tx = self.finalize(tx, tx_format)
         return tx
 
+
+    # backwards compatibility
     def remove_minter(self, contract_address, sender_address, address, tx_format=TxFormat.JSONRPC):
+        return self.delete_writer(contract_address, sender_address, address, tx_format=tx_format)
+
+
+    def delete_writer(self, contract_address, sender_address, address, tx_format=TxFormat.JSONRPC):
         enc = ABIContractEncoder()
-        enc.method('removeMinter')
+        enc.method('deleteWriter')
         enc.typ(ABIContractType.ADDRESS)
         enc.address(address)
         data = enc.get()

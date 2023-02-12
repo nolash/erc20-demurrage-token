@@ -27,6 +27,9 @@ class TestAmounts(TestDemurrageDefault):
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
         (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[1], 1000)
         r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
 
         self.backend.time_travel(self.start_time + self.period_seconds)
 
