@@ -68,10 +68,11 @@ def process_config_local(config, arg, args, flags):
     config.add(sink_address, 'TOKEN_SINK_ADDRESS')
     config.add(args.redistribution_period, 'TOKEN_REDISTRIBUTION_PERIOD')
 
-    v = args.demurrage_level / 1000000
+    v = (1 - (args.demurrage_level / 1000000)) ** (1 / config.get('TOKEN_REDISTRIBUTION_PERIOD'))
     if v >= 1.0:
         raise ValueError('demurrage level must be less than 100%')
     demurrage_level = to_fixed(v)
+    logg.info('v {} demurrage level {}'.format(v, demurrage_level))
     config.add(demurrage_level, 'TOKEN_DEMURRAGE_LEVEL')
     return config
 
