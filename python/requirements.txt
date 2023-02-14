@@ -1,4 +1,5 @@
 chainlib-eth~=0.4.11
-eth-erc20~=0.5.0
+chainlib~=0.4.8
+eth-erc20~=0.5.5
 funga-eth~=0.6.0
 dexif~=0.0.2
