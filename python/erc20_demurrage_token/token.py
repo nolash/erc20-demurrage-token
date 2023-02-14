@@ -78,28 +78,34 @@ class DemurrageToken(ERC20, SealedContract, ExpiryContract):
     __abi = {}
     __bytecode = {}
 
-    def constructor(self, sender_address, settings, tx_format=TxFormat.JSONRPC):
-        code = DemurrageToken.bytecode()
-        enc = ABIContractEncoder()
-        enc.string(settings.name)
-        enc.string(settings.symbol)
-        enc.uint256(settings.decimals)
-        enc.uint256(settings.demurrage_level)
-        enc.uint256(settings.period_minutes)
-        enc.address(settings.sink_address)
-        code += enc.get()
+    def constructor(self, sender_address, settings, tx_format=TxFormat.JSONRPC, version=None):
+        code = self.cargs(settings.name, settings.symbol, settings.decimals, settings.demurrage_level, settings.period_minutes, settings.sink_address, version=version)
         tx = self.template(sender_address, None, use_nonce=True)
         tx = self.set_code(tx, code)
         return self.finalize(tx, tx_format)
 
 
     @staticmethod
-    def gas(code=None):
-        return 4000000
+    def cargs(name, symbol, decimals, demurrage_level, period_minutes, sink_address, version=None):
+        code = DemurrageToken.bytecode()
+        enc = ABIContractEncoder()
+        enc.string(name)
+        enc.string(symbol)
+        enc.uint256(decimals)
+        enc.uint256(demurrage_level)
+        enc.uint256(period_minutes)
+        enc.address(sink_address)
+        code += enc.get()
+        return code
 
 
     @staticmethod
-    def abi(multi=True):
+    def gas(code=None):
+        return 6000000
+
+
+    @staticmethod
+    def abi():
         name = 'DemurrageTokenSingleNocap'
         if DemurrageToken.__abi.get(name) == None:
             f = open(os.path.join(data_dir, name + '.json'), 'r')
@@ -109,7 +115,7 @@ class DemurrageToken(ERC20, SealedContract, ExpiryContract):
 
 
     @staticmethod
-    def bytecode(multi=True):
+    def bytecode(version=None):
         name = 'DemurrageTokenSingleNocap'
         if DemurrageToken.__bytecode.get(name) == None:
             f = open(os.path.join(data_dir, name + '.bin'), 'r')
@@ -665,3 +671,25 @@ class DemurrageToken(ERC20, SealedContract, ExpiryContract):
     def parse_total_burned(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)
 
+
+def bytecode(**kwargs):
+    return DemurrageToken.bytecode(version=kwargs.get('version'))
+
+
+def create(**kwargs):
+    return DemurrageToken.cargs(
+            kwargs['name'],
+            kwargs['symbol'],
+            kwargs['decimals'],
+            kwargs['demurragelevel'],
+            kwargs['redistributionperiod'],
+            kwargs['sinkaddress'],
+            version=kwargs.get('version'))
+
+
+def args(v):
+    if v == 'create':
+        return (['name', 'symbol', 'decimals', 'demurragelevel', 'redistributionperiod', 'sinkaddress'], ['version'],)
+    elif v == 'default' or v == 'bytecode':
+        return ([], ['version'],)
+    raise ValueError('unknown command: ' + v)
