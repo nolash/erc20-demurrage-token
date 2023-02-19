@@ -115,19 +115,18 @@ contract DemurrageTokenSingleNocap {
 	// EIP173
 	event OwnershipTransferred(address indexed previousOwner, address indexed newOwner); // EIP173
 
-	event SealStateChange(uint256 _sealState);
-
 	event Expired(uint256 _timestamp);
 
 	event Cap(uint256 indexed _oldCap, uint256 _newCap);
 
-	// property sealing 
+	// Implements Sealer
 	uint256 public sealState;
 	uint8 constant MINTER_STATE = 1;
 	uint8 constant SINK_STATE = 2;
 	uint8 constant EXPIRY_STATE = 4;
 	uint8 constant CAP_STATE = 8;
 	uint256 constant public maxSealState = 15;
+	event SealStateChange(bool indexed _final, uint256 _sealState);
 
 
 	constructor(string memory _name, string memory _symbol, uint8 _decimals, int128 _taxLevel, uint256 _periodMinutes, address _defaultSinkAddress) {
@@ -158,15 +157,17 @@ contract DemurrageTokenSingleNocap {
 		sinkAddress = _defaultSinkAddress;
 	}
 
+	// Implements Sealer
 	function seal(uint256 _state) public returns(uint256) {
 		require(_state < 16, 'ERR_INVALID_STATE');
 		require(_state & sealState == 0, 'ERR_ALREADY_LOCKED');
 		sealState |= _state;
-		emit SealStateChange(sealState);
+		emit SealStateChange(sealState == maxSealState, sealState);
 		return uint256(sealState);
 	}
 
-	function isSealed(uint256 _state) public returns(bool) {
+	// Implements Sealer
+	function isSealed(uint256 _state) public view returns(bool) {
 		require(_state < maxSealState);
 		if (_state == 0) {
 			return sealState == maxSealState;
@@ -297,7 +298,7 @@ contract DemurrageTokenSingleNocap {
 		uint256 baseAmount;
 
 		require(applyExpiry() == 0);
-		require(minter[msg.sender], 'ERR_ACCESS');
+		require(minter[msg.sender] || msg.sender == owner, 'ERR_ACCESS');
 
 		changePeriod();
 		if (maxSupply > 0) {

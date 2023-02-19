@@ -1,3 +1,5 @@
+- 0.3.6
+	* Reinstate owner as minter by default
 - 0.3.0
 	* Smart contracts use abdk math libraries, all exponential operations are static gas cost
 	* Add expiry features, after which balances are frozen and no more transfers or demurrage will occur

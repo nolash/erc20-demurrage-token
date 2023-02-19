@@ -36,11 +36,37 @@ class TestAmounts(TestDemurrageDefault):
         o = block_by_number(r)
         r = self.rpc.do(o)
         ta = r['timestamp']
-        logg.info('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>< {} {} {}'.format(tb, ta, ta-tb))
 
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
         (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[1], 1000)
+        r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+
+
+    def test_writer(self):
+        nonce_oracle = RPCNonceOracle(self.accounts[1], self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+        (tx_hash, o) = c.mint_to(self.address, self.accounts[1], self.accounts[1], 1000)
+        r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 0)
+
+
+        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+        (tx_hash, o) = c.add_writer(self.address, self.accounts[0], self.accounts[1])
+        r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+
+        nonce_oracle = RPCNonceOracle(self.accounts[1], self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+        (tx_hash, o) = c.mint_to(self.address, self.accounts[1], self.accounts[1], 1000)
         r = self.rpc.do(o)
         o = receipt(tx_hash)
         r = self.rpc.do(o)
