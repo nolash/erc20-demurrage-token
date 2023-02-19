@@ -1,24 +1,24 @@
 # RedistributedDemurrageToken
 
-**this documentation is obsolete, will rewrite asap**
+# RedistributedDemurrageToken
+
+**Last edit: Will Ruddick Feburary 19 2023**
 
 ## Use Case
-* Network / Basic Income Token
-  * 100 Sarafu is distributed to anyone in Kenya after user validation by the owner of a faucet which mints new Sarafu.
-    * Validated users are those that validate their phone number in Kenya.
-  * A Sarafu holding tax aka ([demurrage](https://en.wikipedia.org/wiki/Demurrage_(currency))) of 0.000050105908373373% is charged from users per minute - such that over 1 month to total tax would be 2%. 
-  * After 1 week the total amount tax is distributed evenly out to _active_ users.
-    *  any single transaction by a user within that week is considered _active_ (heartbeat) 
-  * This is meant to result in a disincentivization to hold (hodl) the Sarafu token and increase its usage as a medium of exchange rather than a store of value.
-  * This token can be added to liquidity pools with other ERC20 tokens and or Community Inclusion Currencies (CICs) - and thereby act as a central network token and connect various tokens and CICs together.
+* Vouchers
+  * A Publisher may publish a RedistributedDemurrageToken (Voucher) representing a credit obligation of an Issuer or Association of Issuers that can be redeemed as payment for the products of the Issuer. The Issuer is the entity legally obligated to redeem the voucher as payment.
+  * Decay: The Publisher can specify an decay rate such as 2% as well as a redistribution period. After the redistribution period such as a month. Assuming an account holder has not had any transfers they will have a new balance of their original balance*2%. Note that the numeric decay will happen continuously by the minute.
+  * Redistribution: The missing (demurraged) balances will be added to the balance of the SINK address. So once a redistribution period (e.g. once a month) the total supply of all holders including the SINK will return to the minted supply.
+  * This is meant to result as a disincentivization to hold (hodl) the Voucher without causing price inflation, as the total supply is stable.
   * Example 
-    -  With a demurrage of 2% (net per month) and a reward period of 1 month - If there are 10 users all with balances of 1000 Sarafu and only 2 of them trade that month (assume they trade back and forth with no net balance change). 
-    - Then the resulting balances after one tax period of those two trading would be 1080 Sarafu while the remaining non-active users would be 980 Sarafu. If this behaviour continued in the next tax period, with the same two users only trading (with no net balance changes), they would have 1158.39999968 Sarafu and those users that are not trading would have their balances further reduced to 960.40 Sarafu. If this continued on ~forever those two active trading users would have the entire token supply and the non-trading users would eventually reach a zero balance.
-    - this example calculation for 3 tax periods can be found here: https://gitlab.com/grassrootseconomics/cic-docs/-/blob/master/demurrage-redist-sarafu.ods
+    -  With a demurrage of 2% (and redistribution period of 1 month) - If there are 10 users all with balances of 100 Vouchers (and only 2 of them trade that month (assume they trade back and forth with no net balance change)). 
+    - Then the resulting balances after one redistribution period of ALL users (regardless of their trading) would be 98 Vouchers and 20 Voucher would be the balance of the SINK address. Assuming the SINK address is redistributed (as a Community Fund) back to users, it’s balance would again reach 20 the next redistribution period. 
+    - Note that after the redistribution the total of all balances will equal the total minted amount. 
+    - Note that all accounts holding such Vouchers are effected by demurrage.
 
 ## Nomenclature
 
-* `Demurrage` aka Decay amount: A percentage of token supply that will be charged once per minute and evenly redistributed to _active_ users every Demurrage Period (minutes)
+* `Demurrage` aka Decay amount: A percentage of token supply that will gradually be removed over a redstribution period and then redistributed to the SINK account.
 * Base balance: The inflated balance of each user is stored for bookkeeping.
 * Sink Token Address: Rounding errors and if no one trades the tax goes to this address
 * Demurrage Period (minutes)- aka `period`: The number of minutes over which a user must be _active_ to receive tax-redistibution. 
