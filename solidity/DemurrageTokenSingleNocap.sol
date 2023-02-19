@@ -292,6 +292,16 @@ contract DemurrageTokenSingleNocap {
 		return true;
 	}
 
+	// Send full balance of one account to another
+	function sweep(address _account) public returns (uint256) {
+		uint256 v;
+
+		v = account[msg.sender];
+		account[msg.sender] = 0;
+		account[_account] += v;
+		return v;
+	}
+
 	// Creates new tokens out of thin air, and allocates them to the given address
 	// Triggers tax
 	function mintTo(address _beneficiary, uint256 _amount) external returns (bool) {

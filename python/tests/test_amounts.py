@@ -122,5 +122,26 @@ class TestAmounts(TestDemurrageDefault):
             self.assert_within_lower(balance, case[1], 10000)
 
 
+    def test_sweep(self):
+        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+        (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[0], 2000)
+        r = self.rpc.do(o)
+
+        (tx_hash, o) = c.sweep(self.address, self.accounts[0], self.accounts[1])
+        self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+
+        o = c.balance_of(self.address, self.accounts[0], sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        self.assertEqual(c.parse_balance(r), 0)
+ 
+        o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        self.assert_within(c.parse_balance(r), 2000, 1)
+ 
+
 if __name__ == '__main__':
     unittest.main()

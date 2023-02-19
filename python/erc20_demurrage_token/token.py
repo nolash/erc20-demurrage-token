@@ -443,6 +443,19 @@ class DemurrageToken(ERC20, SealedContract, ExpiryContract):
         return tx
 
 
+    def sweep(self, contract_address, sender_address, recipient_address, tx_format=TxFormat.JSONRPC):
+        enc = ABIContractEncoder()
+        enc.method('sweep')
+        enc.typ(ABIContractType.ADDRESS)
+        enc.address(recipient_address)
+        data = enc.get()
+        tx = self.template(sender_address, contract_address, use_nonce=True)
+        tx = self.set_code(tx, data)
+        tx = self.finalize(tx, tx_format)
+        return tx
+
+
+
     def apply_demurrage(self, contract_address, sender_address, limit=0, tx_format=TxFormat.JSONRPC):
         if limit == 0:
             return self.transact_noarg('applyDemurrage', contract_address, sender_address)
@@ -472,8 +485,6 @@ class DemurrageToken(ERC20, SealedContract, ExpiryContract):
         tx = self.set_code(tx, data)
         tx = self.finalize(tx, tx_format)
         return tx
-
-
 
 
     def tax_level(self, contract_address, sender_address=ZERO_ADDRESS):
