@@ -67,9 +67,9 @@ contract DemurrageTokenSingleNocap {
 	uint256 public immutable periodDuration;
 
 	// Demurrage in ppm per minute
-	//uint256 public immutable taxLevel;
+	//uint256 public immutable decayLevel;
 	// 64x64
-	int128 public immutable taxLevel;
+	int128 public immutable decayLevel;
 		
 	// Addresses allowed to mint new tokens
 	mapping (address => bool) minter;
@@ -129,11 +129,11 @@ contract DemurrageTokenSingleNocap {
 	event SealStateChange(bool indexed _final, uint256 _sealState);
 
 
-	constructor(string memory _name, string memory _symbol, uint8 _decimals, int128 _taxLevel, uint256 _periodMinutes, address _defaultSinkAddress) {
-		require(_taxLevel < (1 << 64));
+	constructor(string memory _name, string memory _symbol, uint8 _decimals, int128 _decayLevel, uint256 _periodMinutes, address _defaultSinkAddress) {
+		require(_decayLevel < (1 << 64));
 		redistributionItem memory initialRedistribution;
 
-		//require(ABDKMath64x64.toUInt(_taxLevel) == 0);
+		//require(ABDKMath64x64.toUInt(_decayLevel) == 0);
 
 		// ACL setup
 		owner = msg.sender;
@@ -149,7 +149,7 @@ contract DemurrageTokenSingleNocap {
 		periodDuration = _periodMinutes * 60;
 		demurrageAmount = ABDKMath64x64.fromUInt(1);
 
-		taxLevel = ABDKMath64x64.ln(_taxLevel);
+		decayLevel = ABDKMath64x64.ln(_decayLevel);
 		initialRedistribution = toRedistribution(0, demurrageAmount, 0, 1);
 		redistributions.push(initialRedistribution);
 
@@ -448,7 +448,7 @@ contract DemurrageTokenSingleNocap {
 		lastDemurrageAmount = toRedistributionDemurrageModifier(lastRedistribution);
 		demurrageCounts = (periodDuration * currentPeriod) / 60;
 		// TODO refactor decayby to take int128 then DRY with it
-		nextRedistributionDemurrage = ABDKMath64x64.exp(ABDKMath64x64.mul(taxLevel, ABDKMath64x64.fromUInt(demurrageCounts)));
+		nextRedistributionDemurrage = ABDKMath64x64.exp(ABDKMath64x64.mul(decayLevel, ABDKMath64x64.fromUInt(demurrageCounts)));
 		nextRedistribution = toRedistribution(0, nextRedistributionDemurrage, totalSupply(), nextPeriod);
 		redistributions.push(nextRedistribution);
 
@@ -491,7 +491,7 @@ contract DemurrageTokenSingleNocap {
 		}
 
 		periodPoint = ABDKMath64x64.fromUInt(periodCount);
-		v = ABDKMath64x64.mul(taxLevel, periodPoint);
+		v = ABDKMath64x64.mul(decayLevel, periodPoint);
 		v = ABDKMath64x64.exp(v);
 		demurrageAmount = ABDKMath64x64.mul(demurrageAmount, v);
 
@@ -533,7 +533,7 @@ contract DemurrageTokenSingleNocap {
 		valuePoint = ABDKMath64x64.fromUInt(_value);
 		periodPoint = ABDKMath64x64.fromUInt(_period);
 
-		v = ABDKMath64x64.mul(taxLevel, periodPoint);
+		v = ABDKMath64x64.mul(decayLevel, periodPoint);
 		v = ABDKMath64x64.exp(v);
 		v = ABDKMath64x64.mul(valuePoint, v);
 		return ABDKMath64x64.toUInt(v);

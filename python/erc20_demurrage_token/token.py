@@ -487,8 +487,8 @@ class DemurrageToken(ERC20, SealedContract, ExpiryContract):
         return tx
 
 
-    def tax_level(self, contract_address, sender_address=ZERO_ADDRESS):
-        return self.call_noarg('taxLevel', contract_address, sender_address=sender_address)
+    def decay_level(self, contract_address, sender_address=ZERO_ADDRESS):
+        return self.call_noarg('decayLevel', contract_address, sender_address=sender_address)
 
 
     def resolution_factor(self, contract_address, sender_address=ZERO_ADDRESS):
@@ -669,7 +669,7 @@ class DemurrageToken(ERC20, SealedContract, ExpiryContract):
 
 
     @classmethod
-    def parse_tax_level(self, v):
+    def parse_decay_level(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)
 
 
