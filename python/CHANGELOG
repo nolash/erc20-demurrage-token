@@ -1,4 +1,5 @@
-- 0.3.7
+- 0.4.0
+	* Rename taxLevel to decayLevel in contract
 	* Add sweep contract method to fully empty one account into another
 - 0.3.6
 	* Reinstate owner as minter by default
