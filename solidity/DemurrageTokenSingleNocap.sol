@@ -706,9 +706,6 @@ contract DemurrageTokenSingleNocap {
 		if (_sum == 0x9493f8b2) { // EIP173
 			return true;
 		}
-		if (_sum == 0x37a47be4) { // OwnedAccepter
-			return true;
-		}
 		return false;
 	}
 }
