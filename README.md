@@ -1,9 +1,5 @@
 # RedistributedDemurrageToken
 
-# RedistributedDemurrageToken
-
-**Last edit: Will Ruddick Feburary 19 2023**
-
 ## Use Case
 * Vouchers
   * A Publisher may publish a RedistributedDemurrageToken (Voucher) representing a credit obligation of an Issuer or Association of Issuers that can be redeemed as payment for the products of the Issuer. The Issuer is the entity legally obligated to redeem the voucher as payment.
