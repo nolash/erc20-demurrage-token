@@ -5,6 +5,7 @@ all: single_nocap
 single_nocap:
 	$(SOLC) DemurrageTokenSingleNocap.sol --abi --evm-version byzantium | awk 'NR==4' > DemurrageTokenSingleNocap.json
 	$(SOLC) DemurrageTokenSingleNocap.sol --bin --evm-version byzantium | awk 'NR==4' > DemurrageTokenSingleNocap.bin
+	$(SOLC) DemurrageTokenSingleNocap.sol --metadata --evm-version byzantium | awk 'NR==4' > DemurrageTokenSingleNocap.metadata.json
 	truncate -s -1 DemurrageTokenSingleNocap.bin
 
 single: single_nocap
