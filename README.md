@@ -85,6 +85,34 @@ Token parameters are truncated when calculating demurrage and redistribution:
 * Demurrage modifier: 64 bits
 
 
+## Expiration
+
+A token may set to expire at a certain point in time. After the expiry, no more transfers may be executed. From that point on, balances are frozen and demurrage is halted.
+
+Expiration may be set in terms of redistribution periods.
+
+Unless sealed (see below), expiration may be changed at any time to any future redistribution period. However, once expired, expiration may not be changed further.
+
+
+## Supply
+
+Unless sealed (see below), Supply limit may be set and change at any time. Supply may never be directly set to less than the current supply. However, contract _writers_ may burn tokens in their possession using the `burn()` method, which will effectively reduce the supply.
+
+
+## Mutability
+
+The following parameters may not be changed after contract is published:
+
+* Demurrage level
+* Redistribution period
+
+The contract provides a sealing feature which prohibits further changes to parameters that can initially be edited. These include:
+
+* Adding and removing writers (addresses that may mint tokens)
+* Sink addres
+* Expiry period
+* Supply limit
+
 
 ## Gas usage
 

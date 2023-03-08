@@ -121,7 +121,7 @@ contract DemurrageTokenSingleNocap {
 
 	// Implements Sealer
 	uint256 public sealState;
-	uint8 constant MINTER_STATE = 1;
+	uint8 constant WRITER_STATE = 1;
 	uint8 constant SINK_STATE = 2;
 	uint8 constant EXPIRY_STATE = 4;
 	uint8 constant CAP_STATE = 8;
@@ -223,7 +223,7 @@ contract DemurrageTokenSingleNocap {
 
 	// Given address will be allowed to call the mintTo() function
 	function addWriter(address _minter) public returns (bool) {
-		require(!isSealed(MINTER_STATE));
+		require(!isSealed(WRITER_STATE));
 		require(msg.sender == owner);
 		minter[_minter] = true;
 		return true;
@@ -231,7 +231,7 @@ contract DemurrageTokenSingleNocap {
 
 	// Given address will no longer be allowed to call the mintTo() function
 	function deleteWriter(address _minter) public returns (bool) {
-		require(!isSealed(MINTER_STATE));
+		require(!isSealed(WRITER_STATE));
 		require(msg.sender == owner || _minter == msg.sender);
 		minter[_minter] = false;
 		return true;
