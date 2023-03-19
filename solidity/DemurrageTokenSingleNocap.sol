@@ -242,7 +242,6 @@ contract DemurrageTokenSingleNocap {
 		int128 baseBalance;
 		int128 currentDemurragedAmount;
 		uint256 periodCount;
-		uint8 expiryState;
 
 		baseBalance = ABDKMath64x64.fromUInt(baseBalanceOf(_account));
 
@@ -260,7 +259,6 @@ contract DemurrageTokenSingleNocap {
 	/// Increases base balance for a single account
 	function increaseBaseBalance(address _account, uint256 _delta) private returns (bool) {
 		uint256 oldBalance;
-		uint256 newBalance;
 		uint256 workAccount;
 
 		workAccount = uint256(account[_account]);
@@ -277,7 +275,6 @@ contract DemurrageTokenSingleNocap {
 	/// Decreases base balance for a single account
 	function decreaseBaseBalance(address _account, uint256 _delta) private returns (bool) {
 		uint256 oldBalance;
-	       	uint256 newBalance;
 		uint256 workAccount;
 
 		workAccount = uint256(account[_account]);
@@ -327,6 +324,7 @@ contract DemurrageTokenSingleNocap {
 	function toRedistribution(uint256 _participants, int128 _demurrageModifier, uint256 _value, uint256 _period) public pure returns(redistributionItem memory) {
 		redistributionItem memory redistribution;
 
+		_participants;
 		redistribution.period = uint32(_period);
 		redistribution.value = uint72(_value);
 		redistribution.demurrage = uint64(uint128(_demurrageModifier) & 0xffffffffffffffff);
@@ -392,7 +390,7 @@ contract DemurrageTokenSingleNocap {
 		return lastRedistribution;
 	}
 
-	function getDistribution(uint256 _supply, int128 _demurrageAmount) public view returns (uint256) {
+	function getDistribution(uint256 _supply, int128 _demurrageAmount) public pure returns (uint256) {
 		int128 difference;
 
 		difference = ABDKMath64x64.mul(ABDKMath64x64.fromUInt(_supply), ABDKMath64x64.sub(ABDKMath64x64.fromUInt(1), _demurrageAmount));
@@ -400,7 +398,7 @@ contract DemurrageTokenSingleNocap {
 			
 	}
 
-	function getDistributionFromRedistribution(redistributionItem memory _redistribution) public returns (uint256) {
+	function getDistributionFromRedistribution(redistributionItem memory _redistribution) public pure returns (uint256) {
 		uint256 redistributionSupply;
 		int128 redistributionDemurrage;
 
@@ -643,8 +641,6 @@ contract DemurrageTokenSingleNocap {
 
 	// ERC20 transfer backend for transfer, transferFrom
 	function transferBase(address _from, address _to, uint256 _value) private returns (bool) {
-		uint256 period;
-
 		decreaseBaseBalance(_from, _value);
 		increaseBaseBalance(_to, _value);
 
@@ -655,6 +651,7 @@ contract DemurrageTokenSingleNocap {
 	function transferOwnership(address _newOwner) public returns (bool) {
 		require(msg.sender == owner);
 		newOwner = _newOwner;
+		return true;
 	}
 
 	// Implements OwnedAccepter
@@ -666,6 +663,7 @@ contract DemurrageTokenSingleNocap {
 		owner = newOwner;
 		newOwner = address(0);
 		emit OwnershipTransferred(oldOwner, owner);
+		return true;
 	}
 
 	// Explicitly and irretrievably burn tokens

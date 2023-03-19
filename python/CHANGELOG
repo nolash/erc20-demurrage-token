@@ -1,3 +1,5 @@
+- 0.4.1
+	* Eliminate solidity compiler warnings
 - 0.4.0
 	* Rename taxLevel to decayLevel in contract
 	* Add sweep contract method to fully empty one account into another
