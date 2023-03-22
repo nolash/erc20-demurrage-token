@@ -10,6 +10,7 @@ from chainlib.eth.tx import (
 from chainlib.hash import keccak256_string_to_hex
 from chainlib.eth.contract import (
         ABIContractEncoder,
+        ABIContractDecoder,
         ABIContractType,
         abi_decode_single,
         )
@@ -20,11 +21,36 @@ from hexathon import (
         add_0x,
         strip_0x,
         )
+from dexif import from_fixed
 
 # local imports
 from erc20_demurrage_token.data import data_dir
+from erc20_demurrage_token.seal import SealedContract
+from erc20_demurrage_token.expiry import ExpiryContract
 
 logg = logging.getLogger(__name__)
+
+
+class DemurrageRedistribution:
+    
+    def __init__(self, v):
+        d = ABIContractDecoder()
+        v = strip_0x(v)
+        d.typ(ABIContractType.UINT256)
+        d.typ(ABIContractType.UINT256)
+        d.typ(ABIContractType.BYTES32)
+        d.val(v[:64])
+        d.val(v[64:128])
+        d.val(v[128:192])
+        r = d.decode()
+
+        self.period = r[0]
+        self.value = r[1]
+        self.demurrage = from_fixed(r[2])
+
+
+    def __str__(self):
+        return 'period {} value {} demurrage {}'.format(self.period, self.value, self.demurrage)
 
 
 class DemurrageTokenSettings:
@@ -47,59 +73,40 @@ class DemurrageTokenSettings:
                 )
 
 
-class DemurrageToken(ERC20):
+class DemurrageToken(ERC20, SealedContract, ExpiryContract):
 
     __abi = {}
     __bytecode = {}
-    valid_modes = [
-                'MultiNocap',
-                'SingleNocap',
-                'MultiCap',
-                'SingleCap',
-                ]
 
-    def constructor(self, sender_address, settings, redistribute=True, cap=0, tx_format=TxFormat.JSONRPC):
-        if int(cap) < 0:
-            raise ValueError('cap must be 0 or positive integer')
-        code = DemurrageToken.bytecode(multi=redistribute, cap=cap>0)
-        enc = ABIContractEncoder()
-        enc.string(settings.name)
-        enc.string(settings.symbol)
-        enc.uint256(settings.decimals)
-        enc.uint256(settings.demurrage_level)
-        enc.uint256(settings.period_minutes)
-        enc.address(settings.sink_address)
-        if cap > 0:
-            enc.uint256(cap)
-        code += enc.get()
+    def constructor(self, sender_address, settings, tx_format=TxFormat.JSONRPC, version=None):
+        code = self.cargs(settings.name, settings.symbol, settings.decimals, settings.demurrage_level, settings.period_minutes, settings.sink_address, version=version)
         tx = self.template(sender_address, None, use_nonce=True)
         tx = self.set_code(tx, code)
         return self.finalize(tx, tx_format)
 
 
     @staticmethod
+    def cargs(name, symbol, decimals, demurrage_level, period_minutes, sink_address, version=None):
+        code = DemurrageToken.bytecode()
+        enc = ABIContractEncoder()
+        enc.string(name)
+        enc.string(symbol)
+        enc.uint256(decimals)
+        enc.uint256(demurrage_level)
+        enc.uint256(period_minutes)
+        enc.address(sink_address)
+        code += enc.get()
+        return code
+
+
+    @staticmethod
     def gas(code=None):
-        return 4000000
+        return 7000000
 
 
     @staticmethod
-    def __to_contract_name(multi, cap):
-        name = 'DemurrageToken'
-        if multi:
-            name += 'Multi'
-        else:
-            name += 'Single'
-        if cap:
-            name += 'Cap'
-        else:
-            name += 'Nocap'
-        logg.debug('bytecode name {}'.format(name))
-        return name
-
-
-    @staticmethod
-    def abi(multi=True, cap=False):
-        name = DemurrageToken.__to_contract_name(multi, cap)
+    def abi():
+        name = 'DemurrageTokenSingleNocap'
         if DemurrageToken.__abi.get(name) == None:
             f = open(os.path.join(data_dir, name + '.json'), 'r')
             DemurrageToken.__abi[name] = json.load(f)
@@ -108,8 +115,8 @@ class DemurrageToken(ERC20):
 
 
     @staticmethod
-    def bytecode(multi=True, cap=False):
-        name = DemurrageToken.__to_contract_name(multi, cap)
+    def bytecode(version=None):
+        name = 'DemurrageTokenSingleNocap'
         if DemurrageToken.__bytecode.get(name) == None:
             f = open(os.path.join(data_dir, name + '.bin'), 'r')
             DemurrageToken.__bytecode[name] = f.read()
@@ -145,9 +152,14 @@ class DemurrageToken(ERC20):
         return tx
 
 
+    # backwards compatibility
     def add_minter(self, contract_address, sender_address, address, tx_format=TxFormat.JSONRPC):
+        return self.add_writer(contract_address, sender_address, address, tx_format=tx_format)
+
+
+    def add_writer(self, contract_address, sender_address, address, tx_format=TxFormat.JSONRPC):
         enc = ABIContractEncoder()
-        enc.method('addMinter')
+        enc.method('addWriter')
         enc.typ(ABIContractType.ADDRESS)
         enc.address(address)
         data = enc.get()
@@ -157,9 +169,26 @@ class DemurrageToken(ERC20):
         return tx
 
 
-    def remove_minter(self, contract_address, sender_address, address, tx_format=TxFormat.JSONRPC):
+    def set_max_supply(self, contract_address, sender_address, cap, tx_format=TxFormat.JSONRPC):
         enc = ABIContractEncoder()
-        enc.method('removeMinter')
+        enc.method('setMaxSupply')
+        enc.typ(ABIContractType.UINT256)
+        enc.uint256(cap)
+        data = enc.get()
+        tx = self.template(sender_address, contract_address, use_nonce=True)
+        tx = self.set_code(tx, data)
+        tx = self.finalize(tx, tx_format)
+        return tx
+
+
+    # backwards compatibility
+    def remove_minter(self, contract_address, sender_address, address, tx_format=TxFormat.JSONRPC):
+        return self.delete_writer(contract_address, sender_address, address, tx_format=tx_format)
+
+
+    def delete_writer(self, contract_address, sender_address, address, tx_format=TxFormat.JSONRPC):
+        enc = ABIContractEncoder()
+        enc.method('deleteWriter')
         enc.typ(ABIContractType.ADDRESS)
         enc.address(address)
         data = enc.get()
@@ -280,18 +309,18 @@ class DemurrageToken(ERC20):
         return o
 
 
-    def to_redistribution(self, contract_address, participants, demurrage_modifier_ppm, value, period, sender_address=ZERO_ADDRESS, id_generator=None):
+    def to_redistribution(self, contract_address, participants, demurrage_modifier, value, period, sender_address=ZERO_ADDRESS, id_generator=None):
         j = JSONRPCRequest(id_generator)
         o = j.template()
         o['method'] = 'eth_call'
         enc = ABIContractEncoder()
         enc.method('toRedistribution')
         enc.typ(ABIContractType.UINT256)
-        enc.typ(ABIContractType.UINT256)
+        enc.typ_literal('int128')
         enc.typ(ABIContractType.UINT256)
         enc.typ(ABIContractType.UINT256)
         enc.uint256(participants)
-        enc.uint256(demurrage_modifier_ppm)
+        enc.uint256(demurrage_modifier)
         enc.uint256(value)
         enc.uint256(period)
         data = add_0x(enc.get())
@@ -310,8 +339,11 @@ class DemurrageToken(ERC20):
         o['method'] = 'eth_call'
         enc = ABIContractEncoder()
         enc.method('toRedistributionPeriod')
-        enc.typ(ABIContractType.BYTES32)
-        enc.bytes32(redistribution)
+        v = strip_0x(redistribution)
+        enc.typ_literal('(uint32,uint72,uint64)')
+        enc.bytes32(v[:64])
+        enc.bytes32(v[64:128])
+        enc.bytes32(v[128:192])
         data = add_0x(enc.get())
         tx = self.template(sender_address, contract_address)
         tx = self.set_code(tx, data)
@@ -321,22 +353,26 @@ class DemurrageToken(ERC20):
         return o
 
 
-    def to_redistribution_participants(self, contract_address, redistribution, sender_address=ZERO_ADDRESS, id_generator=None):
-        j = JSONRPCRequest(id_generator)
-        o = j.template()
-        o['method'] = 'eth_call'
-        enc = ABIContractEncoder()
-        enc.method('toRedistributionParticipants')
-        enc.typ(ABIContractType.BYTES32)
-        enc.bytes32(redistribution)
-        data = add_0x(enc.get())
-        tx = self.template(sender_address, contract_address)
-        tx = self.set_code(tx, data)
-        o['params'].append(self.normalize(tx))
-        o['params'].append('latest')
-        o = j.finalize(o)
-        return o
-
+#    def to_redistribution_participants(self, contract_address, redistribution, sender_address=ZERO_ADDRESS, id_generator=None):
+#        j = JSONRPCRequest(id_generator)
+#        o = j.template()
+#        o['method'] = 'eth_call'
+#        enc = ABIContractEncoder()
+#        enc.method('toRedistributionParticipants')
+#        v = strip_0x(redistribution)
+#        enc.typ_literal('(uint32,uint72,uint104)')
+#        #enc.typ(ABIContractType.BYTES32)
+#        enc.bytes32(v[:64])
+#        enc.bytes32(v[64:128])
+#        enc.bytes32(v[128:192])
+#        data = add_0x(enc.get())
+#        tx = self.template(sender_address, contract_address)
+#        tx = self.set_code(tx, data)
+#        o['params'].append(self.normalize(tx))
+#        o['params'].append('latest')
+#        o = j.finalize(o)
+#        return o
+#
 
     def to_redistribution_supply(self, contract_address, redistribution, sender_address=ZERO_ADDRESS, id_generator=None):
         j = JSONRPCRequest(id_generator)
@@ -344,8 +380,11 @@ class DemurrageToken(ERC20):
         o['method'] = 'eth_call'
         enc = ABIContractEncoder()
         enc.method('toRedistributionSupply')
-        enc.typ(ABIContractType.BYTES32)
-        enc.bytes32(redistribution)
+        v = strip_0x(redistribution)
+        enc.typ_literal('(uint32,uint72,uint64)')
+        enc.bytes32(v[:64])
+        enc.bytes32(v[64:128])
+        enc.bytes32(v[128:192])
         data = add_0x(enc.get())
         tx = self.template(sender_address, contract_address)
         tx = self.set_code(tx, data)
@@ -361,8 +400,11 @@ class DemurrageToken(ERC20):
         o['method'] = 'eth_call'
         enc = ABIContractEncoder()
         enc.method('toRedistributionDemurrageModifier')
-        enc.typ(ABIContractType.BYTES32)
-        enc.bytes32(redistribution)
+        v = strip_0x(redistribution)
+        enc.typ_literal('(uint32,uint72,uint64)')
+        enc.bytes32(v[:64])
+        enc.bytes32(v[64:128])
+        enc.bytes32(v[128:192])
         data = add_0x(enc.get())
         tx = self.template(sender_address, contract_address)
         tx = self.set_code(tx, data)
@@ -387,6 +429,31 @@ class DemurrageToken(ERC20):
         o['params'].append('latest')
         o = j.finalize(o)
         return o
+
+
+    def set_sink_address(self, contract_address, sender_address, address, tx_format=TxFormat.JSONRPC):
+        enc = ABIContractEncoder()
+        enc.method('setSinkAddress')
+        enc.typ(ABIContractType.ADDRESS)
+        enc.address(address)
+        data = enc.get()
+        tx = self.template(sender_address, contract_address, use_nonce=True)
+        tx = self.set_code(tx, data)
+        tx = self.finalize(tx, tx_format)
+        return tx
+
+
+    def sweep(self, contract_address, sender_address, recipient_address, tx_format=TxFormat.JSONRPC):
+        enc = ABIContractEncoder()
+        enc.method('sweep')
+        enc.typ(ABIContractType.ADDRESS)
+        enc.address(recipient_address)
+        data = enc.get()
+        tx = self.template(sender_address, contract_address, use_nonce=True)
+        tx = self.set_code(tx, data)
+        tx = self.finalize(tx, tx_format)
+        return tx
+
 
 
     def apply_demurrage(self, contract_address, sender_address, limit=0, tx_format=TxFormat.JSONRPC):
@@ -420,8 +487,8 @@ class DemurrageToken(ERC20):
         return tx
 
 
-    def tax_level(self, contract_address, sender_address=ZERO_ADDRESS):
-        return self.call_noarg('taxLevel', contract_address, sender_address=sender_address)
+    def decay_level(self, contract_address, sender_address=ZERO_ADDRESS):
+        return self.call_noarg('decayLevel', contract_address, sender_address=sender_address)
 
 
     def resolution_factor(self, contract_address, sender_address=ZERO_ADDRESS):
@@ -448,28 +515,28 @@ class DemurrageToken(ERC20):
         return self.call_noarg('demurrageTimestamp', contract_address, sender_address=sender_address)
 
 
-    def supply_cap(self, contract_address, sender_address=ZERO_ADDRESS):
-        return self.call_noarg('supplyCap', contract_address, sender_address=sender_address)
+    def max_supply(self, contract_address, sender_address=ZERO_ADDRESS):
+        return self.call_noarg('maxSupply', contract_address, sender_address=sender_address)
 
 
-    def grow_by(self, contract_address, value, period, sender_address=ZERO_ADDRESS, id_generator=None):
-        j = JSONRPCRequest(id_generator)
-        o = j.template()
-        o['method'] = 'eth_call'
-        enc = ABIContractEncoder()
-        enc.method('growBy')
-        enc.typ(ABIContractType.UINT256)
-        enc.typ(ABIContractType.UINT256)
-        enc.uint256(value)
-        enc.uint256(period)
-        data = add_0x(enc.get())
-        tx = self.template(sender_address, contract_address)
-        tx = self.set_code(tx, data)
-        o['params'].append(self.normalize(tx))
-        o['params'].append('latest')
-        o = j.finalize(o)
-        return o
-
+#    def grow_by(self, contract_address, value, period, sender_address=ZERO_ADDRESS, id_generator=None):
+#        j = JSONRPCRequest(id_generator)
+#        o = j.template()
+#        o['method'] = 'eth_call'
+#        enc = ABIContractEncoder()
+#        enc.method('growBy')
+#        enc.typ(ABIContractType.UINT256)
+#        enc.typ(ABIContractType.UINT256)
+#        enc.uint256(value)
+#        enc.uint256(period)
+#        data = add_0x(enc.get())
+#        tx = self.template(sender_address, contract_address)
+#        tx = self.set_code(tx, data)
+#        o['params'].append(self.normalize(tx))
+#        o['params'].append('latest')
+#        o = j.finalize(o)
+#        return o
+#
 
     def decay_by(self, contract_address, value, period, sender_address=ZERO_ADDRESS, id_generator=None):
         j = JSONRPCRequest(id_generator)
@@ -497,7 +564,7 @@ class DemurrageToken(ERC20):
         enc = ABIContractEncoder()
         enc.method('getDistribution')
         enc.typ(ABIContractType.UINT256)
-        enc.typ(ABIContractType.UINT256)
+        enc.typ_literal('int128')
         enc.uint256(supply)
         enc.uint256(demurrage_amount)
         data = add_0x(enc.get())
@@ -515,8 +582,11 @@ class DemurrageToken(ERC20):
         o['method'] = 'eth_call'
         enc = ABIContractEncoder()
         enc.method('getDistributionFromRedistribution')
-        enc.typ(ABIContractType.BYTES32)
-        enc.bytes32(redistribution)
+        v = strip_0x(redistribution)
+        enc.typ_literal('(uint32,uint72,uint64)')
+        enc.bytes32(v[:64])
+        enc.bytes32(v[64:128])
+        enc.bytes32(v[128:192])
         data = add_0x(enc.get())
         tx = self.template(sender_address, contract_address)
         tx = self.set_code(tx, data)
@@ -544,7 +614,8 @@ class DemurrageToken(ERC20):
 
     @classmethod
     def parse_demurrage_amount(self, v):
-        return abi_decode_single(ABIContractType.UINT256, v)
+        #        return abi_decode_single(ABIContractType.UINT256, v)
+        return from_fixed(v)
 
 
     @classmethod
@@ -559,8 +630,8 @@ class DemurrageToken(ERC20):
     
     @classmethod
     def parse_redistributions(self, v):
-        return abi_decode_single(ABIContractType.BYTES32, v)
-
+        return strip_0x(v)
+        
 
     @classmethod
     def parse_account_period(self, v):
@@ -598,7 +669,7 @@ class DemurrageToken(ERC20):
 
 
     @classmethod
-    def parse_tax_level(self, v):
+    def parse_decay_level(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)
 
 
@@ -610,3 +681,26 @@ class DemurrageToken(ERC20):
     @classmethod
     def parse_total_burned(self, v):
         return abi_decode_single(ABIContractType.UINT256, v)
+
+
+def bytecode(**kwargs):
+    return DemurrageToken.bytecode(version=kwargs.get('version'))
+
+
+def create(**kwargs):
+    return DemurrageToken.cargs(
+            kwargs['name'],
+            kwargs['symbol'],
+            kwargs['decimals'],
+            kwargs['demurragelevel'],
+            kwargs['redistributionperiod'],
+            kwargs['sinkaddress'],
+            version=kwargs.get('version'))
+
+
+def args(v):
+    if v == 'create':
+        return (['name', 'symbol', 'decimals', 'demurragelevel', 'redistributionperiod', 'sinkaddress'], ['version'],)
+    elif v == 'default' or v == 'bytecode':
+        return ([], ['version'],)
+    raise ValueError('unknown command: ' + v)

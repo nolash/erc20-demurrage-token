@@ -1,22 +1,20 @@
 # RedistributedDemurrageToken
 
 ## Use Case
-* Network / Basic Income Token
-  * 100 Sarafu is distributed to anyone in Kenya after user validation by the owner of a faucet which mints new Sarafu.
-    * Validated users are those that validate their phone number in Kenya.
-  * A Sarafu holding tax aka ([demurrage](https://en.wikipedia.org/wiki/Demurrage_(currency))) of 0.000050105908373373% is charged from users per minute - such that over 1 month to total tax would be 2%. 
-  * After 1 week the total amount tax is distributed evenly out to _active_ users.
-    *  any single transaction by a user within that week is considered _active_ (heartbeat) 
-  * This is meant to result in a disincentivization to hold (hodl) the Sarafu token and increase its usage as a medium of exchange rather than a store of value.
-  * This token can be added to liquidity pools with other ERC20 tokens and or Community Inclusion Currencies (CICs) - and thereby act as a central network token and connect various tokens and CICs together.
+* Vouchers
+  * A Publisher may publish a RedistributedDemurrageToken (Voucher) representing a credit obligation of an Issuer or Association of Issuers that can be redeemed as payment for the products of the Issuer. The Issuer is the entity legally obligated to redeem the voucher as payment.
+  * Decay: The Publisher can specify an decay rate such as 2% as well as a redistribution period. After the redistribution period such as a month. Assuming an account holder has not had any transfers they will have a new balance of their original balance*2%. Note that the numeric decay will happen continuously by the minute.
+  * Redistribution: The missing (demurraged) balances will be added to the balance of the SINK address. So once a redistribution period (e.g. once a month) the total supply of all holders including the SINK will return to the minted supply.
+  * This is meant to result as a disincentivization to hold (hodl) the Voucher without causing price inflation, as the total supply is stable.
   * Example 
-    -  With a demurrage of 2% (net per month) and a reward period of 1 month - If there are 10 users all with balances of 1000 Sarafu and only 2 of them trade that month (assume they trade back and forth with no net balance change). 
-    - Then the resulting balances after one tax period of those two trading would be 1080 Sarafu while the remaining non-active users would be 980 Sarafu. If this behaviour continued in the next tax period, with the same two users only trading (with no net balance changes), they would have 1158.39999968 Sarafu and those users that are not trading would have their balances further reduced to 960.40 Sarafu. If this continued on ~forever those two active trading users would have the entire token supply and the non-trading users would eventually reach a zero balance.
-    - this example calculation for 3 tax periods can be found here: https://gitlab.com/grassrootseconomics/cic-docs/-/blob/master/demurrage-redist-sarafu.ods
+    -  With a demurrage of 2% (and redistribution period of 1 month) - If there are 10 users all with balances of 100 Vouchers (and only 2 of them trade that month (assume they trade back and forth with no net balance change)). 
+    - Then the resulting balances after one redistribution period of ALL users (regardless of their trading) would be 98 Vouchers and 20 Voucher would be the balance of the SINK address. Assuming the SINK address is redistributed (as a Community Fund) back to users, it’s balance would again reach 20 the next redistribution period. 
+    - Note that after the redistribution the total of all balances will equal the total minted amount. 
+    - Note that all accounts holding such Vouchers are effected by demurrage.
 
 ## Nomenclature
 
-* `Demurrage` aka Decay amount: A percentage of token supply that will be charged once per minute and evenly redistributed to _active_ users every Demurrage Period (minutes)
+* `Demurrage` aka Decay amount: A percentage of token supply that will gradually be removed over a redstribution period and then redistributed to the SINK account.
 * Base balance: The inflated balance of each user is stored for bookkeeping.
 * Sink Token Address: Rounding errors and if no one trades the tax goes to this address
 * Demurrage Period (minutes)- aka `period`: The number of minutes over which a user must be _active_ to receive tax-redistibution. 
@@ -30,63 +28,103 @@
 
 ## Mint
 
-* Owner can add minters and remove
-  - A faucet contract would be a minter and choose the amount of tokens to mint and distribute to new _validated_ users.
-  - The interface says the amount and is at the caller's discretion per contract call. _validation_ is outside of this contract.
-* A minter can remove itself
-* Minters can mint any amount
+* Minters are called writers. Contract owner can add and remove writers.
+* A writer can remove itself
+* The interface says the amount and is at the caller's discretion per contract call. _validation_ is outside of this contract.
+* Writers can mint any amount. If supply cap is set, minting will be limited to this cap.
 
 
-## Demurrage
-* Holding Tax (`demurrage`) is applied when a **mint** or **transfer**; (it can also be triggered explicitly)
-  - Note that the token supply _stays the same_ but a virtual _balance output_ is created.
-  - Updates `demurrageModifier` which represents the accumulated tax value and is an exponential decay step (of size `demurrage`) for each minute that has passed.
-    - `demurrageModifier = (1-demurrage)^(minute_passed)` 
-      - e.g. a `demurrage` of 2% after the 1st minute would be give a `demurrageModifier = (1-0.02)^1 = 0.98`.
-      - e.g. a `demurrage` after the 2nd minute would be give a `demurrageModifier = (1-0.02)^2 = 0.9604`.
-* All client-facing values (_balance output_ , _transfer inputs_) are adjusted with `demurrageModifier`.
-  - e.g. `_balance output_ = user_balance - user_balance * demurrageModifier`
+## Input parameters
+
+The redistrbution period is passed to the contract in minutes. E.g. a redistribution period of one month would be approximately 43200 minutes.
+
+The demurrage level specified as the percentage of continuous growth per minute:
+
+`(1 - percentage) ^ (1 / period)`
+
+E.g. A demurrage of 2% monthly would be defined as:
+
+`(1 - 0.02) ^ (1 / 43200) ~ 0.99999953234484737109`
+
+The number must be provided to the contract as a 64x64 bit fixed-point number (where the integer part is 0).
+
+A script is included in the python package to publish the contract which takes the input as a percentage as parts-per-million and converts the correct input argument for the contract. The calculation can be found in the function `process_config_local` in `python/erc20_demurrage_token/runnable/publish.py`. It uses the python module [dexif](https://pypi.org/project/dexif/) to perform the fixed-point conversion.
+
+
+## Demurrage calculation
+
+The demurrage calculation inside the contract is done by the following formula, where `demurrageLevel` is the demurrage level input parameter of the contract:
+
+`newDemurrageModifier = currentDemurrageModifier * (e ^ (ln(demurrageLevel) * minutes))`
+
+Holding Tax (`demurrage`) is applied when a **mint** or **transfer**; (it can also be triggered explicitly)
+- Note that the token supply _stays the same_ but a virtual _balance output_ is created.
+- Updates `demurrageModifier` which represents the accumulated tax value and is an exponential decay step (of size `demurrage`) for each minute that has passed.
+
+
+All client-facing values (_balance output_ , _transfer inputs_) are adjusted with `demurrageModifier`.
+
+e.g. `_balance output_ = user_balance - user_balance * demurrageModifier`
 
 
 ## Redistribution
 
 * One redistribution entry is added to storage for each `period`;
-  - When `mint` is triggered, the new totalsupply is stored to the entry
-  - When `transfer` is triggered, and the account did not yet participate in the `period`, the entry's participant count is incremented. 
-* Account must have "participated" in a period to be redistribution beneficiary.
-* Redistribution is applied when an account triggers a **transfer** for the first time in a new `period`;
-  - Check if user has participated in `period`. (_active_ user heartbeat)
-  - Each _active_ user balance in the `period` is increased by `(total supply at end of period * demurrageModifier ) / number_of_active_participants` via minting
-  - Participation field is zeroed out for that user.
-* Fractions must be rounded down
-  - Remainder is "dust" and should be sent to a dedicated Sink Token Address.
-  - If no one is _active_ all taxes go to the Sink Token Address.
+* When `mint` is triggered, the new totalsupply is stored to the entry
+* When `transfer` is triggered, and the account did not yet participate in the `period`, the entry's participant count is incremented. 
+* Redistributed tokens are added to the balance of the _sink address_ given when the contract is published.
+* _sink address_ may be changed.
 
 
-## Data structures
+## Data representation
 
-* One word per `account`:
-  - bits 000-071: value
-  - bits 072-103: period
-  - bits 104-255: (Unused)
-* One word per `redistributions` period:
-  - bits 000-031: period
-  - bits 032-103: supply
-  - bits 104-139: participant count
-  - bits 140-159: demurrage modifier
-  - bits 160-254: (Unused)
-  - bits     255: Set if individual redistribution amounts are fractions
+Token parameters are truncated when calculating demurrage and redistribution:
 
-### Notes
+* Redistribution period: 32 bits
+* Token supply: 72 bits
+* Demurrage modifier: 64 bits
 
-Accumulated demurrage modifier in `demurrageModifier` is 128 bit, but will be _truncated_ do 20 bits in `redistributions`. The 128 bit resolution is to used to reduce the impact of fractional drift of the long-term accumulation of the demurrage modifier. However, the demurrage snapshot values used in `redistributions` are parts-per-million and can be fully contained within a 20-bit value.
+
+## Expiration
+
+A token may set to expire at a certain point in time. After the expiry, no more transfers may be executed. From that point on, balances are frozen and demurrage is halted.
+
+Expiration may be set in terms of redistribution periods.
+
+Unless sealed (see below), expiration may be changed at any time to any future redistribution period. However, once expired, expiration may not be changed further.
+
+
+## Supply
+
+Unless sealed (see below), Supply limit may be set and change at any time. Supply may never be directly set to less than the current supply. However, contract _writers_ may burn tokens in their possession using the `burn()` method, which will effectively reduce the supply.
+
+
+## Mutability
+
+The following parameters may not be changed after contract is published:
+
+* Demurrage level
+* Redistribution period
+
+The contract provides a sealing feature which prohibits further changes to parameters that can initially be edited. These include:
+
+* Adding and removing writers (addresses that may mint tokens)
+* Sink addres
+* Expiry period
+* Supply limit
+
+
+## Gas usage
+
+The token contract uses the [ADBKMath](https://github.com/abdk-consulting/abdk-libraries-solidity/blob/master/ABDKMath64x64.sol) library to calculate exponentials.
+
+Gas usage is constant regardless of the amount of time passed between each execution of demurrage and redistribution period calculations.
 
 
 ## QA
 
-* Basic python tests in place
-* How to determine and generate sufficient test vectors, and how to adapt them to scripts.
-* Audit sources?
+* Tests are implemented using the `chaintool` python package suite.
+
 
 ## Known issues
 

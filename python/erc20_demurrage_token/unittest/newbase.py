@@ -24,17 +24,13 @@ from dexif import *
 
 logg = logging.getLogger()
 
-#BLOCKTIME = 5 # seconds
 TAX_LEVEL = int(10000 * 2) # 2%
-# calc "1-(0.98)^(1/518400)" <- 518400 = 30 days of blocks
-# 0.00000003897127107225
-PERIOD = 43200
-
+PERIOD = 43200 # 30 days in minutes
 
 class TestTokenDeploy:
 
     """tax level is ppm, 1000000 = 100%"""
-    def __init__(self, rpc, token_symbol='FOO', token_name='Foo Token', sink_address=ZERO_ADDRESS, tax_level=TAX_LEVEL, period=PERIOD):
+    def __init__(self, rpc, token_symbol='FOO', token_name='Foo Token', sink_address=ZERO_ADDRESS, supply=10**12, tax_level=TAX_LEVEL, period=PERIOD):
         self.tax_level = tax_level
         self.period_seconds = period * 60
 
@@ -60,11 +56,14 @@ class TestTokenDeploy:
         except TypeError:
             self.start_time = int(r['timestamp'])
 
+        self.default_supply = supply
+        self.default_supply_cap = 0
 
-    def publish(self, rpc, publisher_address, interface, supply_cap=0):
+
+    def deploy(self, rpc, deployer_address, interface, supply_cap=0):
         tx_hash = None
         o = None
-        (tx_hash, o) = interface.constructor(publisher_address, self.settings)
+        (tx_hash, o) = interface.constructor(deployer_address, self.settings, redistribute=False, cap=0)
 
         r = rpc.do(o)
         o = receipt(tx_hash)
@@ -89,21 +88,21 @@ class TestDemurrage(EthTesterCase):
             period = getattr(self, 'period')
         except AttributeError as e:
             pass
-        self.publisher = TestTokenDeploy(self.rpc, period=period, sink_address=self.accounts[9])
-        self.default_supply = 0
-        self.default_supply_cap = 0
+        self.deployer = TestTokenDeploy(self.rpc, period=period)
+        self.default_supply = self.deployer.default_supply
+        self.default_supply_cap = self.deployer.default_supply_cap
         self.start_block = None
         self.address = None
         self.start_time = None
 
 
-    def publish(self, interface):
-        self.address = self.publisher.publish(self.rpc, self.accounts[0], interface, supply_cap=self.default_supply_cap)
-        self.start_block = self.publisher.start_block
-        self.start_time = self.publisher.start_time
-        self.tax_level = self.publisher.tax_level
-        self.period_seconds = self.publisher.period_seconds
-        self.sink_address = self.publisher.sink_address
+    def deploy(self, interface):
+        self.address = self.deployer.deploy(self.rpc, self.accounts[0], interface, supply_cap=self.default_supply_cap)
+        self.start_block = self.deployer.start_block
+        self.start_time = self.deployer.start_time
+        self.tax_level = self.deployer.tax_level
+        self.period_seconds = self.deployer.period_seconds
+        self.sink_address = self.deployer.sink_address
 
         logg.debug('contract address {} start block {} start time {}'.format(self.address, self.start_block, self.start_time))
 
@@ -117,13 +116,6 @@ class TestDemurrage(EthTesterCase):
             logg.debug('asserted within {} <= {} <= {}'.format(lower_target, v, higher_target))
             return
         raise AssertionError('{} not within lower {} and higher {}'.format(v, lower_target, higher_target))
-
-
-    def assert_within_greater(self, v, target, tolerance_ppm):
-        greater_target = target + (target * (tolerance_ppm / 1000000))
-        self.assertLessEqual(v, greater_target)
-        self.assertGreaterEqual(v, target)
-        logg.debug('asserted within greater {} >= {} >= {}'.format(greater_target, v, target))
 
 
     def assert_within_lower(self, v, target, tolerance_ppm):
@@ -151,7 +143,4 @@ class TestDemurrageDefault(TestDemurrage):
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
-        self.publish(c)
-
-        self.default_supply = 10**12
-        self.default_supply_cap = self.default_supply
+        self.deploy(c)

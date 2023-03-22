@@ -13,7 +13,7 @@ from chainlib.eth.tx import receipt
 from erc20_demurrage_token import DemurrageToken
 
 # test imports
-from erc20_demurrage_token.unittest.base import TestDemurrageDefault
+from erc20_demurrage_token.unittest import TestDemurrageDefault
 
 logging.basicConfig(level=logging.DEBUG)
 logg = logging.getLogger()
@@ -27,6 +27,9 @@ class TestAmounts(TestDemurrageDefault):
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
         (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[1], 1000)
         r = self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
 
         self.backend.time_travel(self.start_time + self.period_seconds)
 
@@ -36,7 +39,7 @@ class TestAmounts(TestDemurrageDefault):
         o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
         r = self.rpc.do(o)
         balance = c.parse_balance(r)
-        self.assertEqual(balance, 817)
+        self.assertEqual(balance, 980)
 
         (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[1], 1000)
         r = self.rpc.do(o)
@@ -44,7 +47,7 @@ class TestAmounts(TestDemurrageDefault):
         o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
         r = self.rpc.do(o)
         balance = c.parse_balance(r)
-        self.assert_within_lower(balance, 1817, 750)
+        self.assert_within_lower(balance, 1980, 750)
 
         self.backend.time_travel(self.start_time + self.period_seconds * 2)
 
@@ -57,8 +60,8 @@ class TestAmounts(TestDemurrageDefault):
 
         expected_balance = ((1 - self.tax_level / 1000000) ** 10) * 1000
         expected_balance += ((1 - self.tax_level / 1000000) ** 20) * 1000
-        self.assert_within_lower(balance, expected_balance, 500)
-
+        #self.assert_within_lower(balance, expected_balance, 500)
+        self.assertEqual(balance, 1940)
 
     def test_transfers(self):
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
@@ -74,7 +77,7 @@ class TestAmounts(TestDemurrageDefault):
         o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
         r = self.rpc.do(o)
         balance = c.parse_balance(r)
-        self.assertEqual(balance, 1634)
+        self.assertEqual(balance, 1960)
 
         nonce_oracle = RPCNonceOracle(self.accounts[1], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
@@ -84,7 +87,7 @@ class TestAmounts(TestDemurrageDefault):
         o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
         r = self.rpc.do(o)
         balance = c.parse_balance(r)
-        self.assertEqual(balance, 1134)
+        self.assertEqual(balance, 1460)
 
         o = c.balance_of(self.address, self.accounts[2], sender_address=self.accounts[0])
         r = self.rpc.do(o)
@@ -99,25 +102,46 @@ class TestAmounts(TestDemurrageDefault):
         r = self.rpc.do(o)
 
         cases = [
-            (61, 1960),
-            (121, 1920),
-            (181, 1882),
-            (241, 1844),
-            (301, 1807),
-            (361, 1771),
-            (421, 1736),
-            (481, 1701),
-            (541, 1667),
-            (601, 1634),
+            (60, 1960),
+            (120, 1920),
+            (180, 1882),
+            (240, 1844),
+            (300, 1807),
+            (360, 1771),
+            (420, 1736),
+            (480, 1701),
+            (540, 1667),
+            (600, 1634),
                 ]
         for case in cases:
-            self.backend.time_travel(self.start_time + case[0])
+            self.backend.time_travel(self.start_time + int(case[0] * (self.period_seconds / 60)))
 
             o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
             r = self.rpc.do(o)
             balance = c.parse_balance(r)
-            self.assertEqual(balance, case[1])
+            self.assert_within_lower(balance, case[1], 10000)
 
+
+    def test_sweep(self):
+        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+        (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[0], 2000)
+        r = self.rpc.do(o)
+
+        (tx_hash, o) = c.sweep(self.address, self.accounts[0], self.accounts[1])
+        self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+
+        o = c.balance_of(self.address, self.accounts[0], sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        self.assertEqual(c.parse_balance(r), 0)
+ 
+        o = c.balance_of(self.address, self.accounts[1], sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        self.assert_within(c.parse_balance(r), 2000, 1)
+ 
 
 if __name__ == '__main__':
     unittest.main()

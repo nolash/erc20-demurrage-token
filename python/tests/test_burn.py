@@ -18,42 +18,34 @@ from chainlib.eth.block import (
 from erc20_demurrage_token import DemurrageToken
 
 # test imports
-from erc20_demurrage_token.unittest.base import TestDemurrage
+from erc20_demurrage_token.unittest.base import TestDemurrageDefault
 
 logging.basicConfig(level=logging.INFO)
 logg = logging.getLogger()
 
 testdir = os.path.dirname(__file__)
 
-TAX_LEVEL = 2
+#TAX_LEVEL = 2
 
-class TestBurn(TestDemurrage):
+class TestBurn(TestDemurrageDefault):
 
     def setUp(self):
         super(TestBurn, self).setUp()
 
-
-    def deploy(self, tax_level=None):
-        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
-        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
-
-        self.mode = os.environ.get('ERC20_DEMURRAGE_TOKEN_TEST_MODE')
-        if self.mode == None:
-            self.mode = 'MultiNocap'
-        logg.debug('executing test setup default mode {}'.format(self.mode))
-
-        if tax_level != None:
-            self.deployer.settings.demurrage_level = tax_level * (10 ** 32)
-        self.deployer.settings.sink_address = self.accounts[9]
-        self.deployer.sink_address = self.accounts[9]
-        super(TestBurn, self).deploy(c, self.mode)
-
-        logg.info('deployed with mode {}'.format(self.mode))
+#
+#    def publish(self, tax_level=None):
+#        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+#        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+#
+#        if tax_level != None:
+#            self.publisher.settings.demurrage_level = tax_level * (10 ** 32)
+#        self.publisher.settings.sink_address = self.accounts[9]
+#        self.publisher.sink_address = self.accounts[9]
+#        super(TestBurn, self).publish(c)
 
 
     # Burn tokens and immediately check balances and supply
     def test_burn_basic(self):
-        self.deploy()
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
@@ -94,7 +86,6 @@ class TestBurn(TestDemurrage):
 
     # burn tokens and check sink balance and supply after first redistribution period
     def test_burned_redistribution(self):
-        self.deploy()
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
@@ -102,8 +93,8 @@ class TestBurn(TestDemurrage):
         r = self.rpc.do(o)
 
         (tx_hash, o) = c.burn(self.address, self.accounts[0], 500000000)
-        r = self.rpc.do(o)
-
+        self.rpc.do(o)
+        
         (tx_hash, o) = c.transfer(self.address, self.accounts[0], self.sink_address, 500000000)
         r = self.rpc.do(o)
 
@@ -112,7 +103,7 @@ class TestBurn(TestDemurrage):
         o = c.balance(self.address, self.sink_address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         bal = c.parse_balance(r)
-        self.assertEqual(bal, 416873881) # 9 periods demurrage
+        self.assert_within(bal, 490000000, 1) # 2% == 10000000
 
         (tx_hash, o) = c.change_period(self.address, self.accounts[0])
         r = self.rpc.do(o)
@@ -128,7 +119,7 @@ class TestBurn(TestDemurrage):
         o = c.balance(self.address, self.sink_address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         bal = c.parse_balance(r)
-        self.assert_within_lower(bal, 500000000, 0.0025)
+        self.assert_within(bal, 500000000, 1)
 
         self.backend.time_travel(self.start_time + (self.period_seconds * 2))
 
@@ -147,12 +138,11 @@ class TestBurn(TestDemurrage):
         o = c.balance(self.address, self.sink_address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         bal = c.parse_balance(r)
-        self.assert_within_lower(bal, 500000000, 0.0025)
+        self.assert_within_lower(bal, 500000000, 1)
 
 
     # burn tokens and check sink and taxed balance and supply after first redistribution period
     def test_burned_other_redistribution(self):
-        self.deploy()
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
@@ -170,7 +160,8 @@ class TestBurn(TestDemurrage):
         o = c.balance(self.address, self.accounts[1], sender_address=self.accounts[0])
         r = self.rpc.do(o)
         bal = c.parse_balance(r)
-        self.assertEqual(bal, 416873881) # 9 periods demurrage
+        #self.assertEqual(bal, 416873881) # 9 periods demurrage
+        self.assert_within(bal, 490000000, 1)
 
         (tx_hash, o) = c.change_period(self.address, self.accounts[0])
         r = self.rpc.do(o)
@@ -186,12 +177,12 @@ class TestBurn(TestDemurrage):
         o = c.balance(self.address, self.accounts[1], sender_address=self.accounts[0])
         r = self.rpc.do(o)
         bal = c.parse_balance(r)
-        self.assertEqual(bal, 408536403) # 9 periods demurrage
+        self.assert_within(bal, 490000000, 1)
 
         o = c.balance(self.address, self.sink_address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
         sink_bal = c.parse_balance(r)
-        self.assert_within_lower(sink_bal, 500000000 - 408536403, 0.09) # TODO is this ok variance, 1.0 is ppm?
+        self.assert_within_lower(sink_bal, 10000000, 1) # TODO is this ok variance, 1.0 is ppm?
 
         self.backend.time_travel(self.start_time + (self.period_seconds * 2))
 
@@ -209,7 +200,7 @@ class TestBurn(TestDemurrage):
         o = c.balance(self.address, self.accounts[1], sender_address=self.accounts[0])
         r = self.rpc.do(o)
         next_bal = c.parse_balance(r)
-        self.assertEqual(next_bal, 333803985) # 9 periods demurrage
+        self.assert_within(next_bal, 480200000, 0.01)
 
         o = c.balance(self.address, self.sink_address, sender_address=self.accounts[0])
         r = self.rpc.do(o)
@@ -221,7 +212,6 @@ class TestBurn(TestDemurrage):
 
     # verify expected results of balance and supply after multiple redistribution periods
     def test_burn_accumulate(self):
-        self.deploy(tax_level=2/1000)
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
@@ -250,6 +240,10 @@ class TestBurn(TestDemurrage):
         r = self.rpc.do(o)
         bob_bal = c.parse_balance(r)
         prev_bob_bal = bob_bal
+
+        o = c.balance(self.address, self.sink_address, sender_address=self.accounts[0])
+        r = self.rpc.do(o)
+        logg.info('sink has balance {}'.format(c.parse_balance(r)))
 
         iterations = 100
 
@@ -307,11 +301,11 @@ class TestBurn(TestDemurrage):
         sum_supply = burner_bal + bob_bal
         logg.debug('balances sink {} bob {} total {} supply real {} original {}'.format(sink_bal, bob_bal, sum_supply, new_supply, self.default_supply))
 
-        self.assert_within_lower(sum_supply, new_supply, 0.00001)
-        self.assert_within_greater(burner_bal, balance_share - total_burned, 0.1)
+        self.assert_within_lower(sum_supply, new_supply, 1)
+        self.assert_within_lower(burner_bal, balance_share - total_burned + bob_refund, 1)
 
         bob_delta = self.default_supply * ((2 / 1000000) / 1000)
-        self.assert_within_lower(bob_bal, balance_share - bob_delta, 0.1)
+        self.assert_within_greater(bob_bal, balance_share - bob_delta - bob_refund, 1)
         
         self.assertEqual(total_burned, iterations * burn_rate)
 

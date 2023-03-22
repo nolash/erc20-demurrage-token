@@ -1,3 +1,19 @@
+- 0.4.2
+	* Correct burn interface implementation
+- 0.4.1
+	* Eliminate solidity compiler warnings
+- 0.4.0
+	* Rename taxLevel to decayLevel in contract
+	* Add sweep contract method to fully empty one account into another
+- 0.3.6
+	* Reinstate owner as minter by default
+- 0.3.0
+	* Smart contracts use abdk math libraries, all exponential operations are static gas cost
+	* Add expiry features, after which balances are frozen and no more transfers or demurrage will occur
+	* Add sealable features for supply, sink address, expiry and minters (when sealed cannot be changed)
+	* Deployer script now takes demurrage amount as ppm instead of literal growth fraction
+	* Retire old multi and cap contracts
+	* Replace contract bitfields for redistributions with structs
 - 0.2.0
 	* Add token burn function
 	* Fix gas leak when calculating decay on period change

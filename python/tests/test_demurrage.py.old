@@ -13,32 +13,13 @@ from erc20_demurrage_token import DemurrageToken
 from erc20_demurrage_token.demurrage import DemurrageCalculator
 
 # test imports
-from erc20_demurrage_token.unittest.base import TestDemurrage
+from erc20_demurrage_token.unittest import TestDemurrageDefault
 
 logging.basicConfig(level=logging.INFO)
 logg = logging.getLogger()
 
 
-class TestDemurragePeriods(TestDemurrage):
-
-    def setUp(self):
-        super(TestDemurragePeriods, self).setUp()
-   
-        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
-        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
-
-        self.mode = os.environ.get('ERC20_DEMURRAGE_TOKEN_TEST_MODE')
-        if self.mode == None:
-            self.mode = 'MultiNocap'
-        logg.debug('executing test setup default mode {}'.format(self.mode))
-
-        self.deployer.settings.demurrage_level = (2 / 1000) * (10 ** 32)
-        self.deployer.settings.sink_address = self.accounts[9]
-        self.deployer.sink_address = self.accounts[9]
-        self.deploy(c, self.mode)
-
-        logg.info('deployed with mode {}'.format(self.mode))
-
+class TestDemurragePeriods(TestDemurrageDefault):
 
     # verify that tax level calculation is in ppm as expected
     def test_ppm(self):

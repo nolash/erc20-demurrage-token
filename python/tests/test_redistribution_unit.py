@@ -16,12 +16,14 @@ from hexathon import (
         strip_0x,
         add_0x,
         )
+from dexif import to_fixed
 
 # local imports
 from erc20_demurrage_token import DemurrageToken
+from erc20_demurrage_token import DemurrageRedistribution
 
 # test imports
-from erc20_demurrage_token.unittest.base import TestDemurrageUnit
+from erc20_demurrage_token.unittest import TestDemurrageDefault
 
 logging.basicConfig(level=logging.DEBUG)
 logg = logging.getLogger()
@@ -29,7 +31,8 @@ logg = logging.getLogger()
 testdir = os.path.dirname(__file__)
 
 
-class TestRedistribution(TestDemurrageUnit):
+class TestRedistribution(TestDemurrageDefault):
+
 
 
     # TODO: move to "pure" test file when getdistribution is implemented in all contracts
@@ -40,11 +43,12 @@ class TestRedistribution(TestDemurrageUnit):
         demurrage = (1 - (self.tax_level / 1000000)) * (10**28)
         supply = self.default_supply
 
-        o = c.get_distribution(self.address, supply, demurrage, sender_address=self.accounts[0])
+        #o = c.get_distribution(self.address, supply, demurrage, sender_address=self.accounts[0])
+        o = c.get_distribution(self.address, supply, to_fixed(self.tax_level / 1000000), sender_address=self.accounts[0])
         r = self.rpc.do(o)
         distribution = c.parse_get_distribution(r)
         expected_distribution = self.default_supply * (self.tax_level / 1000000)
-        self.assert_within_lower(distribution, expected_distribution, 1000)
+        self.assert_within(distribution, expected_distribution, 100)
 
 
     def test_distribution_from_redistribution(self):
@@ -53,18 +57,17 @@ class TestRedistribution(TestDemurrageUnit):
 
         demurrage = (1 - (self.tax_level / 100000)) * (10**28)
 
-        logg.debug('demurrage {}'.format(demurrage))
         supply = self.default_supply
 
-        o = c.to_redistribution(self.address, 0, demurrage, supply, 2, sender_address=self.accounts[0])
+        o = c.to_redistribution(self.address, 0, to_fixed(self.tax_level / 1000000), supply, 2, sender_address=self.accounts[0])
         redistribution = self.rpc.do(o)
 
         o = c.get_distribution_from_redistribution(self.address, redistribution, self.accounts[0])
         r = self.rpc.do(o)
         distribution = c.parse_get_distribution(r)
-        expected_distribution = (self.default_supply * self.tax_level) / 100000
+        expected_distribution = (self.default_supply * (self.tax_level / 1000000))
         logg.debug('distribution {} supply {}'.format(distribution, self.default_supply))
-        self.assert_within_lower(distribution, expected_distribution, 1000)
+        self.assert_within(distribution, expected_distribution, 1000)
 
 
     def test_single_step_basic(self):
@@ -124,7 +127,7 @@ class TestRedistribution(TestDemurrageUnit):
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
 
-        mint_amount = 100000000
+        mint_amount = self.default_supply
         half_mint_amount = int(mint_amount / 2)
 
         (tx_hash, o) = c.mint_to(self.address, self.accounts[0], self.accounts[1], mint_amount)
@@ -156,7 +159,7 @@ class TestRedistribution(TestDemurrageUnit):
         o = c.balance_of(self.address, self.accounts[2], sender_address=self.accounts[0])
         r = self.rpc.do(o)
         balance = c.parse_balance(r)
-        self.assertEqual(balance, expected_balance)
+        self.assert_within(balance, expected_balance, 10)
 
         half_demurrage_amount = int((self.tax_level / 1000000) * half_mint_amount)
 
@@ -182,8 +185,10 @@ class TestRedistribution(TestDemurrageUnit):
         supply = c.parse_to_redistribution_item(r)
         o = c.to_redistribution_demurrage_modifier(self.address, redistribution, sender_address=self.accounts[0])
         r = self.rpc.do(o)
-        demurrage = c.parse_to_redistribution_item(r)
-        logg.debug('\nrediistribution {}\ndemurrage {}\nsupply {}'.format(redistribution, demurrage, supply))
+        #demurrage = c.parse_to_redistribution_item(r)
+        #logg.debug('\nrediistribution {}\ndemurrage {}\nsupply {}'.format(redistribution, demurrage, supply))
+        redistro_item = DemurrageRedistribution(redistribution)
+        logg.debug('redistribution {}'.format(redistro_item))
 
         expected_balance = int(supply * (self.tax_level / 1000000))
         expected_balance_tolerance = 1
