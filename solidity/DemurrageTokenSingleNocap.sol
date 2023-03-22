@@ -668,7 +668,7 @@ contract DemurrageTokenSingleNocap {
 
 	// Explicitly and irretrievably burn tokens
 	// Only token minters can burn tokens
-	function burn(uint256 _value) public {
+	function burn(uint256 _value) public returns (bool) {
 		require(applyExpiry() == 0);
 		require(minter[msg.sender]);
 		require(_value <= account[msg.sender]);
@@ -678,6 +678,7 @@ contract DemurrageTokenSingleNocap {
 		decreaseBaseBalance(msg.sender, _delta);
 		burned += _value;
 		emit Burn(msg.sender, _value);
+		return true;
 	}
 
 	// Implements ERC20
@@ -689,6 +690,12 @@ contract DemurrageTokenSingleNocap {
 	function totalBurned() public view returns (uint256) {
 		return burned;
 	}
+
+	// Return total number of tokens ever minted
+	function totalMinted() public view returns (uint256) {
+		return supply;
+	}
+
 
 	// Implements EIP165
 	function supportsInterface(bytes4 _sum) public pure returns (bool) {

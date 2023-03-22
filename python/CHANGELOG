@@ -1,3 +1,5 @@
+- 0.4.2
+	* Correct burn interface implementation
 - 0.4.1
 	* Eliminate solidity compiler warnings
 - 0.4.0
