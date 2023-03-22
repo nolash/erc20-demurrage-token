@@ -324,10 +324,10 @@ contract DemurrageTokenSingleNocap {
 	function toRedistribution(uint256 _participants, int128 _demurrageModifier, uint256 _value, uint256 _period) public pure returns(redistributionItem memory) {
 		redistributionItem memory redistribution;
 
-		_participants;
 		redistribution.period = uint32(_period);
 		redistribution.value = uint72(_value);
 		redistribution.demurrage = uint64(uint128(_demurrageModifier) & 0xffffffffffffffff);
+		_participants;
 		return redistribution;
 
 	}
