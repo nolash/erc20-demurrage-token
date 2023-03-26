@@ -116,6 +116,9 @@ contract DemurrageTokenSingleNocap {
 	// Implements Expire
 	event Expired(uint256 _timestamp);
 
+	// Implements Expire
+	event ExpiryChange(uint256 indexed _oldTimestamp, uint256 _newTimestamp);
+
 	event Cap(uint256 indexed _oldCap, uint256 _newCap);
 
 	// Implements Seal
@@ -180,13 +183,16 @@ contract DemurrageTokenSingleNocap {
 	// Cannot be set to a time in the past.
 	function setExpirePeriod(uint256 _expirePeriod) public {
 		uint256 r;
+		uint256 oldTimestamp;
 
 		require(!isSealed(EXPIRY_STATE));
 		require(!expired);
 		require(msg.sender == owner);
 		r = periodStart + (_expirePeriod * periodDuration);
 		require(r > expires);
+		oldTimestamp = expires;
 		expires = r;
+		emit ExpiryChange(oldTimestamp, expires);
 	}
 
 	// Change max token supply.

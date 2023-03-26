@@ -1,5 +1,6 @@
 - 0.5.2
 	* Update ERC165 interface response for Expire
+	* Add ExpiryChange event
 - 0.5.1
 	* Update ERC165 interface responses
 - 0.5.0
