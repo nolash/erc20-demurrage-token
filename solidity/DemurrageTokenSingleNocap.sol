@@ -1,9 +1,9 @@
 pragma solidity >= 0.8.0;
 
-
 import "aux/ABDKMath64x64.sol";
 
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 contract DemurrageTokenSingleNocap {
 
 	struct redistributionItem {
@@ -11,7 +11,7 @@ contract DemurrageTokenSingleNocap {
 		uint72 value;
 		uint64 demurrage;
 	}
-	redistributionItem[] public redistributions; // uint51(unused) | uint64(demurrageModifier) | uint36(participants) | uint72(value) | uint32(period)
+	redistributionItem[] public redistributions;
 
 	// Account balances
 	mapping (address => uint256) account;
@@ -23,7 +23,7 @@ contract DemurrageTokenSingleNocap {
 	// Cached demurrage timestamp; the timestamp for which demurrageAmount was last calculated
 	uint256 public demurrageTimestamp;
 
-	// Implements EIP172
+	// Implements EIP173
 	address public owner;
 
 	address newOwner;
@@ -37,8 +37,6 @@ contract DemurrageTokenSingleNocap {
 	// Implements ERC20
 	uint256 public immutable decimals;
 
-	// Implements ERC20
-	//uint256 public totalSupply;
 	uint256 supply;
 
 	// Last executed period
@@ -48,7 +46,7 @@ contract DemurrageTokenSingleNocap {
 	uint256 public totalSink;
 
 	// Value of burnt tokens (burnt tokens do not decay)
-	uint256 public burned;
+	uint256 burned;
 
 	// 128 bit resolution of the demurrage divisor
 	// (this constant x 1000000 is contained within 128 bits)
@@ -93,7 +91,7 @@ contract DemurrageTokenSingleNocap {
 	// Implements ERC20
 	event Approval(address indexed _owner, address indexed _spender, uint256 _value);
 
-	// New tokens minted
+	// Implements Minter
 	event Mint(address indexed _minter, address indexed _beneficiary, uint256 _value);
 
 	// New demurrage cache milestone calculated
@@ -109,23 +107,27 @@ contract DemurrageTokenSingleNocap {
 	//event Debug(bytes32 _foo);
 	event Debug(int128 indexed _foo, uint256 indexed _bar);
 
-	// Emitted when tokens are burned
+	// Implements Burn
 	event Burn(address indexed _burner, uint256 _value);
 
 	// EIP173
 	event OwnershipTransferred(address indexed previousOwner, address indexed newOwner); // EIP173
 
+	// Implements Expire
 	event Expired(uint256 _timestamp);
 
 	event Cap(uint256 indexed _oldCap, uint256 _newCap);
 
-	// Implements Sealer
+	// Implements Seal
 	uint256 public sealState;
 	uint8 constant WRITER_STATE = 1;
 	uint8 constant SINK_STATE = 2;
 	uint8 constant EXPIRY_STATE = 4;
 	uint8 constant CAP_STATE = 8;
+	// Implements Seal
 	uint256 constant public maxSealState = 15;
+
+	// Implements Seal
 	event SealStateChange(bool indexed _final, uint256 _sealState);
 
 
@@ -157,7 +159,6 @@ contract DemurrageTokenSingleNocap {
 		sinkAddress = _defaultSinkAddress;
 	}
 
-	// Implements Sealer
 	function seal(uint256 _state) public returns(uint256) {
 		require(_state < 16, 'ERR_INVALID_STATE');
 		require(_state & sealState == 0, 'ERR_ALREADY_LOCKED');
@@ -166,7 +167,6 @@ contract DemurrageTokenSingleNocap {
 		return uint256(sealState);
 	}
 
-	// Implements Sealer
 	function isSealed(uint256 _state) public view returns(bool) {
 		require(_state < maxSealState);
 		if (_state == 0) {
@@ -175,6 +175,9 @@ contract DemurrageTokenSingleNocap {
 		return _state & sealState == _state;
 	}
 
+	// Set when token expires. 
+	// Value is set it terms of redistribution periods.
+	// Cannot be set to a time in the past.
 	function setExpirePeriod(uint256 _expirePeriod) public {
 		uint256 r;
 
@@ -185,7 +188,9 @@ contract DemurrageTokenSingleNocap {
 		require(r > expires);
 		expires = r;
 	}
-	
+
+	// Change max token supply.
+	// Can only increase supply cap, not decrease.
 	function setMaxSupply(uint256 _cap) public {
 		require(!isSealed(CAP_STATE));
 		require(msg.sender == owner);
@@ -222,6 +227,7 @@ contract DemurrageTokenSingleNocap {
 	}
 
 	// Given address will be allowed to call the mintTo() function
+	// Implements Writer
 	function addWriter(address _minter) public returns (bool) {
 		require(!isSealed(WRITER_STATE));
 		require(msg.sender == owner);
@@ -230,11 +236,17 @@ contract DemurrageTokenSingleNocap {
 	}
 
 	// Given address will no longer be allowed to call the mintTo() function
+	// Implements Writer
 	function deleteWriter(address _minter) public returns (bool) {
 		require(!isSealed(WRITER_STATE));
 		require(msg.sender == owner || _minter == msg.sender);
 		minter[_minter] = false;
 		return true;
+	}
+
+	// Implements Writer
+	function isWriter(address _minter) public view returns(bool) {
+		return minter[_minter];
 	}
 
 	/// Implements ERC20
@@ -301,7 +313,8 @@ contract DemurrageTokenSingleNocap {
 
 	// Creates new tokens out of thin air, and allocates them to the given address
 	// Triggers tax
-	function mintTo(address _beneficiary, uint256 _amount) external returns (bool) {
+	// Implements Minter
+	function mintTo(address _beneficiary, uint256 _amount) public returns (bool) {
 		uint256 baseAmount;
 
 		require(applyExpiry() == 0);
@@ -318,6 +331,18 @@ contract DemurrageTokenSingleNocap {
 		emit Mint(msg.sender, _beneficiary, _amount);
 		saveRedistributionSupply();
 		return true;
+	}
+
+	// Implements Minter
+	function mint(address _beneficiary, uint256 _amount, bytes calldata _data) public {
+		_data;
+		mintTo(_beneficiary, _amount);
+	}
+
+	// Implements Minter
+	function safeMint(address _beneficiary, uint256 _amount, bytes calldata _data) public {
+		_data;
+		mintTo(_beneficiary, _amount);
 	}
 
 	// Deserializes the redistribution word
@@ -508,6 +533,7 @@ contract DemurrageTokenSingleNocap {
 		return (block.timestamp - _target) / 60;
 	}
 
+	// Equality check for empty redistribution data
 	function isEmptyRedistribution(redistributionItem memory _redistribution) public pure returns(bool) {
 		if (_redistribution.period > 0) {
 			return false;
@@ -545,7 +571,8 @@ contract DemurrageTokenSingleNocap {
 		return ABDKMath64x64.toUInt(r);
 	}
 
-	// Implements ERC20, triggers tax and/or redistribution
+	// Triggers tax and/or redistribution
+	// Implements ERC20
 	function approve(address _spender, uint256 _value) public returns (bool) {
 		uint256 baseValue;
 		uint8 ex;
@@ -595,7 +622,8 @@ contract DemurrageTokenSingleNocap {
 		return true;
 	}
 
-	// Implements ERC20, triggers tax and/or redistribution
+	// Triggers tax and/or redistribution
+	// Implements ERC20
 	function transfer(address _to, uint256 _value) public returns (bool) {
 		uint256 baseValue;
 		bool result;
@@ -615,7 +643,8 @@ contract DemurrageTokenSingleNocap {
 		return result;
 	}
 
-	// Implements ERC20, triggers tax and/or redistribution
+	// Triggers tax and/or redistribution
+	// Implements ERC20
 	function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
 		uint256 baseValue;
 		bool result;
@@ -649,26 +678,20 @@ contract DemurrageTokenSingleNocap {
 
 	// Implements EIP173
 	function transferOwnership(address _newOwner) public returns (bool) {
-		require(msg.sender == owner);
-		newOwner = _newOwner;
-		return true;
-	}
-
-	// Implements OwnedAccepter
-	function acceptOwnership() public returns (bool) {
 		address oldOwner;
 
-		require(msg.sender == newOwner);
-		oldOwner = owner; 
-		owner = newOwner;
-		newOwner = address(0);
+		require(msg.sender == owner);
+		oldOwner = owner;
+		owner = _newOwner;
+
 		emit OwnershipTransferred(oldOwner, owner);
 		return true;
 	}
 
 	// Explicitly and irretrievably burn tokens
 	// Only token minters can burn tokens
-	function burn(uint256 _value) public returns (bool) {
+	// Implements Burner
+	function burn(uint256 _value) public returns(bool) {
 		require(applyExpiry() == 0);
 		require(minter[msg.sender] || msg.sender == owner, 'ERR_ACCESS');
 		require(_value <= account[msg.sender]);
@@ -681,17 +704,31 @@ contract DemurrageTokenSingleNocap {
 		return true;
 	}
 
+	// Implements Burner
+	function burn(address _from, uint256 _value, bytes calldata _data) public {
+		require(_from == msg.sender, 'ERR_ONLY_SELF_BURN');
+		_data;
+		burn(_value);
+	}
+
+	// Implements Burner
+	function burn() public returns(bool) {
+		return burn(account[msg.sender]);
+	}
+
 	// Implements ERC20
 	function totalSupply() public view returns (uint256) {
 		return supply - burned;
 	}
 
 	// Return total number of burned tokens
+	// Implements Burner
 	function totalBurned() public view returns (uint256) {
 		return burned;
 	}
 
 	// Return total number of tokens ever minted
+	// Implements Burner
 	function totalMinted() public view returns (uint256) {
 		return supply;
 	}
@@ -699,16 +736,31 @@ contract DemurrageTokenSingleNocap {
 
 	// Implements EIP165
 	function supportsInterface(bytes4 _sum) public pure returns (bool) {
-		if (_sum == 0xc6bb4b70) { // ERC20
+		if (_sum == 0xb61bc941) { // ERC20
 			return true;
 		}
-		if (_sum == 0x449a52f8) { // Minter
+		if (_sum == 0x5878bcf4) { // Minter
 			return true;
 		}
-		if (_sum == 0x01ffc9a7) { // EIP165
+		if (_sum == 0xbc4babdd) { // Burner
 			return true;
 		}
-		if (_sum == 0x9493f8b2) { // EIP173
+		if (_sum == 0x0d7491f8) { // Seal
+			return true;
+		}
+		if (_sum == 0xabe1f1f5) { // Writer
+			return true;
+		}
+		if (_sum == 0xcb52c823) { // Expire
+			return true;
+		}
+		if (_sum == 0x01ffc9a7) { // ERC165
+			return true;
+		}
+		if (_sum == 0x9493f8b2) { // ERC173
+			return true;
+		}
+		if (_sum == 0xd0017968) { // ERC5678Ext20
 			return true;
 		}
 		return false;
