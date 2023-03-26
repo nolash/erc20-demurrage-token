@@ -1,3 +1,9 @@
+- 0.5.2
+	* Update ERC165 interface response for Expire
+- 0.5.1
+	* Update ERC165 interface responses
+- 0.5.0
+	* Change license
 - 0.4.2
 	* Correct burn interface implementation
 - 0.4.1

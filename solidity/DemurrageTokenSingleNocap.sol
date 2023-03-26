@@ -209,6 +209,7 @@ contract DemurrageTokenSingleNocap {
 	// Expire the contract if expire is set and we have gone over the threshold.
 	// Finalizes demurrage up to the timestamp of the expiry. 
 	// The first approve, transfer or transferFrom call that hits the ex == 2 will get the tx mined. but without the actual effect. Otherwise we would have to wait until an external egent called applyExpiry to get the correct final balance.
+	// Implements Expire
 	function applyExpiry() public returns(uint8) {
 		if (expired) {
 			return 1;
@@ -751,7 +752,7 @@ contract DemurrageTokenSingleNocap {
 		if (_sum == 0xabe1f1f5) { // Writer
 			return true;
 		}
-		if (_sum == 0xcb52c823) { // Expire
+		if (_sum == 0x841a0e94) { // Expire
 			return true;
 		}
 		if (_sum == 0x01ffc9a7) { // ERC165
