@@ -1,0 +1,44 @@
+@node overview
+@chapter Overview
+
+@verbatim
+de-mur-rage
+
+1: the detention of a ship by the freighter beyond the time allowed for loading, unloading, or sailing
+
+2: a charge for detaining a ship, freight car, or truck
+@end verbatim
+
+This ERC20 smart contract implementation for the EVM imposes a demurrage on all held token balances.
+
+The demurrage is a continuous value @emph{decay}, subtracted from all balances every minute.
+
+Also. a time period is defined at contract creation time at which the difference between held balances and the demurrage can be withdrawn to a pre-selected address, which in turn can redistribute that token value.
+
+In short: Everyone is taxed a little something every minute, and every so often a decision is made on how to redistribute that tax.
+
+
+@section Features
+
+@itemize
+@item Continuous decay of all balances.
+@item Capture and redistribution of decayed balances.
+@item Per-minute decay resolution.
+@item Minting and burning of vouchers.
+@item Grant and revoke access to mint and burn vouchers.
+@item Voucher expiration.
+@item Constant gas usage across exponential calculations.
+@end itemize
+
+@section Nomenclature
+
+@table @samp
+@item Demurrage
+A percentage of token supply that will continuously be removed.
+@item Demurrage Period
+A period of time denominated in minutes after which demurraged amounts are available for redistribution.
+@item Sink Account
+The intermediate beneficiary of the demurraged amount, which may or may not redistribute value.
+@item Base balance
+The inflated balance of each used which is stored for bookkeeping.
+@end table

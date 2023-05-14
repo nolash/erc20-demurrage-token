@@ -1,0 +1,32 @@
+@node usecase
+@chapter Use Case
+
+The use-case inspiring this implementation is in the context of issuance of a @emph{voucher} representing a credit obligation of an @emph{Issuer} or @emph{Association of Issuers}.
+
+This voucher can be redeemed as payment for the products of the Issuer.
+
+The Issuer is the entity legally obligated to redeem the voucher as payment.
+
+Introducing demurrage on this vehicle discourages @emph{withholding} the voucher, for example for speculative advantage.
+
+This also encourages increased @emph{velocity} of voucher use.
+
+
+@section Example
+
+Given:
+
+@itemize
+@item 10 voucher holders.
+@item A total supply of 1000 tokens.
+@item Demurrage of 2% per 30 days (43200 minutes).
+@item Redistribution period of 30 days (43200 minutes).
+@end itemize
+
+If no trades are made, the resulting balances after one redistribution period of every user would be 98 Vouchers.
+
+The Sink Address will have a balance of 20 vouchers after the same period.
+
+Note that after the redistribution the total of all balances will equal the total minted amount. 
+
+Note that all accounts holding such vouchers are effected by demurrage (even the Sink Account, pending redistribution).

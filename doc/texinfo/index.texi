@@ -1,0 +1,29 @@
+\input texinfo
+@settitle ERC20 Demurrage Token
+
+@copying
+Released 2023 under AGPL3
+@end copying
+
+@titlepage
+@title ERC20 Demurrage Token
+@author Louis Holbrook
+
+@end titlepage
+
+@c
+@contents
+
+@ifnottex
+@node Top
+@top Introduction
+@end ifnottex
+@menu
+* overview ::
+* instructions :
+@end menu
+
+@include overview.texi
+@include usecase.texi
+@include contract.texi
+@include tools.texi

@@ -1,0 +1,185 @@
+@node contract
+@chapter Smart contract
+
+
+@section Common interfaces
+
+@subsection ERC standard interfaces
+
+@itemize @bullet
+@item
+@uref{https://eips.ethereum.org/EIPS/eip-20, ERC20 - Token Standard}
+@item
+@uref{https://eips.ethereum.org/EIPS/eip-165, ERC165 - Standard Interface Detection}
+@item
+@uref{https://eips.ethereum.org/EIPS/eip-173, ERC173 - Contract Ownership Standard}
+@item
+@uref{https://eips.ethereum.org/EIPS/eip-5679, ERC5679 - Token Minting and Burning (as part of CIC.Minter and CIC.Burner)}
+@end itemize
+
+@subsection CIC interfaces
+
+@itemize @bullet
+@item
+@uref{https://git.grassecon.net/cicnet/cic-contracts/src/branch/master/solidity/Burner.sol, Burner}
+@item
+@uref{https://git.grassecon.net/cicnet/cic-contracts/src/branch/master/solidity/Expire.sol, Expire}
+@item
+@uref{https://git.grassecon.net/cicnet/cic-contracts/src/branch/master/solidity/Minter.sol, Minter}
+@item
+@uref{https://git.grassecon.net/cicnet/cic-contracts/src/branch/master/solidity/Seal.sol, Seal}
+@item
+@uref{https://git.grassecon.net/cicnet/cic-contracts/src/branch/master/solidity/Writer.sol, Writer}
+@end itemize
+
+
+@section Dependencies
+
+The token contract uses the @url{https://github.com/abdk-consulting/abdk-libraries-solidity/blob/master/ABDKMath64x64.sol, ADBKMath} library to calculate exponentials.
+
+
+@section Permissions
+
+The smart contract defines three levels of access.
+
+@enumerate
+@item Voucher contract owner
+@item Voucher minter
+@item Voucher holder
+@end enumerate
+
+
+@subsection Contract owner
+
+When the contract is published to the network, the signer account of the publishing transaction will be the contract owner.
+
+Contract ownership can be changed by the owner using the @strong{ERC173} standard interface.
+
+
+@subsection Minter
+
+A minter has access to mint vouchers, and to burn vouchers from its own balance.
+
+Only the contract owner may mint, and may add and remove minters. Minters may be added and removed using the @strong{CIC Writer} interface, as long as the @code{WRITER_STATE} seal is not set. @xref{seal_state, Sealing the contract} for further details.
+
+The contract owner is automatically a minter.
+
+
+@subsection Holder
+
+Any address may hold vouchers, and transfer vouchers from their balance.
+
+Minters and the contract owner are automatically token holders.
+
+All token holders are subject to demurrage.
+
+
+@section Publishing the contract
+
+The contract is published with the following arguments:
+
+@table @samp
+@item name
+ERC20 voucher name
+@item symbol
+ERC20 voucher symbol
+@item decimals
+ERC20 decimal count
+@item decayLevel
+Level of decay per minute. @xref{specifying_demurrage, Specifying demurrage} below for further details.
+@item periodMinutes
+Number of minutes between each time the demurraged value can be withdrawn to the @emph{Sink Account}. @xref{withdrawing, Withdrawing demurraged value} below for further details. The period may not be altered. 
+@item defaultSinkAddress
+The initial @emph{Sink Address}. The address may be altered as long as the @code{SINK_STATE} seal has not been set. @xref{seal_state, Sealing the contract} for further details.
+@end table
+
+
+@node specifying_demurrage
+@subsection Specifying demurrage
+
+The @emph{input parameter} to the contract is a 128-bit positive fixed-point number, where the most significant 64 bits represent the integer part, and the lower 64 bits represents the decimals part, each consecutive lesser bit halving the value of the previous bit.
+
+For example, The byte value @code{00000000 00000002 a0000000 00000000}, representing a zero-stripped binary value of @math{10.101}, translates to the (base 10) decimal value @math{2.625}.
+
+@subsubsection Calculating the demurrage parameter
+
+The minute granularity of the demurrage value is calculating using the continuous decay function.
+
+For example, for a demurrage of 2% per 30 days (43200 minutes), the input value will be:
+
+@math{(1-0.02)^(1/43200) ~ 0.99999953234484737109} 
+
+The decimal part of the fixed-point representation of this value is:
+
+@code{fffff8276fb8cfff}
+
+The input parameter becomes:
+
+@code{0000000000000000ffffa957014dc7ff}
+
+@xref{tools, Useful tools} for additional help generating the necessary values.
+
+Note that attempting to publish a voucher contract with no (zero) demurrage will fail (if demurrage is not needed, use another contract).
+
+
+@section Using the contract
+
+@node withdrawing
+@subsection Withdrawing demurrage
+
+After each redistribution period, the demurraged value of that period can be withdrawn to the currently defined @emph{Sink Account}.
+
+The demurrage is calculated as from the total supply of voucher at the end of the period. @xref{sideeffects, Side-effects in state changes}.
+
+To explicitly credit the @emph{Sink Address} with the demurrage value after a period has been exceeded, the @code{changePeriod()} (@code{8f1df6bc}) method can be called.
+
+
+@node sideeffects
+@subsection Side-effects in state changes
+
+All state changes involving voucher values implicitly execute two core methods to ensure application of the demurrage and redistribution.
+
+The two methods are:
+
+@table @code
+@item applyDemurrage() (731f237c)
+Calculates the demurrage modifier of all balances according to the current timestamp.
+@item changePeriod() (8f1df6bc)
+If the previously executed period change does not match the current period, the period is changed, and the @emph{Sink Address} is credited with the demurrage amount of the current total supply.
+@end table
+
+Examples of state changes that execute these methods include @code{ERC20.transfer(...)}, @code{ERC20.transferFrom(...)} and @code{CIC.mintTo(...)}.
+
+
+@node seal_state
+@subsection Sealing the contract
+
+Certain mutable core parameters of the contract can be @emph{sealed}, meaning prevented from being modifier further.
+
+Sealing is executed using the @code{CIC.Seal} interface.
+
+The sealing of parameters is irreversible.
+
+The sealable parameters are@footnote{Please refer to the contract source code for the numeric values of the state flags}:
+
+@table @code
+@item WRITER_STATE
+The @code{CIC.Writer} interface is blocked. The effect of this is that no more changes may be made to which accounts have minter permission.
+@item SINK_STATE
+After setting this seal, the @emph{Sink Address} may not be changed.
+@item EXPIRY_STATE
+Prevents future changes to the voucher expiry date@footnote{The @code{EXPIRY_STATE} is implicitly set after expiration.}.
+@item CAP_STATE
+Immediately prevents future voucher minting, regardless of permissions.
+@end table
+
+
+@section Gas usage
+
+Gas usage is constant regardless of the amount of time passed between each execution of demurrage and redistribution period calculations.
+
+
+@section Caveats
+
+A @code{ERC20.transferFrom(...)} following an @code{ERC20.approve(...)} call, when called across period thresholds, may fail if margin to demurraged amount is insufficient.
+
