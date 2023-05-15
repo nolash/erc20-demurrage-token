@@ -4,6 +4,12 @@
 
 @section Common interfaces
 
+The smart contract is written in solidity, compatible with 0.8.x.
+
+It implements a number of interfaces both from the Ethereum (ERC) standards aswell as the Community Inclusion Currency contract interface suite.
+
+
+
 @subsection ERC standard interfaces
 
 @itemize @bullet
@@ -132,6 +138,32 @@ After each redistribution period, the demurraged value of that period can be wit
 The demurrage is calculated as from the total supply of voucher at the end of the period. @xref{sideeffects, Side-effects in state changes}.
 
 To explicitly credit the @emph{Sink Address} with the demurrage value after a period has been exceeded, the @code{changePeriod()} (@code{8f1df6bc}) method can be called.
+
+
+@node expiry
+@subsection Setting voucher expiry
+
+The effect of a voucher expiring is that all balances will be frozen, and all state changes affecting token balances will be blocked.
+
+Expiry is defined in terms of redistribution periods. For example, if the redistribution period is 30 days, and the expity is 3, then the voucher expires after 90 days.
+
+The expiry takes effect immediately when the redistribution period time has been exceeded.
+
+When the contract is published, no expiry is set.
+
+Expiry may be set after publishing using the @code{CIC.Expire} interface.
+
+If the @code{EXPIRE_STATE} seal has been set, expiry may not be changed further.
+
+
+@node supply
+@subsection Capping voucher supply
+
+The effect of a voucher supply cap is that all @code{CIC.Minter} calls will fail if the total supply after minting exceeds the defined supply cap.
+
+The supply cap still allows vouchers to be minted after @code{CIC.Burn} calls, provided that the previous condition holds.
+
+To apply the supply cap, the method @code{maxSupply(uint256) (869f7594)} is used.
 
 
 @node sideeffects

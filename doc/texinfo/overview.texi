@@ -26,7 +26,8 @@ In short: Everyone is taxed a little something every minute, and every so often 
 @item Per-minute decay resolution.
 @item Minting and burning of vouchers.
 @item Grant and revoke access to mint and burn vouchers.
-@item Voucher expiration.
+@item Voucher expiration (modifiable anytime after publishing).
+@item Supply cap (modifiable anytime after publishing).
 @item Constant gas usage across exponential calculations.
 @end itemize
 
@@ -42,3 +43,5 @@ The intermediate beneficiary of the demurraged amount, which may or may not redi
 @item Base balance
 The inflated balance of each used which is stored for bookkeeping.
 @end table
+
+

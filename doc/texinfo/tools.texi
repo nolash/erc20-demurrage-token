@@ -1,2 +1,57 @@
 @node tools
 @chapter Tools
+
+
+When installed as a python package, @code{erc20-demurrage-token} installs the @code{erc20-demurrage-token-publish} executable script, which can be used to publish smart contract instances.
+
+While the man page for the tool can be referred to for general information of the tool usage, two argument flags warrant special mention in the context of this documentation.
+
+@table @code
+@item --demurrage-level
+The percentage of demurrage in terms of the redistribution period, defined as parts-per-million.
+@item --redistribution-period
+A numeric value denominated in @emph{minutes} to define the redistribution period of the voucher demurrage.
+@end table
+
+For example, to define a 2% demurrage value for a redistribution period of 30 days (43200 minutes), the argument to the argument flags would be:
+
+@verbatim
+erc20-demurrage-token-publish --demurrage-level 20000 --redistribution-period 43200 ...
+@end verbatim
+
+
+@section Calculating fixed-point values
+
+The @code{erc20-demurrage-token} package installs the python package @code{dexif} as part of its dependencies.
+
+This package in turn provides an epinymous command-line tool (@code{dexif}) which converts decimal values to a 128-bit fixed-point value expected by the contract constructor.
+
+An example:
+
+@example
+$ dexif 123.456
+7b74bc6a7ef9db23ff
+
+$ dexif -x 7b74bc6a7ef9db23ff
+123.456
+@end example
+
+
+@section Contract interaction with chainlib-eth
+
+All smart contract tests are implementing using @url{https://git.defalsify.org/chainlib-eth, chainlib-eth} from the chaintool suite.
+
+The @code{eth-encode} tool from the @code{chainlib-eth} python package may be a convenient way to interact with contract features.
+
+Some examples include:
+
+@example
+# explicitly call changePeriod()
+$ eth-encode --mode tx --signature changePeriod -e <contract_address> -y <key_file> ...
+
+# Set the sink address seal (The integer value of the SINK_STATE flag is 2 at the time of writing)
+$ eth-encode --mode tx --signature seal  -e <contract_address> -y <key_file> ... u:2
+
+# Query current sink address of contract
+$ eth-encode --mode call --signature sinkAddress -e <contract_address> ...
+@end example
