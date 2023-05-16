@@ -123,7 +123,7 @@ The input parameter becomes:
 
 @code{0000000000000000ffffa957014dc7ff}
 
-@xref{tools, Useful tools} for additional help generating the necessary values.
+@xref{tools, Tools} for additional help generating the necessary values.
 
 Note that attempting to publish a voucher contract with no (zero) demurrage will fail (if demurrage is not needed, use another contract).
 
@@ -135,7 +135,9 @@ Note that attempting to publish a voucher contract with no (zero) demurrage will
 
 After each redistribution period, the demurraged value of that period can be withdrawn to the currently defined @emph{Sink Account}.
 
-The demurrage is calculated as from the total supply of voucher at the end of the period. @xref{sideeffects, Side-effects in state changes}.
+The demurrage is calculated as from the total supply of voucher at the end of the period.
+
+Withdrawal should happen implicitly duing normal operation of the contract. @xref{sideeffects, Side-effects in state changes}.
 
 To explicitly credit the @emph{Sink Address} with the demurrage value after a period has been exceeded, the @code{changePeriod()} (@code{8f1df6bc}) method can be called.
 
@@ -163,7 +165,7 @@ The effect of a voucher supply cap is that all @code{CIC.Minter} calls will fail
 
 The supply cap still allows vouchers to be minted after @code{CIC.Burn} calls, provided that the previous condition holds.
 
-To apply the supply cap, the method @code{maxSupply(uint256) (869f7594)} is used.
+To apply the supply cap, the method @code{setMaxSupply(uint256) (6f8b44b0)} is used.
 
 
 @node sideeffects
@@ -179,6 +181,8 @@ Calculates the demurrage modifier of all balances according to the current times
 @item changePeriod() (8f1df6bc)
 If the previously executed period change does not match the current period, the period is changed, and the @emph{Sink Address} is credited with the demurrage amount of the current total supply.
 @end table
+
+Both of these methods are @emph{noop} if no demurrage or withdrawal is pending, respectively.
 
 Examples of state changes that execute these methods include @code{ERC20.transfer(...)}, @code{ERC20.transferFrom(...)} and @code{CIC.mintTo(...)}.
 
