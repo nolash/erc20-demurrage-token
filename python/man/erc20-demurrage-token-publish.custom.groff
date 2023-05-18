@@ -1,0 +1,5 @@
+.SH SPECIFYING DEMURRAGE
+
+Demurrage is specified as a parts-per-million value in terms of the chosen \fI--redistribution-period\fP.
+
+For example, a value of \fB20000\fP with a \fI--redistribution-period\fP of \fB43200\fP corresponds to a \fB2%\fP demurrage per \fB30\fP days.

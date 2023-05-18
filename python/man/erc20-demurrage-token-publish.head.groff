@@ -1,0 +1,22 @@
+.TH erc20-demurrage-token-publish 1
+
+.SH NAME
+erc20-demurrage-token-publish \- Publishing tool for the ERC20 Demurrage Token smart contract.
+
+
+.SH SYNOPSIS
+.SY erc20-demurrage-token-publish
+.RI --name NAME --symbol SYMBOL --decimals DECIMALS --demurrage-level PPM --redistribution-period MINUTES --sink-address ADDRESS
+.YS
+
+
+.SH DESCRIPTION
+.P
+This tool generates the appropriate bytecode to store the ERC20 Demurrage Token smartcontract code on an EVM chain, along with the required construction parameters.
+
+Arguments for EVM encoding and interaction with EVM RPC node is handled by the \fBchainlib-eth\fP python package.
+
+Specific arguments for this tool are the \fB--demurrage-level\fP, \fB--redistribution-period\fP and \fB--sink-address\fP arguments.
+
+
+.SS OPTIONS

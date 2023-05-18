@@ -1,4 +1,5 @@
 from setuptools import setup
+import os
 
 requirements = []
 f = open('requirements.txt', 'r')
@@ -19,6 +20,7 @@ while True:
 f.close()
 
 
+man_dir = 'man/build'
 setup(
         package_data={
             '': [
@@ -28,4 +30,8 @@ setup(
         include_package_data=True,
         install_requires=requirements,
         tests_require=test_requirements,
+        data_files=[("man/man1", [
+                os.path.join(man_dir, 'erc20-demurrage-token-publish.1'),
+            ]
+             )],
         )

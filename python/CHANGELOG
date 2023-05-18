@@ -1,3 +1,6 @@
+- 0.5.3
+	* Add texinfo documentation
+	* Add man page for publish tool
 - 0.5.2
 	* Update ERC165 interface response for Expire
 	* Add ExpiryChange event

@@ -1,0 +1,3 @@
+demurragelevel	Level of decay per minute. See SPECIFYING DEMURRAGE below.	--demurrage-level	level
+redistributionperiod	Number of minuntes between each withdrawal of demurraged value is possible.	--redistribution-period	minutes
+sinkaddress	Initial address receiving the demurrage value withdrawal.	--sink-address	address
