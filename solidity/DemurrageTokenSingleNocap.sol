@@ -253,7 +253,7 @@ contract DemurrageTokenSingleNocap {
 
 	// Implements Writer
 	function isWriter(address _minter) public view returns(bool) {
-		return minter[_minter];
+		return minter[_minter] || _minter == owner;
 	}
 
 	/// Implements ERC20
@@ -315,6 +315,7 @@ contract DemurrageTokenSingleNocap {
 		v = account[msg.sender];
 		account[msg.sender] = 0;
 		account[_account] += v;
+		emit Transfer(msg.sender, _account, v);
 		return v;
 	}
 

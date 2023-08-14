@@ -1,3 +1,5 @@
+- 0.5.4
+	* Add Transfer() event emission to sweep() in contract
 - 0.5.3
 	* Add texinfo documentation
 	* Add man page for publish tool

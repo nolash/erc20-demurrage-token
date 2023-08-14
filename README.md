@@ -208,8 +208,9 @@ and the lower 64 bits represents the decimals part, each consecutive
 lesser bit halving the value of the previous bit.
 
 For example, The byte value `00000000 00000002 a0000000 00000000`,
-representing a zero-stripped binary value of $10.101$, translates to the
-(base 10) decimal value $2.625$.
+representing a zero-stripped binary value of $10.101$. This translates
+to the (base 10) decimal value $2.625$. The decimal part is calculated
+as, from left to right: $(1 * 0.5) + (0 * 0.25) + (1 * 0.125)$.
 
 #### Calculating the demurrage parameter
 

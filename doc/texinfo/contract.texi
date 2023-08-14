@@ -105,7 +105,7 @@ The initial @emph{Sink Address}. The address may be altered as long as the @code
 
 The @emph{input parameter} to the contract is a 128-bit positive fixed-point number, where the most significant 64 bits represent the integer part, and the lower 64 bits represents the decimals part, each consecutive lesser bit halving the value of the previous bit.
 
-For example, The byte value @code{00000000 00000002 a0000000 00000000}, representing a zero-stripped binary value of @math{10.101}, translates to the (base 10) decimal value @math{2.625}.
+For example, The byte value @code{00000000 00000002 a0000000 00000000}, representing a zero-stripped binary value of @math{10.101}. This translates to the (base 10) decimal value @math{2.625}. The decimal part is calculated as, from left to right: @math{(1 * 0.5) + (0 * 0.25) + (1 * 0.125)}.
 
 @subsubsection Calculating the demurrage parameter
 
