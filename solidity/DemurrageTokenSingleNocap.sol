@@ -73,7 +73,7 @@ contract DemurrageTokenSingleNocap {
 	mapping (address => bool) minter;
 
 	// Storage for ERC20 approve/transferFrom methods
-	mapping (address => mapping (address => uint256 ) ) allowance; // holder -> spender -> amount (amount is subject to demurrage)
+	mapping (address => mapping (address => uint256 ) ) public allowance; // holder -> spender -> amount (amount is subject to demurrage)
 
 	// Address to send unallocated redistribution tokens
 	address public sinkAddress; 
