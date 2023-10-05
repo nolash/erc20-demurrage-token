@@ -6,6 +6,8 @@ import "aux/ABDKMath64x64.sol";
 
 contract DemurrageTokenSingleNocap {
 
+	uint256 constant VALUE_LIMIT = 1 << 63;
+
 	struct redistributionItem {
 		uint32 period;
 		uint72 value;
@@ -597,7 +599,14 @@ contract DemurrageTokenSingleNocap {
 		
 		changePeriod();
 
-		baseValue = toBaseAmount(_value);
+		// dex code will attempt uint256max approve, but contract cannot handle that size
+		// truncate to biggest possible value
+		if (_value <= VALUE_LIMIT) {
+			baseValue = toBaseAmount(_value);
+		} else {
+			baseValue = VALUE_LIMIT;
+		}
+
 		allowance[msg.sender][_spender] = baseValue;
 		emit Approval(msg.sender, _spender, _value);
 		return true;

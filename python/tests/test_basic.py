@@ -308,6 +308,30 @@ class TestBasic(TestDemurrageDefault):
         self.assertEqual(r['status'], 1)
 
 
+    def test_approve_max(self):
+        nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+        (tx_hash, o) = c.approve(self.address, self.accounts[0], self.accounts[1], int.from_bytes(b'\xff' * 32, byteorder='big'))
+        self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+
+        (tx_hash, o) = c.approve(self.address, self.accounts[0], self.accounts[1], 0)
+        self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+
+        self.backend.time_travel(self.start_time + (60 * 60 * 24 * 365 * 10))
+        c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
+        (tx_hash, o) = c.approve(self.address, self.accounts[0], self.accounts[1], int.from_bytes(b'\xff' * 32, byteorder='big'))
+        self.rpc.do(o)
+        o = receipt(tx_hash)
+        r = self.rpc.do(o)
+        self.assertEqual(r['status'], 1)
+
+
     def test_transfer_from(self):
         nonce_oracle = RPCNonceOracle(self.accounts[0], self.rpc)
         c = DemurrageToken(self.chain_spec, signer=self.signer, nonce_oracle=nonce_oracle)
